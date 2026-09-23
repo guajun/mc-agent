@@ -64,7 +64,12 @@ nothing about agents.
 ## Primitives (protocol v1)
 
 `state`, `entities`, `command`, `chat`, `record_start`, `record_stop`, `wait`,
-`screen`, `mark`, `connect`, `ping`, `capabilities`.
+`screen`, `mark`, `connect`, `world`, `ping`, `capabilities`.
+
+`connect` and `world` are the two "put me somewhere" primitives: a server, or a
+single-player save. They exist because the agent should be able to start its own
+session, and because the client is the only part that can decide when the client
+is idle enough to do it.
 
 Deliberately missing: pathfinding, inventory manipulation, block placing,
 physics assertions. Those are use-case shaped; they belong behind a command or

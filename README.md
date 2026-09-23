@@ -77,6 +77,17 @@ Minecraft itself. Keep the Hermes API key in `.env` next to this README.
 The bridge in this test listens on the default port 8765 so the `mc-agent` MCP
 server registered with Hermes can reach it.
 
+Two more tools for driving things by hand:
+
+```bash
+python tools/launch_instance.py --minecraft-dir <instance> --version 26.2-Fabric --world <level>
+python tools/mcp_probe.py mc_entities --arg radius=64 --arg types=sulfur_cube
+```
+
+`launch_instance.py` starts the client without the GUI launcher (HMCL has no
+CLI), so an agent can bring up its own game. `mcp_probe.py` calls one MCP tool
+against the running bridge, which is how the agent-facing summaries are tested.
+
 ## Working locally
 
 The recommended layout puts the four checkouts side by side, with one virtual
