@@ -646,6 +646,37 @@ def select_entities(
     return window
 
 
+def is_restorable(entity: Entity) -> bool:
+    """Whether this record can be summoned on its own.
+
+    A passenger's NBT is nested inside its vehicle's, so summoning the vehicle
+    already brings the passenger back: summoning it again would duplicate it or be
+    rejected, and either way the restore would not be faithful. The mod marks
+    those lines (``"restorable": false``); older recordings have no flag and are
+    treated as restorable.
+    """
+    flag = entity.record.get("restorable")
+    return True if flag is None else bool(flag)
+
+
+def forceload_box(
+    entities: Sequence[Entity], margin: float = 16.0
+) -> tuple[float, float, float, float] | None:
+    """The recorded area in blocks, padded a little.
+
+    A lab server starts with no player, so no chunks are loaded, and a ``/summon``
+    at an unloaded position fails silently. Force-loading the box the recording
+    covers is what makes a headless restore possible - and the box comes from the
+    data, not from a guess.
+    """
+    points = [entity.pos for entity in entities if entity.pos]
+    if not points:
+        return None
+    xs = [point[0] for point in points]
+    zs = [point[2] for point in points]
+    return (min(xs) - margin, min(zs) - margin, max(xs) + margin, max(zs) + margin)
+
+
 # ------------------------------------------------------------------ bridge client
 
 
@@ -803,6 +834,7 @@ async def run_restore(
     start: int = 0,
     limit: int | None = None,
     keep_going: bool = False,
+    forceload: bool = True,
     client: BridgeClient | None = None,
     out: TextIO | None = None,
     err: TextIO | None = None,
@@ -836,10 +868,18 @@ async def run_restore(
         )
     try:
         chosen = select_entities(snapshot.entities, start=start, limit=limit)
+        carried = [entity for entity in chosen if not is_restorable(entity)]
+        chosen = [entity for entity in chosen if is_restorable(entity)]
         commands = [summon_command(entity) for entity in chosen]
     except SnapshotError as error:
         _write(err, f"{snapshot.path}: {error}")
         return 1
+    if carried:
+        _write(
+            err,
+            f"note: {len(carried)} record(s) are passengers and come back inside their "
+            "vehicle, so they are not summoned separately",
+        )
     last_index = start + len(chosen) - 1 if chosen else start
     if dry_run:
         _write(
@@ -859,6 +899,20 @@ async def run_restore(
         f"issuing {len(commands)} /summon command(s), index {start}..{last_index}, "
         "through the bridge...",
     )
+    if forceload and chosen:
+        box = forceload_box(chosen)
+        if box is not None:
+            command = "forceload add %d %d %d %d" % (
+                math.floor(box[0]),
+                math.floor(box[1]),
+                math.ceil(box[2]),
+                math.ceil(box[3]),
+            )
+            _write(err, f"loading the recorded area first: {command}")
+            try:
+                await client.command(command)
+            except Exception as error:  # noqa: BLE001 - the summons will complain if this mattered
+                _write(err, f"[restore] forceload failed: {error}")
     issued = 0
     failures: list[str] = []
     for offset, command in enumerate(commands):
@@ -891,8 +945,15 @@ def default_check_name(now: float | None = None) -> str:
     return f"forkverify-{stamp}"
 
 
-def _snapshot_radius(snapshot: Snapshot) -> float | None:
-    """The radius the recording used, so the fresh snapshot asks the same question."""
+def _snapshot_radius(snapshot: Snapshot, override: float | None = None) -> float | None:
+    """The radius the recording used, so the fresh snapshot asks the same question.
+
+    An override matters in a headless lab: a radius is measured from a player and a
+    lab has none, so the caller asks for every entity the level ticks instead -
+    which, after a restore, is exactly the recorded set.
+    """
+    if override is not None:
+        return override if override > 0 else None
     radius = snapshot.meta.get("radius")
     if isinstance(radius, bool) or not isinstance(radius, (int, float)):
         return None
@@ -905,6 +966,7 @@ async def run_check(
     *,
     client: BridgeClient,
     name: str | None = None,
+    radius: float | None = None,
     out: TextIO | None = None,
     err: TextIO | None = None,
 ) -> int:
@@ -913,7 +975,7 @@ async def run_check(
     err = err or sys.stderr
     fork = load_snapshot(fork_dir)
     issues = validate_snapshot(fork)
-    radius = _snapshot_radius(fork)
+    radius = _snapshot_radius(fork, radius)
     snapshot_name = name or default_check_name()
     _write(
         err,
@@ -1409,7 +1471,12 @@ async def run_selftest(out: TextIO | None = None, err: TextIO | None = None) -> 
         fake = FakeTransport(snapshot_dir=a)
         buffer = io.StringIO()
         code = await run_restore(
-            a, dry_run=False, client=BridgeClient(transport=fake), out=buffer, err=io.StringIO()
+            a,
+            dry_run=False,
+            forceload=False,
+            client=BridgeClient(transport=fake),
+            out=buffer,
+            err=io.StringIO(),
         )
         test.equal("restore --apply exits 0", code, 0)
         test.equal(
@@ -1429,6 +1496,7 @@ async def run_selftest(out: TextIO | None = None, err: TextIO | None = None) -> 
         code = await run_restore(
             a,
             dry_run=False,
+            forceload=False,
             client=BridgeClient(transport=fake),
             out=io.StringIO(),
             err=io.StringIO(),
@@ -1443,6 +1511,7 @@ async def run_selftest(out: TextIO | None = None, err: TextIO | None = None) -> 
         code = await run_restore(
             a,
             dry_run=False,
+            forceload=False,
             keep_going=True,
             client=BridgeClient(transport=fake),
             out=io.StringIO(),
@@ -1453,6 +1522,31 @@ async def run_selftest(out: TextIO | None = None, err: TextIO | None = None) -> 
             "--keep-going issues the remaining commands",
             fake.commands,
             [expected_commands[0], *expected_commands[2:]],
+        )
+
+        # A headless lab has no player, so nothing is loaded: the restore has to
+        # force-load the area the recording covers before summoning into it.
+        fake = FakeTransport(snapshot_dir=a)
+        code = await run_restore(
+            a,
+            dry_run=False,
+            client=BridgeClient(transport=fake),
+            out=io.StringIO(),
+            err=io.StringIO(),
+        )
+        test.equal("a restore force-loads the recorded area first", code, 0)
+        box = forceload_box(load_snapshot(a).entities)
+        assert box is not None
+        test.equal(
+            "the force-load command covers the recorded box",
+            fake.commands[0],
+            "forceload add %d %d %d %d"
+            % (math.floor(box[0]), math.floor(box[1]), math.ceil(box[2]), math.ceil(box[3])),
+        )
+        test.equal(
+            "and the entities follow it",
+            fake.commands[1:],
+            expected_commands,
         )
 
         buffer = io.StringIO()
@@ -1613,9 +1707,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="keep sending after a command fails, then report the failures",
     )
+    restore.add_argument(
+        "--forceload",
+        dest="forceload",
+        action="store_true",
+        default=True,
+        help="force-load the recorded area first (default; a headless lab has no "
+        "player, so a summon outside loaded chunks fails silently)",
+    )
+    restore.add_argument(
+        "--no-forceload",
+        dest="forceload",
+        action="store_false",
+        help="skip the force-load step",
+    )
 
     check = sub.add_parser("check", help="re-snapshot the live instance and compare it with a fork")
     check.add_argument("fork_dir")
+    check.add_argument(
+        "--radius",
+        type=float,
+        default=None,
+        help="override the recording's radius (0 = every entity the level ticks; a "
+        "headless lab needs this, since a radius is measured from a player)",
+    )
     check.add_argument(
         "--api-port",
         type=int,
@@ -1668,6 +1783,7 @@ async def run_command(args: argparse.Namespace) -> int:
                 start=args.from_index,
                 limit=args.limit,
                 keep_going=args.keep_going,
+                forceload=args.forceload,
                 client=client,
             )
         finally:
@@ -1682,7 +1798,9 @@ async def run_command(args: argparse.Namespace) -> int:
         except ImportError as error:
             return _no_bridge(args.api_port, error)
         try:
-            return await run_check(args.fork_dir, client=client, name=args.name)
+            return await run_check(
+                args.fork_dir, client=client, name=args.name, radius=args.radius
+            )
         finally:
             await client.close()
     raise ValueError(f"unknown command: {args.command}")

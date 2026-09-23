@@ -141,3 +141,53 @@ the acceptance test for the whole track.
 | `fork_verify.py inspect` | 521 records, type histogram, order hash matches meta, no validation errors |
 | one entity's NBT through the game's own parser | `data modify storage mcagent:probe entity set value <nbt>` succeeded and read back identically, then was removed - compact SNBT is summonable |
 | open question | a restore into a lab and a re-snapshot has to produce the same hash; that is the acceptance test the lab track is for |
+
+## Restoring a fork into a lab: the recipe that works
+
+```bash
+tools/lab_server.py provision --name <lab> --world <fork>/world --fabric-api --carpet \
+    --mod-jar <mc-agent-interface.jar> --java <java25>
+tools/lab_server.py start --name <lab> --wait 300
+# bridge to the lab's own server vantage (its mc-agent-server/port.txt)
+mc-bridge run --api-port 8766 --port-file labs/<lab>/mc-agent-server/port.txt
+
+# deterministic box
+exec "gamerule spawn_monsters false"      # 26.2 renamed the gamerules to snake_case:
+exec "gamerule random_tick_speed 0"       # doMobSpawning -> spawn_monsters, and so on
+exec "gamerule advance_time false"
+exec "difficulty peaceful"
+
+# clear what the copied chunks still carry - in game, then persist it
+exec "kill @e[type=!player]"              # repeat until the count stops dropping
+exec "save-all flush"
+exec "tick freeze"
+
+tools/fork_verify.py restore <fork> --apply --api-port 8766   # force-loads the recorded box itself
+tools/fork_verify.py check   <fork> --api-port 8766 --radius 0
+```
+
+What this run taught us, beyond the hash matching:
+
+| Finding | Consequence |
+| --- | --- |
+| A headless server has no player, so **no chunks are loaded** | `forceload add <box>` from the recording is part of restoring, not an optimisation |
+| A radius is measured **from a player** | a lab snapshot asks for every entity (`--radius 0`) |
+| Entity data survives in the **region files**, not only in `entities/*.mca` | clearing entity storage in the copy is not enough; the lab clears in game and saves |
+| Killing while **frozen** leaves dying-but-present entities | kill while running, `save-all flush`, then freeze |
+| 26.2 renamed gamerules (`spawn_monsters`, `random_tick_speed`, `advance_time`) | the old camelCase names fail with "Incorrect argument" |
+| A passenger is recreated inside its vehicle | restore skips it; the recorded order still holds when vehicle and rider are adjacent |
+
+## Result
+
+```
+fork: 523 records, hash dfc0a562d5395486, tick 9825
+lab : 523 records, hash dfc0a562d5395486, tick 860
+  minecraft:sulfur_cube       467 / 467
+  minecraft:minecart           53 /  53
+  minecraft:trader_llama        2 /   2
+  minecraft:wandering_trader    1 /   1
+orderHash: MATCH   counts: MATCH   result: MATCH
+```
+
+The entity tick order - the one thing a save file does not record, and the reason
+the whole track exists - came back identical in an isolated headless instance.
