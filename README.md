@@ -59,6 +59,16 @@ Now `@codex <anything>` in game chat reaches the backend, and the backend can
 read or change the world through `mc_state`, `mc_entities`, `mc_command`,
 `mc_record_start` and friends.
 
+## Verify the wiring without the game
+
+```bash
+python tools/smoke_offline.py
+```
+
+Runs the real `mc-bridge run` and `mc-agent-loop run` processes against a
+stand-in for the in-game mod, then checks state passthrough, chat-triggered
+replies and event replay.
+
 ## Phase 1 scope
 
 In scope, and shipped:
