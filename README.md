@@ -39,6 +39,7 @@ in code. Phase 1 ships the plumbing; later phases are not designed yet, on
 purpose.
 
 - [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - issue: [#1](https://github.com/guajun/mc-agent/issues/1)
+- [RFC 0002 - programmable tool calls (running agent-written code in the game)](docs/rfc/0002-programmable-tool-calls.md) - draft, for discussion
 - [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
   server, MCP tools, and the end-to-end check
 - [Who is the agent, in game?](docs/player-identity.md) - second client,
