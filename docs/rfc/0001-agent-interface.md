@@ -3,6 +3,9 @@
 * Status: draft, open for discussion
 * Scope: the generic plumbing between a Minecraft client and an agent runtime
 * Out of scope: anything specific to one experiment or use case
+* Modules: [interface mod](https://github.com/guajun/mc-agent-interface-mod) ·
+  [bridge](https://github.com/guajun/mc-agent-bridge) ·
+  [agent loop](https://github.com/guajun/mc-agent-loop)
 
 ## Context
 
