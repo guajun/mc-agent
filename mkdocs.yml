@@ -1,0 +1,60 @@
+site_name: mc-agent
+site_description: Let an agent observe, drive and fork a Minecraft world.
+site_url: https://guajun.github.io/mc-agent/
+repo_url: https://github.com/guajun/mc-agent
+repo_name: guajun/mc-agent
+edit_uri: edit/main/docs/
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Concepts:
+      - How it fits together: concepts.md
+      - Who is the agent in game: player-identity.md
+      - Forking a live world: protocol-snapshot.md
+  - Guides:
+      - Running the agent on Hermes: hermes-setup.md
+      - Headless lab servers: lab-server.md
+      - Checking a fork: fork-verify.md
+  - Reference:
+      - Tools: tools.md
+      - Troubleshooting: troubleshooting.md
+  - RFCs:
+      - "0001: agent interface and bridge": rfc/0001-agent-interface.md
+      - "0002: programmable tool calls": rfc/0002-programmable-tool-calls.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
