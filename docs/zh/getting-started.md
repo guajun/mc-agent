@@ -11,7 +11,9 @@
 | **Python** | 3.11+，用于 bridge、loop 和工具 |
 | **智能体运行时** | 本项目是对着 [Hermes](hermes-setup.md) 开发的；任何能调 MCP 或 HTTP 的东西也行 |
 
-## 1. 编译并安装接口 mod
+## 1. 把各部分装上
+
+安装只做一次，细节在 [安装说明](install.md)：mod jar 放进 `<实例>/mods/`，bridge 和 loop 装进同一个虚拟环境。简版：
 
 mod 直接对着游戏自己的（未混淆）jar 编译——不需要 Gradle，也不需要反编译：
 

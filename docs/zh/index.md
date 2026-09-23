@@ -52,6 +52,7 @@ python -m venv .venv && .venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e m
 然后在游戏聊天里打 `@codex 你能看到什么？`；想自己看接口，就在聊天框里敲 `/mcagent state`。
 
 [快速开始 :material-arrow-right:](getting-started.md){ .md-button .md-button--primary }
+[安装说明 :material-arrow-right:](install.md){ .md-button }
 [整体结构 :material-arrow-right:](concepts.md){ .md-button }
 
 ## 手边没有游戏？
@@ -66,6 +67,7 @@ python tools/smoke_offline.py --backend hermes    # 真模型驱动真工具
 ## 文档
 
 * [快速开始](getting-started.md) —— 安装、运行、第一次对话、第一个实验
+* [安装说明](install.md) —— 版本要求、升级、卸载，以及各种文件落在哪
 * [整体结构](concepts.md) —— 心智模型，以及"新能力该放进哪一层"
 * [智能体在游戏里是谁](player-identity.md) —— 第二个客户端、Carpet 假人，或服务端 mod
 * [分叉一个活的世界](protocol-snapshot.md) —— 快照协议与还原配方

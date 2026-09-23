@@ -14,7 +14,11 @@ platforms with the paths changed.
 | **Python** | 3.11+ for the bridge, the loop and the tools |
 | **An agent runtime** | [Hermes](hermes-setup.md) is what this was built against; anything that can call MCP or HTTP works too |
 
-## 1. Build and install the interface mod
+## 1. Install the pieces
+
+Everything is installed once, from
+[Installation](install.md) - the mod jar into `<instance>/mods/`, the bridge
+and the loop into one virtual environment. The short version:
 
 The mod compiles against the game's own (unobfuscated) jar - no Gradle, no
 decompiler:

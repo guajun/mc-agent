@@ -30,6 +30,7 @@ theme:
 
 nav:
   - Home: index.md
+  - Installation: install.md
   - Getting started: getting-started.md
   - Concepts:
       - How it fits together: concepts.md
@@ -64,6 +65,7 @@ plugins:
             language: zh
           nav_translations:
             Home: 首页
+            Installation: 安装
             Getting started: 快速开始
             Concepts: 概念
             How it fits together: 整体结构

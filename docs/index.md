@@ -61,6 +61,7 @@ Then type `@codex what can you see?` in game chat, or `/mcagent state` in the
 chat box to look at the interface yourself.
 
 [Getting started :material-arrow-right:](getting-started.md){ .md-button .md-button--primary }
+[Installation :material-arrow-right:](install.md){ .md-button }
 [How it fits together :material-arrow-right:](concepts.md){ .md-button }
 
 ## No game handy?
@@ -75,6 +76,7 @@ python tools/smoke_offline.py --backend hermes    # the real model drives the to
 ## Documentation
 
 * [Getting started](getting-started.md) - install, run, first conversation, first experiment
+* [Installation](install.md) - versions, upgrades, uninstalls, and where everything lands
 * [How it fits together](concepts.md) - the mental model, and where a new capability belongs
 * [Who is the agent in game](player-identity.md) - a second client, a Carpet fake player, or a server mod
 * [Forking a live world](protocol-snapshot.md) - the snapshot protocol and the restore recipe

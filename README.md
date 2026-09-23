@@ -1,11 +1,30 @@
 # mc-agent
 
-📖 **Documentation site: <https://guajun.github.io/mc-agent/>** - a guided tour
-from installing the mod to forking a live world into a lab.
-
 Infrastructure for letting agent runtimes observe and act inside a Minecraft
 client - generically. No cannons, no sulfur cubes, no use-case logic in the
 core: the framework moves data and the agent decides what it means.
+
+📖 **[Documentation site](https://guajun.github.io/mc-agent/)** ([中文](https://guajun.github.io/mc-agent/zh/)) -
+installation, a guided tour, the mental model, and the traps.
+
+## Install
+
+```bash
+# the mod: build against your own instance, then copy the jar into mods/
+python mc-agent-interface-mod/build.py --minecraft-dir <instance> \
+    --version 26.2-Fabric --jdk <jdk25>
+
+# the Python side: the loop depends on the bridge, so one environment for both
+python -m venv .venv
+.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
+
+# run
+.venv/Scripts/mc-bridge run
+```
+
+Needs Minecraft 26.2 with Fabric Loader 0.19+ and Fabric API, plus Java 25 and
+Python 3.11+. The full instructions - versions, upgrades, uninstalls, where
+everything lands - are on the [Installation](https://guajun.github.io/mc-agent/install/) page.
 
 ## Modules
 
@@ -52,22 +71,18 @@ purpose.
 
 ## Quick start
 
+With the pieces from [Install](#install) in place and the game running:
+
 ```bash
-# 1. build and install the mod, then start the game
-python build.py --minecraft-dir <instance> --version 26.2-Fabric --jdk <jdk25>
-
-# 2. bridge: owns the mod connection
-pip install -e mc-agent-bridge
-mc-bridge run
-
-# 3. agent loop: answers chat
-pip install -e mc-agent-loop
+mc-bridge run                                    # owns the game connection
+mc-bridge call state                             # look at the world
 mc-agent-loop run --backend hermes --trigger @codex
 ```
 
 Now `@codex <anything>` in game chat reaches the backend, and the backend can
 read or change the world through `mc_state`, `mc_entities`, `mc_command`,
-`mc_record_start` and friends.
+`mc_record_start` and friends. No model to hand? `--backend echo` answers with an
+echo, and `mc-bridge watch` shows the raw event stream.
 
 ## Verify the wiring without the game
 
@@ -158,6 +173,18 @@ mc-agent/            meta: docs and RFCs (this repo)
 mc-agent-interface-mod/   Fabric client mod
 mc-agent-bridge/          Python bridge, CLI and MCP front-end
 mc-agent-loop/            Python agent loop and backends
+```
+
+## Working on the docs
+
+The site is MkDocs Material, built from `docs/` (English) and `docs/zh/`
+(Chinese) by `mkdocs-static-i18n`; `mkdocs.yml` and `requirements-docs.txt` at
+the repository root configure it, and `.github/workflows/pages.yml` builds and
+deploys it on every push that touches the docs.
+
+```bash
+.venv/Scripts/pip install -r requirements-docs.txt
+.venv/Scripts/python -m mkdocs serve        # http://127.0.0.1:8000
 ```
 
 ## License
