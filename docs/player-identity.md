@@ -17,6 +17,43 @@ position, view, and client-side mods. Launch it with
 | The agent sees what a player sees (entities, screens, client commands) | A whole client's worth of CPU/GPU and RAM |
 | Two agents = two clients, fully independent | |
 
+### Verified recipe (single-player world, two identities)
+
+```bash
+# client A: yours, hosting the world
+python tools/launch_instance.py --minecraft-dir <instance> --version 26.2-Fabric
+mc-bridge run --api-port 8765            # bridge A -> your client
+mc-bridge call world '{"level": "<level folder>"}'    # open the save
+mc-bridge call lan '{"port": 25577, "mode": "offline"}'   # Open to LAN, no session check
+
+# client B: the agent's own player
+python tools/launch_instance.py --minecraft-dir <instance> --version 26.2-Fabric \
+    --username deepseek \
+    --jvm-property mcagent.dir=<instance>/mc-agent-b \
+    --jvm-property mcagent.port=25591 \
+    --jvm-property mcagent.autoConnect=127.0.0.1:25577
+mc-bridge run --api-port 8766 --mod-port 25591        # bridge B -> the agent's client
+mc-agent-loop run --backend hermes --trigger @codex --api-port 8766 --env-file .env
+```
+
+Then, in your own client, type `@codex ...` and the agent answers from its own
+player. Observed on a live world: `gua_jun` asked for the agent's coordinates and
+`deepseek` answered "我在主世界（overworld），坐标 X 7.5 / Y 113 / Z -3.5".
+
+Three details that matter:
+
+* **`mode="offline"`** - a client with no Mojang session (the agent) cannot pass
+  the LAN server's session check; the host has to accept offline names
+  (`MinecraftServer.setUsesAuthentication(false)`). LAN only, trusted networks
+  only.
+* **One bridge per player.** Both clients write a port file, so give the second
+  one its own `-Dmcagent.dir` (and a port) or they overwrite each other.
+* **MCP tools point at one bridge, therefore at one player.** The agent's
+  `mc_*` tools must use the *agent's* bridge (8766); a second MCP server entry
+  pointed at 8765 lets it look at your client as well. With the tools pointed at
+  your bridge it happily reports *your* coordinates - which is what happened
+  until the MCP env was repointed.
+
 ## 2. A Carpet fake player (no new code, but server-side)
 
 Carpet's `/player <name> spawn` creates a *server-side* player entity. The

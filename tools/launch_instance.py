@@ -55,6 +55,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--server", default="", help="jump straight onto this server (host:port)")
     parser.add_argument("--natives", default="", help="override the natives directory")
     parser.add_argument("--account-file", default="", help="launcher account json")
+    parser.add_argument("--username", default="", help="override the account's player name")
+    parser.add_argument(
+        "--jvm-property",
+        action="append",
+        default=[],
+        help="extra -DKEY=VALUE, e.g. mcagent.autoConnect=127.0.0.1:25565 (repeatable)",
+    )
     parser.add_argument("--jvm-arg", action="append", default=[], help="extra JVM argument")
     parser.add_argument("--game-arg", action="append", default=[], help="extra game argument")
     parser.add_argument("--log", default="", help="file for the game's output")
@@ -166,6 +173,11 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], Path, Path]:
         )
 
     account = read_account(Path(args.account_file) if args.account_file else default_account_file())
+    if args.username:
+        account["name"] = args.username
+        account["uuid"] = offline_uuid(args.username)
+        account["token"] = "0"
+        account["userid"] = ""
     features = {
         "is_demo_user": False,
         "has_custom_resolution": bool(args.width and args.height),
@@ -207,6 +219,7 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], Path, Path]:
         return value
 
     command = [str(find_java(args.java)), f"-Xmx{args.memory}"]
+    command.extend(f"-D{prop}" for prop in args.jvm_property)
     for entry in data.get("arguments", {}).get("jvm", []):
         if isinstance(entry, str):
             command.append(substitute(entry))
@@ -226,6 +239,16 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], Path, Path]:
 def default_account_file() -> Path:
     appdata = os.environ.get("APPDATA", "")
     return Path(appdata) / ".hmcl" / "accounts.json"
+
+
+def offline_uuid(name: str) -> str:
+    """The uuid an offline-mode server derives from a name (Java's UUID.nameUUIDFromBytes)."""
+    import hashlib
+
+    digest = bytearray(hashlib.md5(f"OfflinePlayer:{name}".encode("utf-8")).digest())
+    digest[6] = (digest[6] & 0x0F) | 0x30  # version 3
+    digest[8] = (digest[8] & 0x3F) | 0x80  # IETF variant
+    return digest.hex()
 
 
 def main() -> int:

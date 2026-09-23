@@ -48,7 +48,11 @@ async def main() -> int:
     try:
         backlog = await client.call("events", {"category": "game", "limit": 1})
         cursor = max((event["seq"] for event in backlog["events"]), default=0)
-        ack = await client.call("command", {"command": args.command})
+        try:
+            ack = await client.call("command", {"command": args.command})
+        except RuntimeError as error:
+            print(f"the game refused the command: {error}", file=sys.stderr)
+            return 1
         print(f"sent: {ack.get('detail')}")
         await asyncio.sleep(args.wait)
         events = await client.call("events", {"since": cursor, "limit": args.limit})

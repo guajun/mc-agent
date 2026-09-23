@@ -89,6 +89,17 @@ hermes mcp add mc-agent `
   --args mcp
 ```
 
+With two players (see `docs/player-identity.md`) register two servers, so the
+agent's tools describe its own body and yours is a second, explicitly named
+window into the world:
+
+```powershell
+hermes mcp add mc-agent --command "F:\mc-agent\.venv\Scripts\mc-bridge.exe" `
+  --env MC_AGENT_API_PORT=8766 --args mcp      # the agent's own client
+hermes mcp add mc-host  --command "F:\mc-agent\.venv\Scripts\mc-bridge.exe" `
+  --env MC_AGENT_API_PORT=8765 --args mcp      # the human's client
+```
+
 `--args` must be last. The command discovers the tools, asks whether to enable
 them, and writes the result into `config.yaml` under `mcp_servers`.
 
