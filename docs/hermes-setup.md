@@ -110,11 +110,22 @@ Keep them in an untracked `.env` next to the meta repository (`.env` is
 git-ignored), then:
 
 ```powershell
-mc-agent-loop run --backend hermes --trigger @codex
+mc-agent-loop run --backend hermes --trigger @codex --env-file .env
 ```
 
-Now `@codex <anything>` in game chat reaches the model, and the model can look
-at the world before answering.
+`--env-file` (default `./.env`) keeps the key off the command line. Now
+`@codex <anything>` in game chat reaches the model, and the model can look at
+the world before answering.
+
+One caveat about single player: the loop ignores chat from the client's own
+player name, which is the client it is attached to. So the chat trigger only
+fires when *somebody else* says it - another player on a server, or a second
+client running the mod (see the `mc-agent-interface-mod` README). For a
+single-client session use the one-shot form instead:
+
+```powershell
+mc-agent-loop once "look around and tell me what is within 64 blocks" --sender operator --env-file .env
+```
 
 ## 6. Verify without Minecraft
 
