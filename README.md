@@ -1,5 +1,8 @@
 # mc-agent
 
+📖 **Documentation site: <https://guajun.github.io/mc-agent/>** - a guided tour
+from installing the mod to forking a live world into a lab.
+
 Infrastructure for letting agent runtimes observe and act inside a Minecraft
 client - generically. No cannons, no sulfur cubes, no use-case logic in the
 core: the framework moves data and the agent decides what it means.
