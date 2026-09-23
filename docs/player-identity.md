@@ -1,8 +1,57 @@
 # Who is the agent, in game?
 
 Short answer: the interface mod is a **client** mod, so it borrows the identity
-of the client it runs in. If you want the agent to be a player of its own, there
-are three ways - and only one of them needs new code.
+of the client it runs in. To give the agent an identity of its own there are
+three routes, and **Carpet fake players are the cheapest by a wide margin** - no
+LAN, no second account, no second client.
+
+## 0. A Carpet fake player (recommended: body, voice and data, single client)
+
+A fake player is a *server-side* player. In single player the integrated server
+is the server, so nothing else has to change: your own client creates it with a
+command and it then exists in the world like any other player.
+
+```bash
+# one-time per world: allow the command for non-op callers
+python tools/game_cmd.py "carpet commandPlayer true"
+
+# body: spawn it, drive it, remove it
+python tools/fake_player.py spawn deepseek 103 95 52
+python tools/fake_player.py action deepseek look north
+python tools/fake_player.py action deepseek jump
+python tools/fake_player.py action deepseek attack continuous   # mines/attacks
+python tools/fake_player.py kill deepseek
+
+# voice: the server broadcasts on its behalf
+python tools/fake_player.py say "hello from the agent" --as deepseek
+# -> [deepseek] hello from the agent
+
+# data: authoritative, straight from the server
+python tools/fake_player.py status deepseek
+```
+
+Verified on a live world: `deepseek` spawned, `look north` moved the server's
+`Rotation` to `[180.0f, 0.0f]`, the client saw it as a `RemotePlayer` at the same
+position, `/data get entity deepseek Motion` returned the server's own numbers,
+and `execute as deepseek run say ...` produced `[deepseek] ...` in chat.
+
+| Pros | Cons |
+| --- | --- |
+| No LAN, no second account, no second client, no extra RAM | Needs Carpet on the server, `commandPlayer` enabled, and command permission |
+| Authoritative state (`/data get`) instead of an interpolated client view | No client of its own: no screens, no camera, no client mods |
+| Counts as a player for game rules, mob targeting and redstone | Because it has no client, the server answers its own command feedback to nobody - read state with `data get` on the caller, not `execute as` |
+| Drivable at command granularity: `use`, `attack`, `jump`, `look`, `move`, `mount`, `hotbar`, `drop`, `sneak`, `sprint`, ... | One command per tick at best; not a tick-accurate instrument (see Scarpet / server adapter) |
+
+The fake player has no command permission of its own (and `/op` does not exist
+in single player), which is why its voice is the server broadcasting *for* it:
+`execute as <name> run say <text>`. `mc-agent-loop` can do that directly:
+
+```bash
+mc-agent-loop run --backend hermes --trigger @codex \
+  --reply-mode command --reply-command 'execute as deepseek run say {text}'
+```
+
+## 1. A second client (a real player with a client view)
 
 ## 1. A second client (what the mod already supports)
 
@@ -54,44 +103,11 @@ Three details that matter:
   your bridge it happily reports *your* coordinates - which is what happened
   until the MCP env was repointed.
 
-## 2. A Carpet fake player (no new code, but server-side)
-
-Carpet's `/player <name> spawn` creates a *server-side* player entity. The
-interface mod cannot attach to it - there is no client behind it - but the
-framework already drives it through the `command` primitive, and reads it back
-through `entities` and the game-event stream:
-
-```bash
-mc-bridge call command '{"command": "player mcagent spawn at 101 95 52"}'
-mc-bridge call command '{"command": "player mcagent look north"}'
-mc-bridge call command '{"command": "player mcagent jump"}'
-mc-bridge call entities '{"radius": 32}'          # it shows up as minecraft:player
-mc-bridge call command '{"command": "data get entity <uuid> Motion"}'   # authoritative
-mc-bridge call command '{"command": "player mcagent kill"}'
-```
-
-Verified on a real world: the fake player spawned 3.5 blocks away, `look north`
-set its yaw to 180°, `jump` showed `vy = 0.333` in the client's view, and
-`/data get entity <uuid> Motion` returned the server's own numbers
-(`[0.0, -0.078, 0.0]`). Command feedback arrives as game messages, which the mod
-already captures as `events:game`, so an agent can read what a command answered
-without any extra plumbing (`tools/game_cmd.py` does exactly that).
-
 Actions available in the version tested (Carpet 26.2+v260616):
 `spawn`, `kill`, `rejoin`, `stop`, `use`, `jump`, `attack`, `drop`, `dropStack`,
 `swapHands`, `hotbar`, `shadow`, `mount`, `dismount`, `sneak`, `unsneak`,
 `sprint`, `unsprint`, `look`, `turn`, `move`, `startFallFlying`, `loadItems`.
-
-Notes and gotchas:
-
-* Requires Carpet (or a compatible fork) **on the server**, plus permission for
-  `/player` - Carpet's `commandPlayer` rule defaults to `ops`, and on a
-  single-player world the player must be an op (cheats on).
-* `spawn at` takes coordinates, not a player name, in this build.
-* `/player ...` is a server command: it crosses the network like any other, so
-  it is not tick-precise. For deterministic stepping use `/tick freeze` +
-  `/tick step`, and for per-tick server-side recording use Scarpet or a server
-  mod (see below).
+`spawn at` takes coordinates, not a player name, in this build.
 
 ## 3. A server-side adapter (the RFC-grade option)
 

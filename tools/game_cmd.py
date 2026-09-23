@@ -6,9 +6,10 @@
     python tools/game_cmd.py "data get entity gua_jun Pos"
 
 This is how an agent reads what a command answered: the mod captures incoming
-game messages (``events:game``), and command feedback arrives as one of them.
-Server commands like Carpet's ``/player`` therefore need no extra plumbing -
-send the command, then read the event stream.
+messages, and command feedback arrives as one of them - usually a game message,
+though a broadcast such as ``say`` lands in the chat stream instead, so both are
+collected. Server commands like Carpet's ``/player`` therefore need no extra
+plumbing: send the command, then read the event stream.
 """
 
 from __future__ import annotations
@@ -46,7 +47,7 @@ async def main() -> int:
         return 2
 
     try:
-        backlog = await client.call("events", {"category": "game", "limit": 1})
+        backlog = await client.call("events", {"limit": 1})
         cursor = max((event["seq"] for event in backlog["events"]), default=0)
         try:
             ack = await client.call("command", {"command": args.command})
@@ -56,7 +57,9 @@ async def main() -> int:
         print(f"sent: {ack.get('detail')}")
         await asyncio.sleep(args.wait)
         events = await client.call("events", {"since": cursor, "limit": args.limit})
-        lines = [event for event in events["events"] if event.get("category") == "game"]
+        lines = [
+            event for event in events["events"] if event.get("category") in ("game", "chat")
+        ]
         if not lines:
             print("(no feedback: the command may have failed silently, or the server is quiet)")
         for event in lines:
