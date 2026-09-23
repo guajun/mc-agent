@@ -1,0 +1,143 @@
+# Wiring Hermes to the bridge
+
+How the agent in this framework is actually run: Hermes as the agent loop's
+backend, the bridge as its tool surface, Minecraft as the world.
+
+Everything below is Windows-native; the same steps work on Linux/macOS with the
+paths swapped.
+
+## 1. Install Hermes
+
+Official installer (brings its own uv, Python 3.11, Node, ripgrep, ffmpeg):
+
+```powershell
+iex (irm https://hermes-agent.nousresearch.com/install.ps1)
+```
+
+For unattended installs, skip the wizard and the optional computer-use bundle:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1 -NonInteractive -SkipComputerUse
+```
+
+Files land in `%LOCALAPPDATA%\hermes` (`config.yaml`, `.env`, `hermes-agent\`,
+`bin\hermes.exe`). Nothing is installed system-wide and no admin rights are
+needed.
+
+> Hermes requires Python <3.14 and provisions its own 3.11, so a machine whose
+> only interpreter is newer is fine.
+
+## 2. Point it at a model
+
+Any provider Hermes supports works. To reuse the model a Codex setup already
+uses (deepseek-flash via the native DeepSeek provider):
+
+```powershell
+hermes config set model.provider deepseek
+hermes config set model.default deepseek-flash
+```
+
+Put the key in `%LOCALAPPDATA%\hermes\.env` (never in `config.yaml`, never in a
+repository):
+
+```
+DEEPSEEK_API_KEY=sk-...
+```
+
+Sanity check without a chat session:
+
+```powershell
+hermes status
+```
+
+## 3. Expose the API server
+
+The agent loop talks to Hermes over its OpenAI-compatible endpoint, so no
+Hermes SDK is needed on the loop side:
+
+```powershell
+hermes config set API_SERVER_ENABLED true
+```
+
+```
+# %LOCALAPPDATA%\hermes\.env
+API_SERVER_KEY=<random local secret>
+```
+
+```powershell
+hermes gateway        # [API Server] listening on http://127.0.0.1:8642
+```
+
+```powershell
+curl http://localhost:8642/v1/chat/completions `
+  -H "Authorization: Bearer <API_SERVER_KEY>" -H "Content-Type: application/json" `
+  -d '{"model":"hermes-agent","messages":[{"role":"user","content":"ping"}]}'
+```
+
+The key matters: the agent has terminal access on this machine, so keep the
+endpoint behind a secret even though it only binds to loopback.
+
+## 4. Give it the game
+
+Register the bridge's MCP front-end so the model gets `mc_state`, `mc_entities`,
+`mc_command`, `mc_record_start`, `mc_events` and friends:
+
+```powershell
+hermes mcp add mc-agent `
+  --command "F:\mc-agent\.venv\Scripts\mc-bridge.exe" `
+  --env MC_AGENT_API_PORT=8765 `
+  --args mcp
+```
+
+`--args` must be last. The command discovers the tools, asks whether to enable
+them, and writes the result into `config.yaml` under `mcp_servers`.
+
+Note the contract: the MCP server is a *client* of the bridge daemon. The daemon
+owns the connection to the game and must be running (`mc-bridge run`); the MCP
+server is spawned by Hermes and connects to it on the configured port.
+
+## 5. Point the loop at Hermes
+
+`mc-agent-loop` reads three variables:
+
+```
+HERMES_API_BASE=http://127.0.0.1:8642
+HERMES_MODEL=hermes-agent
+HERMES_API_KEY=<the API_SERVER_KEY from step 3>
+```
+
+Keep them in an untracked `.env` next to the meta repository (`.env` is
+git-ignored), then:
+
+```powershell
+mc-agent-loop run --backend hermes --trigger @codex
+```
+
+Now `@codex <anything>` in game chat reaches the model, and the model can look
+at the world before answering.
+
+## 6. Verify without Minecraft
+
+```powershell
+python tools/smoke_offline.py --backend hermes
+```
+
+Fake mod, real daemon, real loop, real model. A passing run looks like:
+
+```
+[smoke] lines received by the mod: ['STATE', 'STATE', 'STATE',
+        "CHAT Hello! My character's name is Bot - currently in-world and connected."]
+```
+
+The third `STATE` is the model calling `mc_state` through MCP: the tool path is
+live, not decorative.
+
+## Operating notes
+
+* The gateway is a long-running process; it is what serves `/v1/chat/completions`.
+  Restart it after changing `config.yaml` (`hermes gateway restart`) so new
+  sessions pick up MCP servers or model changes.
+* Model changes only apply to *new* sessions; agents already running keep their
+  model.
+* The bridge daemon and the loop are separate processes with separate failure
+  domains. Restarting either does not disturb the game connection of the other.

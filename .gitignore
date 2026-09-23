@@ -3,6 +3,9 @@
 /bridge/
 /agent-loop/
 
+# local secrets (HERMES_API_KEY, ...)
+.env
+
 __pycache__/
 *.py[cod]
 *.jsonl

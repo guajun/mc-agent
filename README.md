@@ -39,6 +39,8 @@ in code. Phase 1 ships the plumbing; later phases are not designed yet, on
 purpose.
 
 - [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - issue: [#1](https://github.com/guajun/mc-agent/issues/1)
+- [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
+  server, MCP tools, and the end-to-end check
 
 ## Quick start
 
@@ -62,12 +64,18 @@ read or change the world through `mc_state`, `mc_entities`, `mc_command`,
 ## Verify the wiring without the game
 
 ```bash
-python tools/smoke_offline.py
+python tools/smoke_offline.py                     # echo backend: checks the plumbing
+python tools/smoke_offline.py --backend hermes    # real model through the Hermes API server
 ```
 
 Runs the real `mc-bridge run` and `mc-agent-loop run` processes against a
 stand-in for the in-game mod, then checks state passthrough, chat-triggered
-replies and event replay.
+replies and event replay. With `--backend hermes` the reply comes from the
+model, and it can call the `mc_*` MCP tools - which is the whole stack except
+Minecraft itself. Keep the Hermes API key in `.env` next to this README.
+
+The bridge in this test listens on the default port 8765 so the `mc-agent` MCP
+server registered with Hermes can reach it.
 
 ## Working locally
 
