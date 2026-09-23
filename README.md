@@ -41,6 +41,8 @@ purpose.
 - [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - issue: [#1](https://github.com/guajun/mc-agent/issues/1)
 - [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
   server, MCP tools, and the end-to-end check
+- [Who is the agent, in game?](docs/player-identity.md) - second client,
+  Carpet fake players, and when to want a server-side adapter
 
 ## Quick start
 

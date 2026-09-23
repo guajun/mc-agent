@@ -91,6 +91,10 @@ Open questions:
 * **Server-side wake-up.** A client mod cannot call into an agent. Any
   push-triggered flow is therefore agent-side, or requires a small sidecar that
   the agent polls or that speaks MCP over a long-lived connection.
+* **A server-side adapter.** Fake players (Carpet) and per-tick physics are
+  server-side facts: a second adapter behind the same bridge, streaming at tick
+  rate, would be the honest way to expose them. The client view interpolates,
+  so it is not a measurement instrument. See `docs/player-identity.md`.
 * **Backpressure.** Cursors plus `dropped` are a start; a slow consumer currently
   loses old events. Is a per-subscriber queue worth it?
 * **Multiple clients.** The mod accepts several connections and broadcasts to
