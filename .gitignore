@@ -6,6 +6,9 @@
 # local secrets (HERMES_API_KEY, ...)
 .env
 
+# lab servers: throwaway worlds, mods and downloads (tools/lab_server.py)
+labs/
+
 __pycache__/
 *.py[cod]
 *.jsonl

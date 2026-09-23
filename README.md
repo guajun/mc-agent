@@ -44,6 +44,8 @@ purpose.
   server, MCP tools, and the end-to-end check
 - [Who is the agent, in game?](docs/player-identity.md) - second client,
   Carpet fake players, and when to want a server-side adapter
+- [Lab servers the agent raises itself](docs/lab-server.md) - `tools/lab_server.py`:
+  a headless Fabric server per experiment, provisioned and commanded over RCON
 
 ## Quick start
 
