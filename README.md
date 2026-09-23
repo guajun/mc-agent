@@ -69,6 +69,32 @@ Runs the real `mc-bridge run` and `mc-agent-loop run` processes against a
 stand-in for the in-game mod, then checks state passthrough, chat-triggered
 replies and event replay.
 
+## Working locally
+
+The recommended layout puts the four checkouts side by side, with one virtual
+environment at the root:
+
+```
+mc-agent/                  this repository (docs, RFCs, tools)
+mc-agent/.venv/            python -m venv .venv
+mc-agent/interface-mod/    mc-agent-interface-mod
+mc-agent/bridge/           mc-agent-bridge
+mc-agent/agent-loop/       mc-agent-loop
+```
+
+```bash
+python -m venv .venv
+.venv/Scripts/python -m pip install -e "bridge[mcp]" -e agent-loop    # Windows
+.venv/bin/python     -m pip install -e "bridge[mcp]" -e agent-loop    # POSIX
+
+.venv/Scripts/mc-bridge.exe run
+.venv/Scripts/mc-agent-loop.exe run --backend hermes --trigger @codex
+```
+
+The mod writes its `port.txt` into `<gameDir>/mc-agent/`, so a client on the
+same machine finds the game without extra configuration; `--mod-port` or
+`--port-file` override that.
+
 ## Phase 1 scope
 
 In scope, and shipped:
