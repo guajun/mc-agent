@@ -10,7 +10,6 @@ strict: true
 theme:
   name: material
   features:
-    - navigation.instant
     - navigation.sections
     - navigation.top
     - content.code.copy
@@ -46,6 +45,38 @@ nav:
   - RFCs:
       - "0001: agent interface and bridge": rfc/0001-agent-interface.md
       - "0002: programmable tool calls": rfc/0002-programmable-tool-calls.md
+
+plugins:
+  - search
+  - i18n:
+      docs_structure: folder
+      fallback_to_default: true
+      reconfigure_material: true
+      reconfigure_search: true
+      languages:
+        - locale: en
+          default: true
+          name: English
+        - locale: zh
+          name: 中文
+          site_description: 让智能体观测、驱动并分叉一个 Minecraft 世界。
+          theme:
+            language: zh
+          nav_translations:
+            Home: 首页
+            Getting started: 快速开始
+            Concepts: 概念
+            How it fits together: 整体结构
+            Who is the agent in game: 智能体在游戏里是谁
+            Forking a live world: 分叉一个活的世界
+            Guides: 指南
+            Running the agent on Hermes: 用 Hermes 运行智能体
+            Headless lab servers: 无头实验室服务器
+            Checking a fork: 校验一次分叉
+            Reference: 参考
+            Tools: 工具
+            Troubleshooting: 疑难排查
+            RFCs: RFC 提案
 
 markdown_extensions:
   - admonition

@@ -53,8 +53,6 @@ mc-agent-loop run --backend hermes --trigger @codex \
 
 ## 1. A second client (a real player with a client view)
 
-## 1. A second client (what the mod already supports)
-
 Run another Minecraft instance with the same mod, point a second bridge at that
 instance's `port.txt`, and the agent *is* that player: its own inventory,
 position, view, and client-side mods. Launch it with
@@ -109,7 +107,7 @@ Actions available in the version tested (Carpet 26.2+v260616):
 `sprint`, `unsprint`, `look`, `turn`, `move`, `startFallFlying`, `loadItems`.
 `spawn at` takes coordinates, not a player name, in this build.
 
-## 3. A server-side adapter (the RFC-grade option)
+## 2. A server-side adapter (the RFC-grade option)
 
 Everything above drives the server through commands. If the agent needs
 authoritative per-tick data - the actual subject of most cannon/TNT work - the
