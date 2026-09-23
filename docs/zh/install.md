@@ -24,6 +24,19 @@
 
 ## 2. 接口 mod
 
+### 它在哪里运行
+
+一个 jar、两个入口，Fabric 只加载与环境匹配的那个：
+
+| 入口 | 运行在 | 提供 |
+| --- | --- | --- |
+| `client` | 任意客户端 | 那个客户端能看到和能做的事：界面、打开存档、把世界开放到局域网 |
+| `main` | 任意服务端——**包括单机世界里的集成服务端** | 权威状态、控制台命令、快照 |
+
+**单机会同时拥有两者**，在同一个进程里：客户端 vantage 监听 `mcagent.port`（25580），服务端 vantage 监听 `mcagent.serverPort`（25581）。这也是"不用专门开服务器就能做分叉"的原因——你边玩就能对一个权威世界取样。两者的数据写在不同的地方：`<gameDir>/mc-agent/` 与 `mc-agent-server/`（或用 `-Dmcagent.dir` / `-Dmcagent.serverDir` 指定）。
+
+同一个进程里两者并存时有两件事要知道：`tick freeze` 会把你正在玩的世界冻住；你在服务端 vantage 里跑的重活，会和你客户端的帧预算抢时间。
+
 ```bash
 git clone https://github.com/guajun/mc-agent-interface-mod
 python mc-agent-interface-mod/build.py \

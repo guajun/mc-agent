@@ -68,6 +68,12 @@ loopback API.
 
 ## 3. Run the bridge
 
+!!! tip "Single player already has both vantages"
+    The same jar gives you the client vantage (25580) *and* the server vantage
+    (25581) while you play single player, because the world runs on an integrated
+    server inside the same process. Everything below - authoritative state,
+    snapshots, forking - works there without any server to set up.
+
 ```bash
 .venv/Scripts/mc-bridge run
 ```

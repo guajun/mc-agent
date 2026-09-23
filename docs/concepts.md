@@ -42,7 +42,7 @@ mod can run in:
 | Track | Instance | The bridge's job there |
 | --- | --- | --- |
 | 1 | the player's live client | realtime probing and driving |
-| 2 | the live server | authoritative probing, driving players, reacting to what happened |
+| 2 | the live server - including the integrated server inside a single-player world | authoritative probing, driving players, reacting to what happened |
 | 3 | an instance the agent provisioned: a headless server on a copied world | provisioning and operations: load a world, start, command, freeze, step, collect, tear down |
 
 Because the seam is the same, a tool written for one track usually works in the

@@ -57,6 +57,9 @@ python -m venv .venv
 
 ## 3. 起 bridge
 
+!!! tip "单机本来就有两个 vantage"
+    同一个 jar 在你玩单机时同时提供客户端 vantage（25580）**和**服务端 vantage（25581），因为世界跑在同一进程里的集成服务端上。下面的一切——权威状态、快照、分叉——在单机里都能用，不需要另外开服务器。
+
 ```bash
 .venv/Scripts/mc-bridge run
 ```

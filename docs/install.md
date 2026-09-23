@@ -31,6 +31,26 @@ matter later:
 
 ## 2. The interface mod
 
+### Where it runs
+
+One jar, two entrypoints, and Fabric loads whichever matches:
+
+| Entrypoint | Runs in | Serves |
+| --- | --- | --- |
+| `client` | any client | what that client sees and can do: screens, opening a save, publishing to the LAN |
+| `main` | any server - **including the integrated server inside a single-player world** | authoritative state, console commands, snapshots |
+
+**Single player gets both**, at the same time, in the same process: the client
+vantage on `mcagent.port` (25580) and the server vantage on `mcagent.serverPort`
+(25581). That is the whole reason the fork workflow works without a dedicated
+server - you can snapshot an authoritative world while you are playing it.
+The two write to different places: `<gameDir>/mc-agent/` and
+`mc-agent-server/` (or wherever `-Dmcagent.dir` / `-Dmcagent.serverDir` point).
+
+Two things to keep in mind when both run in one process: `tick freeze` freezes
+the world you are playing in, and anything expensive you run in the server
+vantage shares the frame budget of your client.
+
 ```bash
 git clone https://github.com/guajun/mc-agent-interface-mod
 python mc-agent-interface-mod/build.py \

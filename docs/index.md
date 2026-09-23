@@ -29,7 +29,7 @@ instance* the agent is attached to.
 | Track | The agent is | Use it for |
 | --- | --- | --- |
 | **live client** | a mod inside your own game | "look at what I am looking at", playing alongside a human |
-| **live server** | a mod inside the server you play on | authoritative state, driving fake players, reacting to what actually happened |
+| **live server** | a mod inside the server you play on - or inside the integrated server of your single-player world | authoritative state, driving fake players, reacting to what actually happened |
 | **isolated lab** | a headless server the agent provisioned itself | repeatable physics: freeze, step, fork a world, run it a hundred times |
 
 Track 3 is the one that makes experiments honest, and the reason this project
