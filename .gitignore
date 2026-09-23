@@ -1,0 +1,19 @@
+# the three module repositories live side by side with this one
+/interface-mod/
+/bridge/
+/agent-loop/
+
+__pycache__/
+*.py[cod]
+*.jsonl
+*.log
+*.pid
+port.txt
+mc-agent/
+out/
+dist/
+.venv/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
