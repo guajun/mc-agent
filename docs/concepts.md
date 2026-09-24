@@ -132,4 +132,5 @@ been done once. They record practice; they do not guess at it.
   guardrails are budgets, isolation of failures and a kill switch.
 
 The questions that are *not* decided are collected in the
-[RFCs](rfc/0001-agent-interface.md).
+[issue tracker](https://github.com/guajun/mc-agent/issues?q=label%3Arfc): RFC
+0001 is implemented and closed, and RFC 0002 is deferred (above).

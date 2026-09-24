@@ -54,14 +54,14 @@ through them. Event-driven behaviour needs a resident listener on the agent's
 side; that is the loop, and MCP stays an optional *pull* interface. See
 [RFC 0001](docs/rfc/0001-agent-interface.md).
 
-## Open questions live in RFCs
+## Open questions live in the issue tracker
 
 Design discussion that is not settled is filed as an issue rather than decided
 in code. Phase 1 ships the plumbing; later phases are not designed yet, on
 purpose.
 
-- [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - issue: [#1](https://github.com/guajun/mc-agent/issues/1)
-- [RFC 0002 - programmable tool calls (running agent-written code in the game)](docs/rfc/0002-programmable-tool-calls.md) - draft, for discussion
+- [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - implemented, closed; what is still open moved to [#4](https://github.com/guajun/mc-agent/issues/4), [#5](https://github.com/guajun/mc-agent/issues/5), [#6](https://github.com/guajun/mc-agent/issues/6), [#7](https://github.com/guajun/mc-agent/issues/7)
+- [RFC 0002 - programmable tool calls (running agent-written code in the game)](docs/rfc/0002-programmable-tool-calls.md) - deferred, not implemented; the decision is in [concepts.md](docs/concepts.md)
 - [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
   server, MCP tools, and the end-to-end check
 - [Who is the agent, in game?](docs/player-identity.md) - second client,

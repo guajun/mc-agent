@@ -1,6 +1,11 @@
 # RFC 0001: agent interface and bridge architecture
 
-* Status: draft, open for discussion
+* Status: implemented - Phase 1 shipped, and the discussion is closed. What is
+  still open moved to issues [#4](https://github.com/guajun/mc-agent/issues/4)
+  (backpressure), [#5](https://github.com/guajun/mc-agent/issues/5) (richer
+  game events), [#6](https://github.com/guajun/mc-agent/issues/6) (multiple
+  clients) and [#7](https://github.com/guajun/mc-agent/issues/7) (push from the
+  game to the agent)
 * Scope: the generic plumbing between a Minecraft client and an agent runtime
 * Out of scope: anything specific to one experiment or use case
 * Modules: [interface mod](https://github.com/guajun/mc-agent-interface-mod) ·
@@ -75,6 +80,10 @@ Deliberately missing: pathfinding, inventory manipulation, block placing,
 physics assertions. Those are use-case shaped; they belong behind a command or
 in a later RFC with a concrete need.
 
+As shipped (mod 0.5.x): the client vantage also offers `lan`, and the server
+vantage adds `snapshot`. The list the mod reports in `capabilities` - not this
+document - is the authority.
+
 ## Event model
 
 The mod pushes `hello`, `chat`, `game`, `mark`, `sample_start`,
@@ -82,24 +91,18 @@ The mod pushes `hello`, `chat`, `game`, `mark`, `sample_start`,
 monotonic sequence number, keeps a ring buffer, and lets a client replay from a
 cursor (`events {since}` -> `{events, next, dropped}`).
 
-Open questions:
+Open questions - kept here as the record of what Phase 1 did not settle, each
+one now tracked as an issue:
 
-* **Richer game events.** The client offers no general event bus. Which events
-  are worth subscribing to (entity spawn/remove, damage, explosions, player
-  joins/leaves), and is polling `entities` at a tick interval good enough for
-  the rest? Deferred: Phase 1+.
-* **Server-side wake-up.** A client mod cannot call into an agent. Any
-  push-triggered flow is therefore agent-side, or requires a small sidecar that
-  the agent polls or that speaks MCP over a long-lived connection.
-* **A server-side adapter.** Fake players (Carpet) and per-tick physics are
-  server-side facts: a second adapter behind the same bridge, streaming at tick
-  rate, would be the honest way to expose them. The client view interpolates,
-  so it is not a measurement instrument. See `docs/player-identity.md`.
-* **Backpressure.** Cursors plus `dropped` are a start; a slow consumer currently
-  loses old events. Is a per-subscriber queue worth it?
-* **Multiple clients.** The mod accepts several connections and broadcasts to
-  all. Should the bridge arbitrate, so two agents cannot fight over the same
-  player?
+* **Richer game events.** [#5](https://github.com/guajun/mc-agent/issues/5)
+* **Server-side wake-up.** [#7](https://github.com/guajun/mc-agent/issues/7)
+* **A server-side adapter.** Partly overtaken by the mod's server vantage
+  (0.5.0, port 25581): what is left is tick-rate streaming and richer events,
+  [#5](https://github.com/guajun/mc-agent/issues/5). The client view
+  interpolates, so it is not a measurement instrument. See
+  `docs/player-identity.md`.
+* **Backpressure.** [#4](https://github.com/guajun/mc-agent/issues/4)
+* **Multiple clients.** [#6](https://github.com/guajun/mc-agent/issues/6)
 
 ## MCP or loopback API?
 
@@ -113,7 +116,8 @@ The loopback API is therefore the primary contract, and MCP is a thin adapter on
 top of it. The agent loop stays the active listener.
 
 Open question: should the bridge also offer a WebSocket (push, multi-language)
-alongside the JSON-lines socket? Deferred until a concrete need appears.
+alongside the JSON-lines socket? Deferred until a concrete need appears - folded
+into [#7](https://github.com/guajun/mc-agent/issues/7).
 
 ## Decoupling
 
@@ -121,7 +125,8 @@ alongside the JSON-lines socket? Deferred until a concrete need appears.
   separate failure domains.
 * The loop depends on the bridge *package* for the client class and on the
   daemon only over the socket; it does not import the daemon.
-* The mod is a plain client mod with no dependency on either.
+* The mod is a plain Fabric mod with no dependency on either. Since 0.5.0 it
+  also ships a server vantage (see `docs/protocol-snapshot.md`).
 
 ## Phase 1 scope
 

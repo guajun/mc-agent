@@ -1,6 +1,6 @@
 # RFC 0001：智能体接口与 bridge 架构
 
-* 状态：草案，开放讨论
+* 状态：已实现——Phase 1 已发出，讨论关闭。仍未定论的问题已拆成 issue：[#4](https://github.com/guajun/mc-agent/issues/4)（背压）、[#5](https://github.com/guajun/mc-agent/issues/5)（更丰富的游戏事件）、[#6](https://github.com/guajun/mc-agent/issues/6)（多个客户端）、[#7](https://github.com/guajun/mc-agent/issues/7)（游戏向智能体推送）
 * 范围：Minecraft 客户端与智能体运行时之间的通用管道
 * 不在范围：任何与某个具体实验或用例相关的东西
 * 模块：[接口 mod](https://github.com/guajun/mc-agent-interface-mod) ·
@@ -57,17 +57,19 @@ bridge 之上没有任何东西知道 mod 的线格式，mod 也不知道智能�
 
 刻意缺失：寻路、背包操作、放置方块、物理断言。这些是"用例形状"的东西；它们属于某个命令之后，或属于未来某篇有具体需求的 RFC。
 
+实际发出的样子（mod 0.5.x）：客户端视角还提供 `lan`，服务端视角额外提供 `snapshot`。以 mod 在 `capabilities` 里报告的列表为准，而不是本文档。
+
 ## 事件模型
 
 mod 推送 `hello`、`chat`、`game`、`mark`、`sample_start`、`sample_progress`、`sample_done` 以及诊断信息；bridge 分配单调递增的序号、维护一个环形缓冲，并允许客户端从游标重放（`events {since}` → `{events, next, dropped}`）。
 
-开放问题：
+开放问题——留在这里，作为 Phase 1 未定事项的记录；每一条现在都有对应的 issue：
 
-* **更丰富的游戏事件。** 客户端没有通用事件总线。哪些事件值得订阅（实体生成/移除、受伤、爆炸、玩家进出），其余的用"按 tick 轮询 `entities`"是否足够？延后：Phase 1+。
-* **服务端侧的唤醒。** 客户端 mod 无法调用智能体。因此任何"推送触发"的流程要么在智能体一侧，要么需要一个小 sidecar 供智能体轮询，或者它通过长连接说 MCP。
-* **一个服务端适配器。** 假人（Carpet）和逐 tick 物理是**服务端**的事实：同一个 bridge 后面的第二个适配器，按 tick 率流式输出，才是诚实地暴露它们的方式。客户端视图是插值的，所以它不是测量仪器。见 [智能体在游戏里是谁](../player-identity.md)。
-* **背压。** 游标加 `dropped` 只是个开始；慢消费者目前会丢掉旧事件。值得做按订阅者的队列吗？
-* **多个客户端。** mod 接受多条连接并向所有连接广播。bridge 应该仲裁吗，好让两个智能体不会争抢同一个玩家？
+* **更丰富的游戏事件。** [#5](https://github.com/guajun/mc-agent/issues/5)
+* **服务端侧的唤醒。** [#7](https://github.com/guajun/mc-agent/issues/7)
+* **一个服务端适配器。** 部分被 mod 的服务端视角（0.5.0，端口 25581）取代：剩下的是按 tick 率流式输出和更丰富的事件，见 [#5](https://github.com/guajun/mc-agent/issues/5)。客户端视图是插值的，所以它不是测量仪器；见 [智能体在游戏里是谁](../player-identity.md)。
+* **背压。** [#4](https://github.com/guajun/mc-agent/issues/4)
+* **多个客户端。** [#6](https://github.com/guajun/mc-agent/issues/6)
 
 ## MCP 还是 loopback API？
 
@@ -77,13 +79,13 @@ MCP 是**拉取**式接口：由客户端拉起 server，所以游戏永远无�
 
 因此 loopback API 才是主契约，MCP 是它之上的一层薄适配器。agent loop 始终是**主动监听**的那一方。
 
-开放问题：bridge 是否应该在 JSON-lines socket 之外，同时提供 WebSocket（推送、多语言）？在出现具体需求之前延后。
+开放问题：bridge 是否应该在 JSON-lines socket 之外，同时提供 WebSocket（推送、多语言）？在出现具体需求之前延后——并入 [#7](https://github.com/guajun/mc-agent/issues/7)。
 
 ## 解耦
 
 * bridge 与 loop 是两个进程、两个仓库、两个故障域。
 * loop 依赖 bridge 的**包**（为了客户端类），而对守护进程只通过 socket 通信；它不 import 守护进程。
-* mod 是一个普通客户端 mod，不依赖上面两者中的任何一个。
+* mod 是一个普通 Fabric mod，不依赖上面两者中的任何一个；从 0.5.0 起它也带有服务端视角（见 [分叉一个活的世界](../protocol-snapshot.md)）。
 
 ## Phase 1 范围
 

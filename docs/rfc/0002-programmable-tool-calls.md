@@ -1,6 +1,11 @@
 # RFC 0002: programmable tool calls (running agent-written code in the game)
 
-* Status: draft, for discussion - nothing here is implemented yet
+* Status: deferred - nothing here is implemented, and that is a decision rather
+  than a gap: the first draft was judged too much design for a need that has not
+  been demonstrated. See "Deliberately not built (yet)" in
+  [concepts.md](../concepts.md). Reopen when the same hand-rolled helper keeps
+  showing up in more than one experiment; until then, doing it from outside
+  (~35 ms per look) is enough
 * Scope: letting an agent inject code that runs **inside** the game process
 * Related: [RFC 0001](0001-agent-interface.md), [player identity](../player-identity.md)
 

@@ -40,7 +40,7 @@ and `execute as deepseek run say ...` produced `[deepseek] ...` in chat.
 | No LAN, no second account, no second client, no extra RAM | Needs Carpet on the server, `commandPlayer` enabled, and command permission |
 | Authoritative state (`/data get`) instead of an interpolated client view | No client of its own: no screens, no camera, no client mods |
 | Counts as a player for game rules, mob targeting and redstone | Because it has no client, the server answers its own command feedback to nobody - read state with `data get` on the caller, not `execute as` |
-| Drivable at command granularity: `use`, `attack`, `jump`, `look`, `move`, `mount`, `hotbar`, `drop`, `sneak`, `sprint`, ... | One command per tick at best; not a tick-accurate instrument (see Scarpet / server adapter) |
+| Drivable at command granularity: `use`, `attack`, `jump`, `look`, `move`, `mount`, `hotbar`, `drop`, `sneak`, `sprint`, ... | One command per tick at best; not a tick-accurate instrument (see Scarpet / the server vantage) |
 
 The fake player has no command permission of its own (and `/op` does not exist
 in single player), which is why its voice is the server broadcasting *for* it:
@@ -107,14 +107,17 @@ Actions available in the version tested (Carpet 26.2+v260616):
 `sprint`, `unsprint`, `look`, `turn`, `move`, `startFallFlying`, `loadItems`.
 `spawn at` takes coordinates, not a player name, in this build.
 
-## 2. A server-side adapter (the RFC-grade option)
+## 2. The server vantage (shipped in mod 0.5.0)
 
 Everything above drives the server through commands. If the agent needs
-authoritative per-tick data - the actual subject of most cannon/TNT work - the
-right shape is a small **server-side** interface that streams entity state at
-tick rate, next to the existing client-side one. That is a second adapter
-behind the same bridge, not a change to this one, and it belongs in an RFC
-(see `docs/rfc/0001-agent-interface.md`, "richer game events").
+authoritative data - the actual subject of most cannon/TNT work - the honest
+vantage is the **server side**, and it no longer needs a second adapter: the same
+interface mod has a server entrypoint (port 25581, snapshots included), which
+also covers single player, where the integrated server runs in the client's own
+process. See `protocol-snapshot.md`.
+
+What is still open is streaming that vantage at tick rate and subscribing to
+richer game events - [issue #5](https://github.com/guajun/mc-agent/issues/5).
 
 Scarpet (Carpet's scripting language, `/script`) is a middle ground that already
 exists: scripts run inside the server, can read entity NBT and schedule work,
@@ -126,6 +129,6 @@ two primitives it already has (write a file, run a command).
 The client's entity positions and velocities are interpolated for rendering, so
 a `record_start` capture is a *client view* at 20 Hz. It is fine for shape and
 timing, but for exact numbers prefer the server's own answer (`/data get`,
-Scarpet, or a future server adapter). Observed in the test above: the client
+Scarpet, or the server vantage on 25581). Observed in the test above: the client
 reported `vy = 0.333` for a jumping fake player while the server said `-0.078`
 at the moment it was queried - same entity, different vantage points and ticks.
