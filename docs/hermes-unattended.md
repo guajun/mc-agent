@@ -199,6 +199,14 @@ hot-reloads the subscriptions file on the next request, so no restart is needed
 after this edit; re-running `hermes webhook subscribe` rebuilds the route and
 drops the key, so re-add it after changing the route.
 
+!!! note "This is not the cold-start development harness"
+    A restricted route gets the Bridge MCP server only - no terminal, file,
+    source-fetch or build tools. An agent that needs to write, compile and
+    install its own logger cannot do that through this route. The first
+    Minecart ROM cold start therefore runs on a user-launched harness with
+    normal development tools, and webhook delivery stays an optional, later
+    path: see [Auditable cold-start runs](coldstart-protocol.md).
+
 !!! tip "Declarative alternative"
     If you prefer everything in one file, declare the same route under
     `platforms.webhook.extra.routes` in `config.yaml` (with `toolsets` inline,

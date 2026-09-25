@@ -1,0 +1,35 @@
+name: tools
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/**"
+      - "tests/**"
+      - "examples/smoke-mod/**"
+      - ".github/workflows/tools.yml"
+  pull_request:
+    paths:
+      - "tools/**"
+      - "tests/**"
+      - "examples/smoke-mod/**"
+      - ".github/workflows/tools.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cold-start tooling tests (no Minecraft, no network)
+        run: python -m unittest discover -s tools/tests -v
+      - name: Lab and mod-build tests (no Minecraft, no network)
+        run: python -m unittest discover -s tests -v
+      - name: Stage-one gate selftest (no Minecraft, no live evidence)
+        run: python tools/stage1_gate.py selftest

@@ -70,8 +70,9 @@ display name.
    `mc-bridge call player '{"player":"<uuid>"}'`). Passing a name works as a
    convenience, but the reply's stable UUID is what you should carry forward.
 3. Read the reply as server-known context: identity, dimension, position,
-   rotation, eye/direction, and the server-side view target (a raycast at
-   request time - not a client crosshair read). It can report `found: false` /
+   rotation, eye/direction, and the server-side view target
+   (`player.view.target`, one of `block`, `entity` or `miss`) - a raycast at
+   request time, not a client crosshair read. It can report `found: false` /
    `status: not_found`; handle that instead of substituting another player.
 
 Use the view block for "what is this player looking at"; use `state` for
@@ -81,8 +82,11 @@ world-level facts (tick, level, world directory, player count).
 
 When your harness receives a forwarded game event (for example an in-game chat
 message), the event carries a `context_id` and a compact `context` summary. The
-server captured the sender's position, rotation, and view ray **when the
-message arrived**. The player may have moved since.
+bundle is frozen for that message; its `timing` field says what "that message"
+means. `receipt` is a network chat packet (the sender's state the instant the
+packet arrived). `broadcast` is a server-side broadcast - notably a Carpet fake
+player's `execute as <name> run say ...` - and is not packet-time history. The
+player may have moved since either way.
 
 1. Take the `context_id` from the event payload - do not rebuild it, and do not
    use the sender's display name as the key.
@@ -93,8 +97,10 @@ message arrived**. The player may have moved since.
    real answer: the chat-time context is gone. If the live position is still
    useful, fetch it with the player operation and label it as current, not
    chat-time.
-4. Prefer the bundle for "where was this player when they spoke"; use live
-   queries for "where is the world now".
+4. Read `timing` before describing the bundle: use it for "where was this
+   player when they spoke" only when `timing` is `receipt`; a `broadcast`
+   bundle proves where the player was when the server broadcast, which may be
+   later and further away. Use live queries for "where is the world now".
 
 The server keeps the bundles in a bounded cache (capacity and TTL are server
 configuration) and eviction is by capture order, so fetch promptly after the
