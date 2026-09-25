@@ -49,7 +49,7 @@ Skill 和本页的 Hermes 侧现在就可以用。端到端流程依赖
 （并给出依赖项），已安装的 bridge 甚至可能还没有 `mc-bridge forward`。Skill 对此
 的处理是：如实报告缺口，绝不编造兜底。
 
-!!! danger "签名请求头的兼容性"
+!!! danger "签名与投递 ID 的兼容性"
 
     Hermes 按各来源的 scheme 校验签名；它的通用方案是 **HMAC-SHA256 V2**：
     `X-Webhook-Signature-V2: <hex>` 加 `X-Webhook-Timestamp: <unix 秒>`，
@@ -63,6 +63,16 @@ Skill 和本页的 Hermes 侧现在就可以用。端到端流程依赖
     [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2)。
     在它落地之前，可以用下面的验证步骤检查可达性，并预期签名投递会失败关闭
     （fail closed）。
+
+    **幂等性有同样的缺口。** Hermes 的 1 小时去重缓存只认
+    `X-GitHub-Delivery`、`svix-id`、`webhook-id` 或 `X-Request-ID`；都没有时用
+    当前毫秒数生成 ID。forwarder 用 `X-MC-Agent-Event-Id`（以及 body 里的
+    `eventId`）标记每次投递，Hermes 读不到。一旦投递已被接受但响应超时，
+    forwarder 会重试同一个事件；Hermes 看到的是新的投递 ID，于是又起一次独立的
+    agent 运行，同一批游戏命令可能执行两次。forwarder 必须同时发出 Hermes 兼容的
+    投递 ID 头（例如 `webhook-id: <eventId>`）才能让重试去重——这同样属于
+    [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2)
+    的改动。
 
 ## 1. 把共享 Skill 装进 Hermes
 
@@ -201,11 +211,12 @@ bridge 守护进程必须已经在跑，并且连着服务端视角 mod。
 | 2 | route 存在 | `hermes webhook list` 显示 `mc-chat`、URL 和 `deliver` |
 | 3 | 可达性与签名 | `hermes webhook test mc-chat` 有响应（它的事件类型是 `test`，所以只收 `chat` 的 route 会回答 `{"status":"ignored"}`——这仍证明 secret 被接受；接受 `test` 的 route 会回答 `202`） |
 | 4 | 事件离开游戏 | `mc-bridge watch --events chat` 打印聊天事件；forwarder 日志出现 `delivered event <eventId> ... (HTTP 202)` |
-| 5 | 运行加载了 Skill | gateway 日志显示 `mc-chat` 运行，且加载的技能集里有 `minecraft-toolkit` |
-| 6 | 取到了上下文包 | 运行用事件里的 `context_id` 调 `mc_context`（或如实报告 `not_found`/`expired`） |
-| 7 | 用上了 Bridge | 运行至少调到一个服务端视角 Bridge 工具（`mc_capabilities`、`mc_state`、`mc_player`……） |
-| 8 | 结果投递成功 | 回答出现在 `--deliver` 目标（用 `log` 时在 gateway 日志里） |
-| 9 | toolset 确实受限 | 聊天里的提示注入无法触达 terminal/file；这次运行只有 `mc-agent` 工具 |
+| 5 | 重试保持幂等 | 同一个 `eventId` 的重试投递得到 `{"status":"duplicate"}`，不会起第二次运行，游戏命令只执行一次 |
+| 6 | 运行加载了 Skill | gateway 日志显示 `mc-chat` 运行，且加载的技能集里有 `minecraft-toolkit` |
+| 7 | 取到了上下文包 | 运行用事件里的 `context_id` 调 `mc_context`（或如实报告 `not_found`/`expired`） |
+| 8 | 用上了 Bridge | 运行至少调到一个服务端视角 Bridge 工具（`mc_capabilities`、`mc_state`、`mc_player`……） |
+| 9 | 结果投递成功 | 回答出现在 `--deliver` 目标（用 `log` 时在 gateway 日志里） |
+| 10 | toolset 确实受限 | 聊天里的提示注入无法触达 terminal/file；这次运行只有 `mc-agent` 工具 |
 
 想不依赖传输做一次慢速端到端检查：一边 `mc-bridge watch`、一边看 gateway 日志，
 然后在游戏里发一条聊天；三样东西——Skill、`context_id`、Bridge 工具——都要出现在

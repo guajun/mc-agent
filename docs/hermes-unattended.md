@@ -53,7 +53,7 @@ as unsupported (with the dependency named), and an installed bridge may not have
 `mc-bridge forward` at all. The Skill handles that: it reports the gap instead
 of inventing a fallback.
 
-!!! danger "Signature header compatibility"
+!!! danger "Signature and delivery-ID compatibility"
 
     Hermes validates signatures with provider schemes; its generic scheme is
     **HMAC-SHA256 V2**: `X-Webhook-Signature-V2: <hex>` plus
@@ -69,6 +69,19 @@ of inventing a fallback.
     [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2).
     Until it lands, use the verification steps below to check reachability, and
     expect the signed delivery to fail closed.
+
+    **Idempotency has the same gap.** Hermes keys its 1-hour duplicate-delivery
+    cache on `X-GitHub-Delivery`, `svix-id`, `webhook-id` or `X-Request-ID`,
+    and falls back to the current millisecond when none of them is present. The
+    forwarder marks deliveries with `X-MC-Agent-Event-Id` (and `eventId` in the
+    body), which Hermes does not read. If a delivery is accepted but its
+    response times out, the forwarder retries the same event - and Hermes sees
+    a fresh delivery id, starts a second agent run, and can execute the same
+    game commands twice. The forwarder must also emit a Hermes-compatible
+    delivery-id header (for example `webhook-id: <eventId>`) for retries to
+    deduplicate; that is part of the same
+    [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2)
+    change.
 
 ## 1. Install the shared Skill into Hermes
 
@@ -221,11 +234,12 @@ available. Each line names the evidence to look for.
 | 2 | the route exists | `hermes webhook list` shows `mc-chat`, its URL, and `deliver` |
 | 3 | reachability and signature | `hermes webhook test mc-chat` answers (its event is labeled `test`, so a route filtered to `chat` answers `{"status":"ignored"}` - still proof the secret was accepted; a route that accepts `test` answers `202`) |
 | 4 | the event leaves the game | `mc-bridge watch --events chat` prints the chat event; the forwarder logs `delivered event <eventId> ... (HTTP 202)` |
-| 5 | the run loaded the Skill | the gateway log shows the `mc-chat` run and `minecraft-toolkit` in the loaded skill set |
-| 6 | the context bundle was fetched | the run calls `mc_context` with the event's `context_id` (or reports `not_found`/`expired` accurately) |
-| 7 | the Bridge was used | the run calls at least one Bridge tool through the server vantage (`mc_capabilities`, `mc_state`, `mc_player`, ...) |
-| 8 | the answer was delivered | the response appears at the `--deliver` target (with `log`, in the gateway log) |
-| 9 | the toolset is restricted | a prompt-injection attempt in chat cannot reach terminal/file tools; only `mc-agent` tools are available to the run |
+| 5 | retries stay idempotent | a retried delivery of the same `eventId` answers `{"status":"duplicate"}` and starts no second run, so game commands execute once |
+| 6 | the run loaded the Skill | the gateway log shows the `mc-chat` run and `minecraft-toolkit` in the loaded skill set |
+| 7 | the context bundle was fetched | the run calls `mc_context` with the event's `context_id` (or reports `not_found`/`expired` accurately) |
+| 8 | the Bridge was used | the run calls at least one Bridge tool through the server vantage (`mc_capabilities`, `mc_state`, `mc_player`, ...) |
+| 9 | the answer was delivered | the response appears at the `--deliver` target (with `log`, in the gateway log) |
+| 10 | the toolset is restricted | a prompt-injection attempt in chat cannot reach terminal/file tools; only `mc-agent` tools are available to the run |
 
 For a slower end-to-end check without the transport, send an in-game chat while
 watching `mc-bridge watch` and the gateway log; the same three things - Skill,
