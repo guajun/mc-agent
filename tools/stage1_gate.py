@@ -732,8 +732,25 @@ class CheckContext:
 # --------------------------------------------------------------------------- check runners
 
 
+def _normalize_world_dir(value: Any) -> str | None:
+    """Canonical form for comparing declared and scanned world directories."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    return value.replace("\\", "/").rstrip("/")
+
+
+def _bound_task_uuid(ctx: CheckContext) -> str | None:
+    """The fixture fake-player UUID every identity/actor artifact must share."""
+    player = _load_declared_json(ctx.bundle, "fixture_map", "player_identity")
+    if player is None:
+        return None
+    uuid = player.get("uuid")
+    return uuid if isinstance(uuid, str) and uuid else None
+
+
 def _check_fixture_map(ctx: CheckContext) -> None:
     manifest = ctx.json("fixture_manifest")
+    mod_names: list[str] = []
     if manifest is not None:
         mapo = ctx.require(manifest, "map", "object")
         if mapo is not None:
@@ -747,9 +764,17 @@ def _check_fixture_map(ctx: CheckContext) -> None:
         mods = ctx.object_list(manifest, "mods", minimum=1)
         for index, mod in enumerate(mods):
             where = f"mods[{index}]."
-            ctx.require(mod, "name", "string", nonempty=True, where=where)
+            name = ctx.require(mod, "name", "string", nonempty=True, where=where)
             ctx.require(mod, "version", "string", nonempty=True, where=where)
             ctx.require(mod, "sha256", "hex64", where=where)
+            if isinstance(name, str):
+                mod_names.append(name)
+        if "carpet" not in mod_names:
+            ctx.fail(
+                "carpet_dependency_missing",
+                "fixture_manifest.mods: a 'carpet' entry is required so version_lock.carpet "
+                "is cross-checked instead of unchecked",
+            )
         world = ctx.require(manifest, "world", "object")
         if world is not None:
             ctx.require(world, "directory", "string", nonempty=True)
@@ -769,6 +794,7 @@ def _check_fixture_map(ctx: CheckContext) -> None:
     state_hashes: list[str] = []
     order_hashes: list[str] = []
     signatures: list[tuple[Any, Any, Any]] = []
+    used_child_runs: set[str] = set()
     ready = 0
     for index, row in enumerate(runs):
         where = f"init_runs[{index}]."
@@ -783,6 +809,7 @@ def _check_fixture_map(ctx: CheckContext) -> None:
         ready_value = ctx.require(row, "ready", "bool", where=where)
         ctx.require(row, "tick", "int", minimum=0, where=where)
         if isinstance(run_id, str):
+            used_child_runs.add(run_id)
             expected_instance = child_runs.get(run_id)
             if expected_instance is None:
                 ctx.fail(
@@ -808,6 +835,12 @@ def _check_fixture_map(ctx: CheckContext) -> None:
         signatures.append((state, order, count if count is not None else inventory))
     if len(init_ids) != len(set(init_ids)):
         ctx.fail("init_duplicate", "init_runs: init_id values repeat; runs must be independent")
+    if runs and len(used_child_runs) < 3:
+        ctx.fail(
+            "init_runs_not_independent",
+            f"init_runs: only {len(used_child_runs)} distinct child run(s) used; issue #15 requires "
+            ">= 3 independent initializations with declared child-run provenance",
+        )
     if len(set(state_hashes)) > 1:
         ctx.fail("init_state_mismatch", "init_runs: state_hash differs across initializations")
     if len(set(order_hashes)) > 1:
@@ -839,12 +872,34 @@ def _check_fixture_map(ctx: CheckContext) -> None:
     scan = ctx.json("command_block_scan")
     if scan is not None:
         ctx.require(scan, "method", "string", nonempty=True)
-        ctx.string_list(scan, "world_dirs", minimum=1)
+        scan_dirs = ctx.string_list(scan, "world_dirs", minimum=1)
         found = ctx.require(scan, "command_blocks", "int", minimum=0)
         ctx.require_true(scan, "scanned")
         ctx.require_false(scan, "placed_by_init")
         if _is_int(found) and found > 0:
             ctx.fail("command_blocks_present", f"command_block_scan: {found} command block(s) found")
+        if scan_dirs is not None:
+            covered = {normalized for item in scan_dirs if (normalized := _normalize_world_dir(item))}
+            required_worlds: list[tuple[str, str]] = []
+            if manifest is not None:
+                world_block = manifest.get("world")
+                if isinstance(world_block, dict):
+                    directory = world_block.get("directory")
+                    if isinstance(directory, str) and directory:
+                        required_worlds.append(("fixture world.directory", directory))
+            for instance in ctx.bundle.instances:
+                instance_world = instance.get("world_dir")
+                if isinstance(instance_world, str) and instance_world:
+                    required_worlds.append(
+                        (f"instance {instance.get('instance_id')!r} world_dir", instance_world)
+                    )
+            for label, required_dir in required_worlds:
+                normalized = _normalize_world_dir(required_dir)
+                if normalized is not None and normalized not in covered:
+                    ctx.fail(
+                        "command_block_scan_world",
+                        f"command_block_scan.world_dirs does not cover {label} {required_dir!r}",
+                    )
 
     cleanup = ctx.json("cleanup_rebuild")
     if cleanup is not None:
@@ -1027,13 +1082,14 @@ def _check_restore_fidelity(ctx: CheckContext) -> None:
 
 
 def _check_player_context(ctx: CheckContext) -> None:
+    bound_uuid = _bound_task_uuid(ctx)
     rows = ctx.jsonl("identity_records")
     if rows is not None:
         seen: dict[str, dict[str, Any]] = {}
         for index, row in enumerate(rows):
             where = f"identity_records[{index}]."
             case = ctx.require(row, "case", "string", nonempty=True, where=where)
-            ctx.require(row, "uuid", "string", nonempty=True, where=where)
+            row_uuid = ctx.require(row, "uuid", "string", nonempty=True, where=where)
             ctx.require(row, "viewed_uuid", "string", nonempty=True, where=where)
             ctx.require(row, "dimension", "string", nonempty=True, where=where)
             ctx.require(row, "pos", "vec3", where=where)
@@ -1042,6 +1098,16 @@ def _check_player_context(ctx: CheckContext) -> None:
             ctx.require(row, "task_entry", "string", nonempty=True, where=where)
             ctx.one_of(row, "channel", ("mcp", "cli"), where=where)
             accepted = ctx.require(row, "accepted", "bool", where=where)
+            if (
+                bound_uuid is not None
+                and case != "unknown_identity"
+                and isinstance(row_uuid, str)
+                and row_uuid != bound_uuid
+            ):
+                ctx.fail(
+                    "player_identity_binding",
+                    f"{where}uuid {row_uuid!r} is not the fixture fake-player uuid {bound_uuid!r}",
+                )
             if isinstance(case, str):
                 seen[case] = row
             if case == "task_bind":
@@ -1405,6 +1471,30 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
 
         attempts = [row for row in agent_events if row.get("event") == "input_attempt"]
         processed = [row for row in agent_events if row.get("event") == "input_processed"]
+        bound_uuid = _bound_task_uuid(ctx)
+        for row in attempts + processed:
+            where = f"audit_events[{row.get('event_id')!r}]."
+            actor = row.get("actor_uuid")
+            if "actor_uuid" not in row:
+                ctx.fail(
+                    "audit_actor_missing",
+                    f"{where}input event must carry actor_uuid; use null plus actor_provenance "
+                    "when the hook cannot supply it",
+                )
+            elif actor is None:
+                provenance = row.get("actor_provenance")
+                if not isinstance(provenance, str) or not provenance.strip():
+                    ctx.fail(
+                        "audit_actor_provenance",
+                        f"{where}actor_uuid is null; actor_provenance must explain why no actor was supplied",
+                    )
+            elif not isinstance(actor, str) or not actor:
+                ctx.fail("audit_actor_missing", f"{where}actor_uuid must be a non-empty string or null")
+            elif bound_uuid is not None and actor != bound_uuid:
+                ctx.fail(
+                    "audit_actor_mismatch",
+                    f"{where}actor_uuid {actor!r} is not the fixture fake-player uuid {bound_uuid!r}",
+                )
         emitted = [row for row in agent_events if row.get("event") == "cart_emitted"]
         removed = [row for row in agent_events if row.get("event") == "cart_removed"]
         if not attempts or not processed:
@@ -2561,7 +2651,27 @@ def _cmd_scaffold(bundle_dir: str, *, force: bool, out: TextIO) -> int:
                 "after_tree_sha256": placeholder,
             },
             "allowed_port_ranges": [DEFAULT_PORT_RANGE],
-            "instances": [],
+            "child_runs": [
+                {"run_id": f"init-child-{index}", "instance_id": "exp-1"} for index in range(1, 4)
+            ],
+            "instances": [
+                {
+                    "instance_id": "src-audit",
+                    "role": "source_audit",
+                    "dimension": "minecraft:overworld",
+                    "world_dir": "labs/rom13-src/world",
+                    "rcon_port": 27240,
+                    "bridge_port": 27241,
+                },
+                {
+                    "instance_id": "exp-1",
+                    "role": "experiment",
+                    "dimension": "minecraft:overworld",
+                    "world_dir": "labs/rom13-exp/world",
+                    "rcon_port": 27242,
+                    "bridge_port": 27243,
+                },
+            ],
         },
         "checks": {
             spec.id: {
@@ -2577,9 +2687,10 @@ def _cmd_scaffold(bundle_dir: str, *, force: bool, out: TextIO) -> int:
         "This layout is empty on purpose: every check reports `blocked` until live prerequisite\n"
         "evidence is copied into `artifacts/` and the manifest is filled in.\n\n"
         "1. Set `origin` to `live` only when the artifacts are real live-game evidence.\n"
-        "2. Fill `run` (run id, source world path and hashes, instances and ports) and every\n"
-        "   `checks.<id>.evidence` path, keeping the canonical filenames from\n"
-        "   `python tools/stage1_gate.py list`.\n"
+        "2. Fill `run` (run id, `child_runs` with one declared child run per independent\n"
+        "   initialization, source world path and hashes, instances with `dimension`, and\n"
+        "   `allowed_port_ranges`) and every `checks.<id>.evidence` path, keeping the\n"
+        "   canonical filenames from `python tools/stage1_gate.py list`.\n"
         "3. Generate `artifacts/smoke_fixture_validity/evidence-index.json` with sha256 hashes\n"
         "   for every file and tree hash for every directory.\n"
         "4. Run `python tools/stage1_gate.py check <this dir> --source-world <save path>`.\n"
@@ -2735,7 +2846,7 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
         root / "artifacts/fixture_map/command-block-scan.json",
         {
             "method": "grep nbt region scan",
-            "world_dirs": ["Minecart ROM test"],
+            "world_dirs": ["Minecart ROM test", "labs/rom13-src/world", "labs/rom13-exp/world"],
             "command_blocks": 0,
             "placed_by_init": False,
             "scanned": True,
@@ -3286,6 +3397,45 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.equal("command blocks are fail", report.overall, STATUS_FAIL)
         test.check("command block reason", _has_reason(_report_check(report, "fixture_map"), "command_blocks_present"))
 
+        scan_unbound = _copy_bundle(base, valid, "scan-world-unbound")
+        _edit_json(
+            scan_unbound / "artifacts/fixture_map/command-block-scan.json",
+            lambda obj: obj.update(world_dirs=["Minecart ROM test"]),
+        )
+        _refresh_index(scan_unbound, "artifacts/fixture_map/command-block-scan.json")
+        report = run_gate(scan_unbound)
+        test.equal("scan without instance worlds is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "scan world reason",
+            _has_reason(_report_check(report, "fixture_map"), "command_block_scan_world"),
+        )
+
+        carpet_missing = _copy_bundle(base, valid, "carpet-dependency-missing")
+        _edit_json(
+            carpet_missing / "artifacts/fixture_map/fixture-manifest.json",
+            lambda obj: obj.update(mods=[mod for mod in obj["mods"] if mod.get("name") != "carpet"]),
+        )
+        _refresh_index(carpet_missing, "artifacts/fixture_map/fixture-manifest.json")
+        report = run_gate(carpet_missing)
+        test.equal("missing carpet dependency is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "carpet dependency reason",
+            _has_reason(_report_check(report, "fixture_map"), "carpet_dependency_missing"),
+        )
+
+        shared_init = _copy_bundle(base, valid, "init-shared-child-run")
+        _edit_jsonl(
+            shared_init / "artifacts/fixture_map/init-runs.jsonl",
+            lambda rows: rows[1].update(run_id=rows[0]["run_id"]),
+        )
+        _refresh_index(shared_init, "artifacts/fixture_map/init-runs.jsonl")
+        report = run_gate(shared_init)
+        test.equal("shared child run is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "init independence reason",
+            _has_reason(_report_check(report, "fixture_map"), "init_runs_not_independent"),
+        )
+
         unbound_init = _copy_bundle(base, valid, "init-unbound")
         _edit_jsonl(
             unbound_init / "artifacts/fixture_map/init-runs.jsonl",
@@ -3382,6 +3532,22 @@ def run_selftest(out: TextIO | None = None) -> int:
         report = run_gate(crosstalk)
         test.equal("player crosstalk is fail", report.overall, STATUS_FAIL)
         test.check("crosstalk reason", _has_reason(_report_check(report, "player_context"), "player_context_crosstalk"))
+
+        identity_mismatch = _copy_bundle(base, valid, "identity-uuid-mismatch")
+        _edit_jsonl(
+            identity_mismatch / "artifacts/player_context/identity-records.jsonl",
+            lambda rows: rows[0].update(
+                uuid="77777777-7777-7777-7777-777777777777",
+                viewed_uuid="77777777-7777-7777-7777-777777777777",
+            ),
+        )
+        _refresh_index(identity_mismatch, "artifacts/player_context/identity-records.jsonl")
+        report = run_gate(identity_mismatch)
+        test.equal("mismatched identity uuid is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "identity binding reason",
+            _has_reason(_report_check(report, "player_context"), "player_identity_binding"),
+        )
 
         # agent dev capability --------------------------------------------------------
         stale_jar = _copy_bundle(base, valid, "stale-jar")
@@ -3527,6 +3693,70 @@ def run_selftest(out: TextIO | None = None) -> int:
             "extra emission reason",
             _has_reason(_report_check(report, "independent_test_mod"), "audit_removal_missing"),
         )
+
+        actor_mismatch = _copy_bundle(base, valid, "actor-uuid-mismatch")
+        _edit_jsonl(
+            actor_mismatch / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: [
+                row.update(actor_uuid="88888888-8888-8888-8888-888888888888")
+                for row in rows
+                if row.get("event") in ("input_attempt", "input_processed")
+            ],
+        )
+        _refresh_index(actor_mismatch, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(actor_mismatch)
+        test.equal("mismatched audit actor is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "audit actor mismatch reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_actor_mismatch"),
+        )
+
+        actor_missing = _copy_bundle(base, valid, "actor-missing")
+        _edit_jsonl(
+            actor_missing / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: [
+                row.pop("actor_uuid", None)
+                for row in rows
+                if row.get("event") in ("input_attempt", "input_processed")
+            ],
+        )
+        _refresh_index(actor_missing, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(actor_missing)
+        test.equal("missing audit actor key is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "audit actor missing reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_actor_missing"),
+        )
+
+        actor_absent = _copy_bundle(base, valid, "actor-absent")
+        _edit_jsonl(
+            actor_absent / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: [
+                row.update(actor_uuid=None)
+                for row in rows
+                if row.get("event") in ("input_attempt", "input_processed")
+            ],
+        )
+        _refresh_index(actor_absent, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(actor_absent)
+        test.equal("absent audit actor without provenance is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "audit actor provenance reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_actor_provenance"),
+        )
+
+        actor_explicit = _copy_bundle(base, valid, "actor-absent-explicit")
+        _edit_jsonl(
+            actor_explicit / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: [
+                row.update(actor_uuid=None, actor_provenance="hook ran without a player context")
+                for row in rows
+                if row.get("event") in ("input_attempt", "input_processed")
+            ],
+        )
+        _refresh_index(actor_explicit, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(actor_explicit)
+        test.equal("absent audit actor with explicit provenance passes", report.overall, STATUS_PASS)
 
         no_dimension = _copy_bundle(base, valid, "missing-declared-dimension")
         _edit_json(no_dimension / "bundle.json", lambda obj: obj["run"]["instances"][0].pop("dimension"))
@@ -3773,6 +4003,22 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.check("tree hash changes with content", tree_hash(tree) != first)
 
         # CLI smoke -------------------------------------------------------------------
+        scaffold_dir = base / "scaffold-template"
+        _cmd_scaffold(str(scaffold_dir), force=False, out=io.StringIO())
+        template = json.loads((scaffold_dir / "bundle.json").read_text(encoding="utf-8"))
+        template_run = template["run"]
+        test.check("scaffold declares child_runs", len(template_run.get("child_runs", [])) >= 3)
+        test.check(
+            "scaffold child runs reference an instance",
+            all(child.get("instance_id") for child in template_run["child_runs"]),
+        )
+        test.check(
+            "scaffold instances declare dimension",
+            bool(template_run.get("instances"))
+            and all(instance.get("dimension") for instance in template_run["instances"]),
+        )
+        test.equal("scaffold template still blocked", run_gate(scaffold_dir).overall, STATUS_BLOCKED)
+
         buffer = io.StringIO()
         test.equal("list exits 0", _cmd_list(as_json=False, out=buffer), EXIT_PASS)
         test.check("list mentions every check", all(spec.id in buffer.getvalue() for spec in CHECK_SPECS))

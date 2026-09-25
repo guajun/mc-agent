@@ -23,7 +23,7 @@ Exit codes: `0` pass, `1` fail, `3` blocked, `2` usage. A script cannot mistake
 ## Status (2026-09-26, this branch)
 
 * Gate tooling, schema and offline selftest are implemented; `selftest` passes
-  **133 checks** (no game, no live evidence involved).
+  **152 checks** (no game, no live evidence involved).
 * **No live prerequisite evidence exists yet**, so `check` on any real bundle is
   `blocked`. This document deliberately does not claim a gate pass.
 * Independent baseline recorded while the gate was developed: the read-only hash
@@ -155,7 +155,7 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 | `map.immutable` | b | true |
 | `map.download_verified` | b | fresh-cache download verified |
 | `map.bad_hash_rejected` | b | a wrong hash is rejected, not accepted |
-| `mods[]` | list | >= 1 entry, each `{name, version, sha256(h64)}`; a `carpet` entry is cross-checked against `version_lock.carpet` |
+| `mods[]` | list | >= 1 entry, each `{name, version, sha256(h64)}`; a `carpet` entry is **required** and cross-checked against `version_lock.carpet` |
 | `world.directory` | s | copy name, never the source save itself |
 | `world.tree_sha256` | h64 | tree hash of the prepared world copy |
 | `world.files` | i | > 0 |
@@ -165,7 +165,7 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `init_id` | s | unique per run |
-| `run_id` | s | must be declared in `run.child_runs` |
+| `run_id` | s | must be declared in `run.child_runs`; >= 3 distinct child runs must be used |
 | `instance_id` | s | must equal the instance declared for that child run |
 | `state_hash` | h64 | equal across all initializations |
 | `order_hash` | h16 | equal across all initializations |
@@ -177,11 +177,16 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 
 `player-identity.json`: `uuid`, `name`, `dimension`, `pos` (v3), `yaw`, `pitch`
 (n), `source` (s, e.g. `carpet`), `facing_target` (b true),
-`server_vantage_uuid` (s, must equal `uuid`).
+`server_vantage_uuid` (s, must equal `uuid`). The `uuid` is the bound task
+player: every `identity-records.jsonl` row except `unknown_identity` must use
+it, and every `input_attempt`/`input_processed` audit event must carry it (or
+explicitly declare its absence, below).
 
 `command-block-scan.json`: `method` (s), `world_dirs` (non-empty list of
 non-empty strings), `command_blocks` (i, must be 0), `scanned` (b true),
-`placed_by_init` (b false).
+`placed_by_init` (b false). `world_dirs` must cover the fixture
+`world.directory` and every declared `run.instances[].world_dir`, so a scan of
+an unrelated directory cannot stand in for the declared worlds.
 
 `cleanup-rebuild.json`: `steps` (non-empty list of non-empty strings),
 `source_world_untouched` (b true), `rebuild_reproducible` (b true).
@@ -286,7 +291,7 @@ cross-checked against `version_lock.test-mod`), `read_only` (true),
 | `seq` | i | >= 0; equal/colliding pairs fail, they cannot establish ordering |
 | `event` | s | see below |
 | `phase` | s | `init`, `agent` or `restore`; `agent` events must belong to the parent run |
-| `actor_uuid` | s | on `input_attempt`/`input_processed` |
+| `actor_uuid` | s/null | required key on `input_attempt`/`input_processed`: the bound task-player UUID, or `null` with a non-empty `actor_provenance` explaining the absence |
 | `cart_uuid` | s | required on `cart_emitted` and `cart_removed` |
 | `pos` | v3 | as applicable |
 | `captured_before_removal` | b | required true on `cart_emitted` |
@@ -294,7 +299,10 @@ cross-checked against `version_lock.test-mod`), `read_only` (true),
 
 Provenance is enforced before any join: events from an undeclared run,
 instance or dimension fail the gate even when the evidence index is correctly
-refreshed for the changed bytes. Required events: `input_attempt`,
+refreshed for the changed bytes; a non-null `actor_uuid` must equal the fixture
+fake-player UUID (`audit_actor_mismatch`), a missing key fails
+(`audit_actor_missing`), and `null` without `actor_provenance` fails
+(`audit_actor_provenance`). Required events: `input_attempt`,
 `input_processed`, `cart_emitted`, `cart_removed`. The attempt -> processing ->
 emission -> removal chain is joined on the full
 `run_id/instance_id/dimension` identity (plus `cart_uuid` for the removal), the
@@ -426,6 +434,11 @@ The same algorithm and exclusion list are used by the gate and by
   that mapping is part of coordinator review.
 * A gate pass is necessary but not sufficient for stage two: the issue's other
   acceptance points (manual review, correct answer evidence) are still required.
+* Snapshot `meta.json` cannot prove which live instance produced it
+  (`instance` is only `server`/`client`, `worldDir` may be null), so the
+  before/after snapshot pair proves state equality, not endpoint identity;
+  endpoint evidence rests on the bound `restore-record.json` plus the audit and
+  trace provenance.
 
 See also: [lab servers](lab-server.md), [fork verification](fork-verify.md),
 [snapshot protocol](protocol-snapshot.md), [tools](tools.md).

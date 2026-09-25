@@ -14,7 +14,7 @@
 
 ## 状态（2026-09-26，本分支）
 
-* 门禁工具、证据 schema 与离线自测已实现；`selftest` 通过 **133 项检查**（不涉及游戏与实机证据）。
+* 门禁工具、证据 schema 与离线自测已实现；`selftest` 通过 **152 项检查**（不涉及游戏与实机证据）。
 * **目前没有任何实机前置证据**，所以对任何真实 bundle 执行 `check` 都是 `blocked`。本文档刻意不声称门禁已通过。
 * 开发期间记录了独立基线：源存档（26.2-Fabric 实例下的 `Minecart ROM test`）的只读 tree 哈希为 `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`（40 个文件、11 556 310 字节，使用下方规范排除列表）。没有写入任何文件，源存档只被以只读方式打开。
 * 集成运行预留端口：**27240-27249**，通过 `run.allowed_port_ranges` 显式配置（编排便利，不是产品硬编码要求——见下）。
@@ -131,7 +131,7 @@ stage1-evidence/
 | `map.immutable` | b | true |
 | `map.download_verified` | b | 冷缓存下载已验证 |
 | `map.bad_hash_rejected` | b | 错误哈希被拒绝而非接受 |
-| `mods[]` | list | >= 1 项，每项 `{name, version, sha256(h64)}`；`carpet` 项与 `version_lock.carpet` 交叉核对 |
+| `mods[]` | list | >= 1 项，每项 `{name, version, sha256(h64)}`；`carpet` 项**必需**并与 `version_lock.carpet` 交叉核对 |
 | `world.directory` | s | 副本名，绝不是源存档本身 |
 | `world.tree_sha256` | h64 | 准备好的世界副本的 tree 哈希 |
 | `world.files` | i | > 0 |
@@ -141,7 +141,7 @@ stage1-evidence/
 | 字段 | 类型 | 要求 |
 | --- | --- | --- |
 | `init_id` | s | 每次运行唯一 |
-| `run_id` | s | 必须在 `run.child_runs` 中声明 |
+| `run_id` | s | 必须在 `run.child_runs` 中声明；必须使用 >= 3 个不同的 child run |
 | `instance_id` | s | 必须等于该 child run 声明的实例 |
 | `state_hash` | h64 | 所有初始化一致 |
 | `order_hash` | h16 | 所有初始化一致 |
@@ -151,9 +151,9 @@ stage1-evidence/
 | `ready` | b | true |
 | `tick` | i | >= 0 |
 
-`player-identity.json`：`uuid`、`name`、`dimension`、`pos`（v3）、`yaw`、`pitch`（n）、`source`（s，如 `carpet`）、`facing_target`（b true）、`server_vantage_uuid`（s，必须等于 `uuid`）。
+`player-identity.json`：`uuid`、`name`、`dimension`、`pos`（v3）、`yaw`、`pitch`（n）、`source`（s，如 `carpet`）、`facing_target`（b true）、`server_vantage_uuid`（s，必须等于 `uuid`）。该 `uuid` 是绑定的任务玩家：`identity-records.jsonl` 中除 `unknown_identity` 外的每一行都必须使用它，每个 `input_attempt`/`input_processed` 审计事件也必须携带它（或按下方规则显式声明缺失）。
 
-`command-block-scan.json`：`method`（s）、`world_dirs`（非空字符串列表）、`command_blocks`（i，必须为 0）、`scanned`（b true）、`placed_by_init`（b false）。
+`command-block-scan.json`：`method`（s）、`world_dirs`（非空字符串列表）、`command_blocks`（i，必须为 0）、`scanned`（b true）、`placed_by_init`（b false）。`world_dirs` 必须覆盖 fixture `world.directory` 以及每个已声明的 `run.instances[].world_dir`，扫描无关目录不能代替已声明世界。
 
 `cleanup-rebuild.json`：`steps`（非空字符串列表）、`source_world_untouched`（b true）、`rebuild_reproducible`（b true）。
 
@@ -209,13 +209,13 @@ stage1-evidence/
 | `seq` | i | >= 0；相同/碰撞的序号对失败，不能据此建立顺序 |
 | `event` | s | 见下 |
 | `phase` | s | `init`、`agent` 或 `restore`；`agent` 事件必须属于父 run |
-| `actor_uuid` | s | `input_attempt`/`input_processed` 上必需 |
+| `actor_uuid` | s/null | `input_attempt`/`input_processed` 上必需：绑定的任务玩家 UUID，或 `null` 加非空 `actor_provenance` 说明缺失原因 |
 | `cart_uuid` | s | `cart_emitted` 与 `cart_removed` 上必需 |
 | `pos` | v3 | 视事件而定 |
 | `captured_before_removal` | b | `cart_emitted` 上必须为 true |
 | `removal_reason` | s | `cart_removed` 上必须存在（如 `void`） |
 
-任何关联之前先强制来源校验：即使把改动后的字节正确刷新进证据索引，来自未声明 run、实例或维度的事件也会让门禁失败。必需事件：`input_attempt`、`input_processed`、`cart_emitted`、`cart_removed`。attempt -> processing -> emission -> removal 链按完整 `run_id/instance_id/dimension` 身份关联（移除另加 `cart_uuid`），`input_processed` 的 actor 必须与其 `input_attempt` 一致，每个 `cart_emitted` 都必须有同一身份上更早的处理输入，每个弹出的矿车都必须有对应的 `cart_removed`，每个弹出的矿车都在移除前被持久化，每次移除都带原因。`init`/`restore` 事件永远不算 Agent 操作。
+任何关联之前先强制来源校验：即使把改动后的字节正确刷新进证据索引，来自未声明 run、实例或维度的事件也会让门禁失败；非 null 的 `actor_uuid` 必须等于 fixture 假人 UUID（`audit_actor_mismatch`），键缺失失败（`audit_actor_missing`），`null` 且无 `actor_provenance` 失败（`audit_actor_provenance`）。必需事件：`input_attempt`、`input_processed`、`cart_emitted`、`cart_removed`。attempt -> processing -> emission -> removal 链按完整 `run_id/instance_id/dimension` 身份关联（移除另加 `cart_uuid`），`input_processed` 的 actor 必须与其 `input_attempt` 一致，每个 `cart_emitted` 都必须有同一身份上更早的处理输入，每个弹出的矿车都必须有对应的 `cart_removed`，每个弹出的矿车都在移除前被持久化，每次移除都带原因。`init`/`restore` 事件永远不算 Agent 操作。
 
 `negative-cases.jsonl` 必须覆盖 `no_interaction`、`wrong_position`、`marker_only`、`answer_only`，每行含 `attempted`（b）、`processed`（= 0）与 `evidence_ref`（s）。明确归入负例的事件绝不能是 `input_processed`。
 
@@ -279,5 +279,6 @@ stage1-evidence/
 * "hook 只读"之类的布尔事实与规范事件日志交叉核对，但本工具不会实机重测。
 * 各前置项的原始格式必须无损映射到上述 schema；该映射属于协调者审阅范围。
 * 门禁通过是阶段二的必要条件而非充分条件：issue 的其它验收点（人工审阅、正确答案证据）仍然必须满足。
+* 快照 `meta.json` 无法证明它来自哪个实机实例（`instance` 只是 `server`/`client`，`worldDir` 可为 null），因此前后快照对只证明状态相等，不证明端点身份；端点证据由绑定的 `restore-record.json` 加审计/轨迹来源提供。
 
 另见：[实验室服务器](lab-server.md)、[分叉校验](fork-verify.md)、[快照协议](protocol-snapshot.md)、[工具](tools.md)。
