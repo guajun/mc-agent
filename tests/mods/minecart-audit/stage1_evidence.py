@@ -21,6 +21,7 @@ Inputs (all produced by the live drivers in this directory):
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -76,6 +77,15 @@ def main() -> int:
     out = Path(args.out)
     bridge_summary = json.loads((bridge_evidence / "summary.json").read_text(encoding="utf-8"))
     live_summary = json.loads((live_evidence / "summary.json").read_text(encoding="utf-8"))
+    audit_jar = Path(args.audit_jar)
+    current_jar_sha = hashlib.sha256(audit_jar.read_bytes()).hexdigest()
+    used_jar_sha = (bridge_summary.get("auditJar") or {}).get("sha256")
+    if used_jar_sha and current_jar_sha != used_jar_sha:
+        raise SystemExit(
+            "audit jar bytes changed since the live bridge run "
+            f"({current_jar_sha} != {used_jar_sha}); rebuild and re-run the drivers "
+            "before exporting, or pass the jar the run actually used"
+        )
 
     src_run = bridge_summary["checks"]["source_run_id"]
     dst_run = bridge_summary["checks"]["experiment_run_id"]
@@ -171,6 +181,7 @@ def main() -> int:
     independent = next((entry for entry in report["checks"] if entry.get("id") == "independent_test_mod"), None)
     status = independent.get("status") if independent else "missing"
     summary = {
+        "auditJar": {"path": str(audit_jar), "sha256": current_jar_sha},
         "overall": report.get("overall"),
         "independent_test_mod": status,
         "reasons": [reason["message"] for reason in (independent or {}).get("reasons", [])],

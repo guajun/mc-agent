@@ -631,6 +631,10 @@ async def run_stages(args: argparse.Namespace) -> int:
                 process.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 process.kill()
+    if not args.keep_labs:
+        # Evidence is copied; dropping the labs frees the ports for the next run.
+        for name in ("rom18-b6-src", "rom18-b6-dst"):
+            shutil.rmtree(LABS / name, ignore_errors=True)
 
     summary["checks"]["restore_faithful"] = bool(applied.get("ok") and verified.get("ok"))
     summary["checks"]["source_run_id"] = src_run
@@ -647,6 +651,7 @@ async def run_stages(args: argparse.Namespace) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--keep-labs", action="store_true", help="keep the disposable labs for inspection")
     parser.add_argument("--bridge-source", default=str(DEFAULT_BRIDGE_SOURCE))
     parser.add_argument("--expect-bridge-head", default=DEFAULT_BRIDGE_HEAD)
     parser.add_argument("--python", default=str(DEFAULT_VENV_PYTHON))

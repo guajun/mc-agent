@@ -498,6 +498,7 @@ def verify(name: str, run_id: str, expect: list[str], allow_no_operation: bool =
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--skip-build", action="store_true")
+    parser.add_argument("--keep-labs", action="store_true", help="keep the disposable labs for inspection")
     parser.add_argument("--mc-dir", default=default_mc_dir())
     parser.add_argument("--java", default=default_java(), help="Java 25 executable; discovered by default")
     args = parser.parse_args()
@@ -570,6 +571,10 @@ def main() -> int:
         console = LABS / name / "logs" / "console.log"
         if console.exists():
             shutil.copy2(console, EVIDENCE / f"console-{name}.log")
+    if not args.keep_labs:
+        # Evidence is copied; dropping the labs frees the ports for the next driver.
+        for name in ("rom18-a", "rom18-b", "rom18-ctl", "rom18-src"):
+            shutil.rmtree(LABS / name, ignore_errors=True)
     logs = sorted(EVIDENCE.glob("rom18-a/audit-*.jsonl")) + sorted(EVIDENCE.glob("rom18-b/audit-*.jsonl"))
     cross = []
     for log in logs:
