@@ -12,7 +12,7 @@
 | **Java 25** | 编译 mod、运行实验室服务器 | `--jdk` 指向的 JDK；游戏本身用自带运行时即可 |
 | **Python 3.11+** | bridge、loop、工具 | 仓库旁边的虚拟环境 |
 | **接口 mod jar** | 一切 | `<实例>/mods/` |
-| **一个智能体运行时** | 智能体的"大脑"——[Hermes](hermes-setup.md)，或任何会说 MCP/HTTP 的东西 | 它自己的目录 |
+| **一个智能体运行时** | 智能体的"大脑"——[Hermes](hermes-setup.md)，或任何会说 MCP/HTTP 的东西；装上可移植的 [Toolkit Skill](toolkit-skill.md)，它才知道怎么用服务端视角 Toolkit | 它自己的目录 |
 | **一台 Fabric 服务器**（可选） | 隔离实验室轨道 | `labs/<名字>/`，由 `tools/lab_server.py` 供给 |
 
 ## 1. Minecraft 与 Fabric
@@ -93,6 +93,11 @@ HERMES_API_BASE=http://127.0.0.1:8642
 HERMES_MODEL=hermes-agent
 HERMES_API_KEY=<API server 的 key>
 ```
+
+接下来装可移植的 [Toolkit Skill](toolkit-skill.md)：它教运行时如何发现
+Toolkit、按 UUID 解析调用者、取回聊天瞬间的上下文包，以及查询权威状态。若想让
+Hermes 自己拥有触发（而不是 loop），见
+[Hermes 无人值守](hermes-unattended.md)。
 
 ## 5. 可选：实验室服务器
 

@@ -2,6 +2,15 @@
 
 这套框架里的智能体实际是怎么跑起来的：Hermes 是 loop 的后端，bridge 是它的工具面，Minecraft 是世界。
 
+!!! info "事件驱动的 Hermes 有独立路径"
+    本页把 Hermes 接成 **loop 的模型后端**：`mc-agent-loop` 拥有聊天触发，并通过
+    Hermes 的 OpenAI 兼容 API 调用它。对于无人值守、由事件触发的运行，Hermes 也
+    可以自己拥有触发——用户在 Hermes Gateway 配置一条 webhook route，加载同一份
+    可移植的 [Toolkit Skill](toolkit-skill.md)，直接使用 Bridge MCP 工具。见
+    [Hermes 无人值守：webhook + Toolkit Skill](hermes-unattended.md)。这条路径验证
+    通过后，loop 的 Hermes 后端将被移除
+    （[mc-agent-loop#3](https://github.com/guajun/mc-agent-loop/issues/3)）。
+
 下面全部是 Windows 原生路径；换到 Linux/macOS 只要替换路径。
 
 ## 1. 安装 Hermes

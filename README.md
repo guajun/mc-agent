@@ -64,6 +64,10 @@ purpose.
 - [RFC 0002 - programmable tool calls (running agent-written code in the game)](docs/rfc/0002-programmable-tool-calls.md) - deferred, not implemented; the decision is in [concepts.md](docs/concepts.md)
 - [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
   server, MCP tools, and the end-to-end check
+- [Installing the Toolkit Skill](docs/toolkit-skill.md) - one portable Agent
+  Skill for every harness, installed with `gh skill install`
+- [Unattended Hermes](docs/hermes-unattended.md) - webhook-triggered runs that
+  load the same Skill without the loop's Hermes backend
 - [Who is the agent, in game?](docs/player-identity.md) - second client,
   Carpet fake players, and when to want a server-side adapter
 - [Lab servers the agent raises itself](docs/lab-server.md) - `tools/lab_server.py`:

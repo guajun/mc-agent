@@ -112,6 +112,11 @@ For a real model, start Hermes and point the loop at it - see
 .venv/Scripts/mc-agent-loop run --backend hermes --trigger @codex --env-file .env
 ```
 
+For unattended, event-driven runs Hermes can own the trigger as well: a
+user-configured webhook route loads the portable
+[Toolkit Skill](toolkit-skill.md) and calls the Bridge MCP tools directly. See
+[Unattended Hermes](hermes-unattended.md).
+
 The loop ignores its own messages (otherwise it would answer itself forever), so
 in a single-player world the trigger has to come from somebody else - another
 player, or the agent's own player as described in

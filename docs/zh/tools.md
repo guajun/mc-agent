@@ -48,6 +48,14 @@ mc-agent-loop/             智能体 loop 与它的后端
 
 `mc_entities` 刻意返回摘要：真实世界里半径 64 格会回 256 KB 的 JSON，模型没法有效阅读。想看更多就传 `types=` 过滤并调大 `limit`。
 
+!!! info "服务端视角 Toolkit 与它的 Skill"
+    bridge 正在成为接收方中立的服务端视角 Toolkit：`player` 和 `context` 会加进
+    工具面，分别提供每个玩家的上下文和聊天瞬间的上下文包，而 `capabilities` 会
+    如实报告连接的 mod 支持哪些操作。智能体的工作流写在可移植的
+    [Toolkit Skill](toolkit-skill.md) 里；某个具体连接能做什么，以
+    `mc-bridge call capabilities`（或 `mc_capabilities`）为准。想让它由游戏事件
+    无人值守地触发，见 [Hermes 无人值守](hermes-unattended.md)。
+
 ## mc-agent-loop
 
 | 命令 | 作用 |

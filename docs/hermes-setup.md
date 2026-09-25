@@ -3,6 +3,16 @@
 How the agent in this framework is actually run: Hermes as the agent loop's
 backend, the bridge as its tool surface, Minecraft as the world.
 
+!!! info "Event-driven Hermes has its own path"
+    This page wires Hermes as the **loop's model backend**: `mc-agent-loop` owns
+    the chat trigger and calls Hermes over its OpenAI-compatible API. For
+    unattended, event-triggered runs, Hermes can own the trigger too - a
+    user-configured webhook route loads the same portable
+    [Toolkit Skill](toolkit-skill.md) and uses the Bridge MCP tools directly.
+    See [Unattended Hermes: webhook + Toolkit Skill](hermes-unattended.md). The
+    loop's Hermes backend is slated for removal once that path is verified
+    ([mc-agent-loop#3](https://github.com/guajun/mc-agent-loop/issues/3)).
+
 Everything below is Windows-native; the same steps work on Linux/macOS with the
 paths swapped.
 

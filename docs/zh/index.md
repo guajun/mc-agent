@@ -72,6 +72,8 @@ python tools/smoke_offline.py --backend hermes    # 真模型驱动真工具
 * [智能体在游戏里是谁](player-identity.md) —— 第二个客户端、Carpet 假人，或服务端 mod
 * [分叉一个活的世界](protocol-snapshot.md) —— 快照协议与还原配方
 * [用 Hermes 运行智能体](hermes-setup.md) —— 本项目对着开发的运行时
+* [安装 Toolkit Skill](toolkit-skill.md) —— 每个运行时共用的一份可移植 Skill
+* [Hermes 无人值守](hermes-unattended.md) —— webhook 触发、加载同一份 Skill
 * [无头实验室服务器](lab-server.md) —— 供给、启停与控制
 * [工具](tools.md) —— 全部 CLI 与 MCP 工具
 * [疑难排查](troubleshooting.md) —— 那些坑，大多是真机上撞出来的

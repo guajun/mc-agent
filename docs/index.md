@@ -81,6 +81,8 @@ python tools/smoke_offline.py --backend hermes    # the real model drives the to
 * [Who is the agent in game](player-identity.md) - a second client, a Carpet fake player, or a server mod
 * [Forking a live world](protocol-snapshot.md) - the snapshot protocol and the restore recipe
 * [Running the agent on Hermes](hermes-setup.md) - the runtime this was built against
+* [Installing the Toolkit Skill](toolkit-skill.md) - one portable skill for every harness
+* [Unattended Hermes](hermes-unattended.md) - webhook-triggered runs with the same skill
 * [Headless lab servers](lab-server.md) - provision, start and command a lab
 * [Tools](tools.md) - every CLI and MCP tool
 * [Troubleshooting](troubleshooting.md) - the traps, most of them found the hard way

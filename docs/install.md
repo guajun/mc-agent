@@ -15,7 +15,7 @@ system-wide.
 | **Java 25** | building the mod, and running a lab server | the JDK you point `--jdk` at; the game's own runtime is fine for the game |
 | **Python 3.11+** | bridge, loop, tools | a virtual environment next to the repos |
 | **interface mod jar** | everything | `<instance>/mods/` |
-| **an agent runtime** | the agent's mind - [Hermes](hermes-setup.md), or anything that speaks MCP/HTTP | its own directory |
+| **an agent runtime** | the agent's mind - [Hermes](hermes-setup.md), or anything that speaks MCP/HTTP; install the portable [Toolkit Skill](toolkit-skill.md) so it knows how to use the server-vantage Toolkit | its own directory |
 | **a Fabric server** (optional) | the isolated-lab track | `labs/<name>/`, provisioned by `tools/lab_server.py` |
 
 ## 1. Minecraft and Fabric
@@ -115,6 +115,12 @@ HERMES_API_BASE=http://127.0.0.1:8642
 HERMES_MODEL=hermes-agent
 HERMES_API_KEY=<the API server key>
 ```
+
+Install the portable [Toolkit Skill](toolkit-skill.md) next: it is what teaches
+the runtime how to discover the Toolkit, resolve a caller by UUID, fetch a
+chat-time context bundle, and query authoritative state. For unattended runs
+where Hermes owns the trigger instead of the loop, see
+[Unattended Hermes](hermes-unattended.md).
 
 ## 5. Optional: a lab server
 
