@@ -1,11 +1,62 @@
 # Stage-one integration run
 
+!!! success "Full gate pass (2026-09-25, branch `codex/rom13-fullgate`)"
+    The issue-#14 acceptance run (`tools/stage1_fullgate.py`, run id
+    `rom13-fullgate-20260925T210725Z`) has now executed the **full** combined
+    stage-one recipe against the merged #15 fixture and #18 audit mod and the
+    gate reports **pass 8/8** (exit 0), including the read-only source-world
+    re-hash. The compact, versioned record with every pinned hash is
+    [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json).
+    The blocked result documented below is the earlier generic plumbing run
+    (#28, head `32aa245`) and is kept as history; it is superseded by the full
+    gate on this branch pending human review.
+
 This page documents the reproducible **combined** stage-one integration: two
 real Fabric labs, the self-built smoke mod, the committed #18 audit mod, a
 finalized tool trajectory, the merged bridge#6 restore evidence and the gate
 verdict. It is the bridge between the individual prerequisites and the
-stage-two cold start, and it deliberately stops at the gate's `blocked` line:
-the ROM map fixture (#15) and the same-run restore artifacts do not exist yet.
+stage-two cold start, and it deliberately stops at the gate line: no stage-two
+work happens here.
+
+## Full gate run (`tools/stage1_fullgate.py`)
+
+The full gate driver executes six phases against a fresh pair of labs on
+ports 27240-27249, using the merged fixture on `rom13-src` (27240-27243) and
+the restored experiment copy on `rom13-exp` (27244-27247):
+
+| Phase | What it produces |
+| --- | --- |
+| `live` | fixture re-init, fork + guarded same-run restore into the experiment lab, seven failure cases, the positive audit session on the restored machine and four negatives on a disposable void lab, plus the finalized trajectory |
+| `identity` | the five `player_context` records from live task binding/unbinding probes |
+| `devcap` | harness `tool_environment`, same-size jar update, smoke-mod build/deploy and instance isolation |
+| `trace` | frozen trajectory to gate `tool-trace` + verified joins, missing-log detection |
+| `smoke` | five smoke suites, fixture calibration against a real no-mod control lab, version lock |
+| `compose` | audit export, restore snapshot trees + failure cases, bundle spec, gate run |
+
+The 2026-09-25 pass used run id `rom13-fullgate-20260925T210725Z`:
+
+| Check | Verdict | Evidence anchor |
+| --- | --- | --- |
+| `fixture_map` | pass | map `469548…1387`, three identical init runs (`86215e40…`), player `3ec122d5…` |
+| `restore_fidelity` | pass | 13 entities, order hash `cc76834fd15c0e21` before and after, seven failure cases |
+| `player_context` | pass | five live identity records, unknown identity rejected |
+| `agent_dev_capability` | pass | jar update `227d7a91…` -> `2f042c13…` loaded, smoke mod, two isolated instances |
+| `independent_test_mod` | pass | 11 canonical agent events incl. `cart_removed`, four failing negatives, passing source child |
+| `trace_persistence` | pass | 47 finalized calls, 11 verified joins, 0 unmatched agent events, 0 gaps |
+| `smoke_fixture_validity` | pass | five suites, 9-component version lock, control-lab parity |
+| `evidence_integrity` | pass | 27 pinned index entries, source world `8cd54c86…` unchanged |
+
+```bash
+python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity \
+  && python tools/stage1_fullgate.py devcap && python tools/stage1_fullgate.py trace \
+  && python tools/stage1_fullgate.py smoke && python tools/stage1_fullgate.py compose
+```
+
+The gate only accepts the raw artifacts; raw logs stay in the git-ignored
+`labs/fullgate-evidence/` of the worktree that ran them, and the summary above
+pins their hashes. Only a reviewed `pass` authorizes stage two; the driver
+never merges and never closes the issue.
+
 
 !!! warning "No ROM solution"
     The scene is a single generic note block pushing one stack of chest
@@ -154,7 +205,7 @@ and pins their hashes. It is a **different live run** and is deliberately not
 joined to the generic integration run: there is no shared tool/event clock
 across the old labs, so the gate's same-run restore binding is not claimed.
 
-## Gate result
+## Earlier run: gate result (blocked)
 
 `python tools/stage1_evidence.py assemble --bundle labs/rom13-integration/bundle --spec … --source-world "<save>"`
 

@@ -1,6 +1,28 @@
 # 阶段一集成运行
 
-本页记录可复现的**组合式**阶段一集成：两个真实 Fabric 实验室、自构建的 smoke mod、已提交的 #18 审计 mod、最终冻结的工具轨迹、已合并的 bridge#6 恢复证据，以及门禁结论。并刻意停在门禁的 `blocked` 线上：#15 地图 fixture 与同 run 的恢复证据尚未就绪。
+!!! success "完整门禁通过（2026-09-25，分支 `codex/rom13-fullgate`）"
+    issue #14 的验收运行（`tools/stage1_fullgate.py`，run id
+    `rom13-fullgate-20260925T210725Z`）已在已合并的 #15 fixture 与 #18 审计 mod
+    上执行**完整**组合阶段一流程，门禁结果为 **pass 8/8**（exit 0），并通过只读源世界重新哈希。带全部固定哈希的版本化摘要见
+    [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json)。
+    下文记录的 blocked 结果是更早的通用接线运行（#28，head `32aa245`），仅作历史保留；本分支的完整门禁已取代它，等待人工评审。
+
+本页记录可复现的**组合式**阶段一集成：两个真实 Fabric 实验室、自构建的 smoke mod、已提交的 #18 审计 mod、最终冻结的工具轨迹、已合并的 bridge#6 恢复证据，以及门禁结论。并停在门禁线上：这里不做任何阶段二工作。
+
+## 完整门禁运行（`tools/stage1_fullgate.py`）
+
+完整门禁驱动在端口 27240-27249 上以六个阶段运行：`live`（fixture 重建、fork + 同 run 守卫恢复、七类失败用例、恢复后机器上的正向审计、四个负例与冻结轨迹）、`identity`（五条 player_context 记录）、`devcap`（工具环境、同尺寸 jar 更新、smoke mod、实例隔离）、`trace`（冻结轨迹到门禁工具轨迹 + verified join）、`smoke`（五套 smoke 套件、真实无 mod 对照实验、版本锁）、`compose`（审计导出、恢复快照与失败用例、bundle 规格、门禁运行）。
+
+2026-09-25 通过运行的关键事实：地图 `469548…1387`；三次 init run 一致（`86215e40…`）；恢复 13 个实体，前后顺序哈希均为 `cc76834fd15c0e21`；七类失败用例全部通过；11 条 canonical agent 事件（含 `cart_removed`）；47 次冻结调用、11 条 verified join、0 个未匹配 agent 事件；27 条 evidence index 固定项；源世界 `8cd54c86…` 未改变。
+
+```bash
+python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity \
+  && python tools/stage1_fullgate.py devcap && python tools/stage1_fullgate.py trace \
+  && python tools/stage1_fullgate.py smoke && python tools/stage1_fullgate.py compose
+```
+
+门禁只接受原始工件；原始日志保留在执行运行的 worktree 的 git-ignore 目录 `labs/fullgate-evidence/` 下，摘要固定其哈希。只有经过人工评审的 `pass` 才授权阶段二；驱动不做合并，也不关闭 issue。
+
 
 !!! warning "不做 ROM 解法"
     场景只是一个通用音符盒把一摞箱子矿车推入虚空。它是接线验证，不是 ROM，也不是 Agent 运行。这里不写 Agent logger，也不给未来的冷启动喂答案。
@@ -92,7 +114,7 @@ python tools/stage1_integration.py run --bundle-only   # 从 normalize-inputs.js
 
 收集只复制两个快照的 `meta.json`/`entities.jsonl` 并固定哈希。它是**另一次实机运行**，刻意不与通用集成 run 关联：旧 lab 之间没有共享的工具/事件时钟，因此不声称门禁的同 run 恢复绑定。
 
-## 门禁结果
+## 更早运行：门禁结果（blocked）
 
 `python tools/stage1_evidence.py assemble --bundle labs/rom13-integration/bundle --spec … --source-world "<存档>"`
 

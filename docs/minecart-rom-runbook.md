@@ -42,22 +42,27 @@ extracts the reviewed #20 artifacts into a parameterized regression.
 | stage-one gate tool | merged (#22) | `tools/stage1_gate.py`; `selftest` **152 checks** |
 | cold-start protocol tools | merged (#25) | `tools/coldstart.py`, `harness_preflight.py`, `run_trace.py`, `run_audit.py` |
 | combined integration driver | merged (#28, `2675825`) | `tools/stage1_integration.py`; [stage-one integration run](stage1-integration.md) |
-| fixture #15 | PR [#27](https://github.com/guajun/mc-agent/pull/27) open; inspected snapshot `37fb824` (2026-09-26), **not accepted** | `examples/minecart-rom/` on the branch |
-| audit mod #18 | PR [#26](https://github.com/guajun/mc-agent/pull/26) open; inspected snapshot `0e8c15b` (2026-09-26), **not accepted** | `tests/mods/minecart-audit/` on the branch |
-| live stage-one gate | **BLOCKED** (1 pass, 0 fail, 7 blocked) | [`docs/evidence/rom13-stage1/integration-summary.json`](evidence/rom13-stage1/integration-summary.json) |
+| full gate acceptance driver | on branch `codex/rom13-fullgate` (PR for #14) | `tools/stage1_fullgate.py`; [full gate summary](evidence/rom13-stage1/full-gate-summary.json) |
+| fixture #15 | merged (#27, `8dd75c6`) | `examples/minecart-rom/` |
+| audit mod #18 | merged (#26, `824c15d`) | `tests/mods/minecart-audit/` |
+| live stage-one gate | **PASS 8/8** (exit 0) on branch `codex/rom13-fullgate`, pending human review | [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json) |
 | stage #20 | not started | no cold-start run directory, no agent logger |
 | stage #21 | not prepared | - |
-| source save | unchanged | tree hash `8cd54c86...324a` (40 files) |
+| source save | unchanged through the full gate run | tree hash `8cd54c86...324a` (40 files, 11,556,310 bytes) |
 
-Merged prerequisite PRs at this time: bridge#8, bridge#9, #22, #23, #24, #25,
-#28. Issues #16, #17 and bridge#6 are closed with evidence comments; #15 and
-#18 stay open.
+Merged prerequisite PRs: bridge#8, bridge#9, #22, #23, #24, #25,
+#26, #27, #28, #29. Issues #16, #17 and bridge#6 are closed with evidence
+comments. The full gate pass above is the acceptance run for #14; only a
+reviewed `pass` authorizes stage two, and the agent does not merge it.
 
-The PR heads above are **immutable inspected snapshots**, not live claims: both
-branches were still being repaired at that snapshot. Before executing a recipe,
-resolve the actual accepted/merged head, for example
-`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`, and re-check the
-flags against that tree.
+The historical notes below were written when #15/#18 were still snapshots on
+open branches. They are kept as history; the accepted heads are now merged in
+`main` and are pinned in the full gate summary.
+
+The merged heads above are the accepted inputs for the full gate run. Before
+re-running a recipe, re-resolve them, for example
+`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`, and check that
+the tree still matches the pinned hashes in the full gate summary.
 
 !!! note "Tracker history (historical record, 2026-09-25)"
     #14 and #19 were briefly closed right after the tooling PRs merged,

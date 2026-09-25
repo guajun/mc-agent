@@ -1450,7 +1450,12 @@ def assemble(
         evidence: dict[str, Any] = {}
         for kind, artifact in check_spec.artifacts.items():
             canonical = CANONICAL.get(kind)
-            if canonical is None or kind == "evidence_index":
+            if canonical is None:
+                continue
+            if kind == "evidence_index":
+                # written below; declare it so the gate sees the artifact, but
+                # never index it (its own hash is circular)
+                evidence[kind] = canonical
                 continue
             path = bundle / canonical
             if path.is_file() or path.is_dir():

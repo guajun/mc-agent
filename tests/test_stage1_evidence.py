@@ -356,6 +356,11 @@ class AssembleTests(unittest.TestCase):
             self.assertIn(report["gate"]["overall"], ("blocked", "fail"))
             checks = {check["id"]: check for check in report["gate"]["checks"]}
             self.assertEqual(checks["independent_test_mod"]["status"], "blocked")
+            manifest = json.loads((bundle / "bundle.json").read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["checks"]["smoke_fixture_validity"]["evidence"]["evidence_index"],
+                EVIDENCE.CANONICAL["evidence_index"],
+            )
             index = json.loads((bundle / EVIDENCE.CANONICAL["evidence_index"]).read_text(encoding="utf-8"))
             paths = {entry["path"] for entry in index["entries"]}
             self.assertIn(EVIDENCE.CANONICAL["audit_events"], paths)

@@ -1,0 +1,343 @@
+{
+  "kind": "rom13-stage1-full-gate-summary",
+  "evidenceVersion": 1,
+  "issue": "guajun/mc-agent#14",
+  "date": "2026-09-25T21:17:40Z",
+  "repoHeadAtRun": "824c15d4cd1ac714cb738d166846377d710b07c7",
+  "branch": "codex/rom13-fullgate",
+  "acceptance": "pending human review of this pull request; the gate pass is not a merge decision",
+  "gate": {
+    "overall": "pass",
+    "exitCode": 0,
+    "generatedAt": "2026-09-25T21:17:40Z",
+    "checks": {
+      "fixture_map": "pass",
+      "restore_fidelity": "pass",
+      "player_context": "pass",
+      "agent_dev_capability": "pass",
+      "independent_test_mod": "pass",
+      "trace_persistence": "pass",
+      "smoke_fixture_validity": "pass",
+      "evidence_integrity": "pass"
+    },
+    "failReasons": 0,
+    "blockedReasons": 0,
+    "bundle": "labs/fullgate-evidence/bundle",
+    "bundleTreeSha256": "284e3548740c01bc8502f54a25b338e77cd7b73f496528b57a0f4b2d6a28ae64",
+    "bundleFiles": 36,
+    "bundleBytes": 224919,
+    "bundleJsonSha256": "d330480698cc56697136fc111feb874d008fc13f7c9389d8bc457de2bc5e23d3",
+    "evidenceIndexSha256": "17212935c829e12bfdb0a6839b4cf4eb235116d8fc110132ef1593621397f869",
+    "evidenceIndexEntries": 27,
+    "limitations": [
+      "The gate validates coordinator-provided raw artifacts; it cannot prove they were not fabricated. Keep the raw logs and spot-check the evidence index.",
+      "Boolean facts such as hook read-only behavior are cross-checked against the canonical event log, not re-measured live by this tool.",
+      "A pass authorizes the stage-two cold start only after the coordinator reviews this report and the artifact hashes."
+    ]
+  },
+  "run": {
+    "runId": "rom13-fullgate-20260925T210725Z",
+    "runDir": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\fullgate-evidence\\run-20260925T210725Z",
+    "ports": {
+      "rom13-src": [
+        27240,
+        27241,
+        27242,
+        27243
+      ],
+      "rom13-exp": [
+        27244,
+        27245,
+        27246,
+        27247
+      ],
+      "rom13-neg": [
+        27248,
+        27249
+      ],
+      "control-rom18-ctl": [
+        27150,
+        27151
+      ]
+    },
+    "sourceWorld": {
+      "label": "Minecart ROM test",
+      "path": "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test",
+      "beforeTreeSha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "afterTreeSha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "files": 40,
+      "bytes": 11556310
+    },
+    "interface": {
+      "jar": "F:\\mc-agent-worktrees\\rom13\\meta16\\labs\\_build\\mods\\mc-agent-interface-0.6.0.jar",
+      "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+      "commit": "3b93ceb137f8e05624d9d443356c0db78c4b4751"
+    },
+    "bridge": {
+      "source": "F:\\mc-agent-worktrees\\rom13\\bridge6",
+      "runtimeHead": "4116ebb34b60e962e95834791d521b369fd52c65",
+      "mergedHead": "e9a1968784d286ce31ceeb94365fbc00ac0fc9e1"
+    }
+  },
+  "trajectory": {
+    "path": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\fullgate-evidence\\run-20260925T210725Z\\trajectory.final.jsonl",
+    "sha256": "d2edcd2307cabf003f71b556aa82e9c14f595a703b035ced2e81ddd51e1bd2bb",
+    "windowsSha256": "09c83d5c86f04aaeb3efc1c0d1a83962b5aa16d0681900e61224098a5622bc96",
+    "calls": 47,
+    "results": 47,
+    "uniqueCallIds": 47,
+    "finalizedAt": "2026-09-25T21:14:50Z"
+  },
+  "trace": {
+    "toolTraceSha256": "e68a45d726bea9551cd093f49d36326269b582f06bac071a389b62fd5368e1e6",
+    "traceJoinSha256": "f7c1ec27b0cf87fbb1810d5f650d91f8862529acc77c04305a91f7a278ae730c",
+    "verifiedJoins": 11,
+    "unmatchedToolCalls": 43,
+    "unmatchedAgentEvents": 0,
+    "reportOk": true,
+    "gaps": 0,
+    "missingLogDetectionSha256": "6f9154d65303ad7d030ed7f9a34ef6874aa167c8312bcf52c4643f827eba9d14"
+  },
+  "audit": {
+    "positiveRunId": "rom13-fullgate-20260925T210725Z",
+    "positiveLog": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\fullgate-evidence\\audit\\positive-rom13-fullgate-20260925T210725Z.jsonl",
+    "positiveLogSha256": "1d014659888078b18bf59ce291c9bf7489a98d5897cae39e628f3606f73e0656",
+    "canonicalEvents": {
+      "path": "bundle/artifacts/independent_test_mod/audit-events.jsonl",
+      "sha256": "1ac5cec2a35a5645781aa26c695519da6e0e0c137b27c92344aedb979734835c",
+      "count": 11,
+      "byType": {
+        "cart_emitted": 1,
+        "cart_removed": 1,
+        "input_attempt": 6,
+        "input_processed": 3
+      }
+    },
+    "negativeCases": [
+      {
+        "case": "no_interaction",
+        "verdict": "fail"
+      },
+      {
+        "case": "wrong_position",
+        "verdict": "fail"
+      },
+      {
+        "case": "marker_only",
+        "verdict": "fail"
+      },
+      {
+        "case": "answer_only",
+        "verdict": "fail"
+      }
+    ],
+    "sourceChildVerdict": "pass"
+  },
+  "restore": {
+    "applied": 13,
+    "orderHashBefore": "cc76834fd15c0e21",
+    "orderHashAfter": "cc76834fd15c0e21",
+    "snapshotBeforeTreeSha256": "2db987f0b210cbb3e621029ed682d7dfbbfe055d2d04d3a6cb9ac6fa374826de",
+    "snapshotAfterTreeSha256": "a41c14ceee13f4b1cbc8a3a1ad3d296647cf390215496adc31f238f8673de016",
+    "failureCases": [
+      {
+        "case": "inventory_mutation_order_hash",
+        "passed": true
+      },
+      {
+        "case": "wrong_endpoint",
+        "passed": true
+      },
+      {
+        "case": "duplicate_pre_existing",
+        "passed": true
+      },
+      {
+        "case": "unverified",
+        "passed": true
+      },
+      {
+        "case": "corrupt_metadata",
+        "passed": true
+      },
+      {
+        "case": "partial_failure",
+        "passed": true
+      },
+      {
+        "case": "summon_refusal",
+        "passed": true
+      }
+    ],
+    "sourceUnchanged": true,
+    "issuedIsNotSuccess": true
+  },
+  "fixture": {
+    "mapSha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+    "downloadVerified": true,
+    "urlPin": "commit",
+    "initRuns": [
+      {
+        "runId": "init-child-1",
+        "stateHash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+        "orderHash": "a3ba375742d0de28"
+      },
+      {
+        "runId": "init-child-2",
+        "stateHash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+        "orderHash": "a3ba375742d0de28"
+      },
+      {
+        "runId": "init-child-3",
+        "stateHash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+        "orderHash": "a3ba375742d0de28"
+      }
+    ],
+    "playerUuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+    "commandBlocks": 0,
+    "scannedWorldDirs": [
+      "labs/_cache/maps/unpacked/minecart-rom-base-1.0.0/world",
+      "labs/rom13-exp/world",
+      "labs/rom13-src/world"
+    ],
+    "cleanupRebuildSha256": "9d03d544d9d13899d9def557ffcc0d4530006ac50d92614039a13a4f070ba1ae"
+  },
+  "identity": [
+    {
+      "case": "task_bind",
+      "accepted": true
+    },
+    {
+      "case": "hit",
+      "accepted": true
+    },
+    {
+      "case": "miss",
+      "accepted": true
+    },
+    {
+      "case": "two_players",
+      "accepted": true
+    },
+    {
+      "case": "unknown_identity",
+      "accepted": false
+    }
+  ],
+  "capability": {
+    "toolEnvironment": {
+      "harness": "pi",
+      "model": "deepseek-flash",
+      "tools": {
+        "terminal": true,
+        "file": true,
+        "filesystem_write": true,
+        "source_access": true,
+        "build": true,
+        "install": true,
+        "mcp_or_cli": true,
+        "lab_manage": true
+      }
+    },
+    "jarUpdate": {
+      "case": "same_size_different_content",
+      "old_sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+      "new_sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+      "loaded_sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+      "bytes": 15177
+    },
+    "smokeMod": {
+      "mod_id": "mc-agent-lab-smoke",
+      "version": "0.1.0",
+      "built_sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+      "deployed_sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643"
+    },
+    "instanceIsolation": {
+      "count": 2,
+      "sourceAudit": "rom13-src",
+      "experiment": "rom13-exp",
+      "distinctWorlds": true,
+      "distinctPorts": true
+    }
+  },
+  "smoke": {
+    "suites": [
+      {
+        "suite": "smoke_offline",
+        "status": "pass"
+      },
+      {
+        "suite": "lab_boot",
+        "status": "pass"
+      },
+      {
+        "suite": "fake_player_mcp",
+        "status": "pass"
+      },
+      {
+        "suite": "snapshot_restore",
+        "status": "pass"
+      },
+      {
+        "suite": "test_mod_load",
+        "status": "pass"
+      }
+    ],
+    "versionLock": [
+      {
+        "name": "mc-agent",
+        "version": "824c15d4cd1a"
+      },
+      {
+        "name": "mc-agent-interface-mod",
+        "version": "0.6.0"
+      },
+      {
+        "name": "mc-agent-bridge",
+        "version": "0.4.1"
+      },
+      {
+        "name": "minecraft",
+        "version": "26.2"
+      },
+      {
+        "name": "fabric-loader",
+        "version": "0.19.5"
+      },
+      {
+        "name": "jdk",
+        "version": "25.0.1"
+      },
+      {
+        "name": "carpet",
+        "version": "26.2+v260616"
+      },
+      {
+        "name": "test-mod",
+        "version": "0.1.0"
+      },
+      {
+        "name": "fixture-map",
+        "version": "1.0.0"
+      }
+    ],
+    "withModWithoutModConsistent": true
+  },
+  "reproduce": [
+    "python tools/stage1_fullgate.py live",
+    "python tools/stage1_fullgate.py identity",
+    "python tools/stage1_fullgate.py devcap",
+    "python tools/stage1_fullgate.py trace",
+    "python tools/stage1_fullgate.py smoke",
+    "python tools/stage1_fullgate.py compose",
+    "python tools/stage1_gate.py check labs/fullgate-evidence/bundle --source-world \"D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test\""
+  ],
+  "failedAttempts": [
+    "20260925T203053Z: a runway fill caught the generic machine cart, so no cart_removed event existed and the audit chain was incomplete; the driver no longer builds the runway and removes the exited cart with an explicit bounded kill after the sprint.",
+    "compose: the restore record read checks.existing as an int, but it is a collision report; fixed to read the duplicate count and the failed list.",
+    "20260925T205925Z: a stale rom18-ctl lab recorded ports 27248/27249 and blocked the negative-lab provision; the driver now removes the stale control lab first.",
+    "chain 2: the fixture command-block scan did not cover the experiment world, init child runs were undeclared, canonical audit run ids were <run>-exp while bundle.run.run_id was <run>, the smoke-mod artifact used the wrong canonical filename, instance world dirs were absolute versus the declared relative value, and the evidence index was undeclared; all were fixed in the driver/adapter without weakening any check.",
+    "20260925T210725Z: gate pass 8/8 with zero fail and zero blocked reasons."
+  ],
+  "rawEvidence": "Raw artifacts stay under the git-ignored labs/fullgate-evidence/ of the worktree that produced them; the hashes above pin them for spot checks."
+}

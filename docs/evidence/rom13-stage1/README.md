@@ -1,9 +1,22 @@
 # Stage-one integration evidence
 
-`integration-summary.json` is the durable, compact record of the combined
+`full-gate-summary.json` (version 1) is the durable, compact record of the
+**full issue-#14 acceptance run** on branch `codex/rom13-fullgate`: the merged
+#15 fixture, the same-run guarded restore, the positive/negative audit
+sessions, the five smoke suites, the finalized trajectory and the gate verdict
+**pass 8/8** (exit 0, run id `rom13-fullgate-20260925T210725Z`). It pins the
+sha256 of every artifact the gate consumed (bundle tree, evidence index,
+canonical audit events, tool trace, joins, snapshots, trajectory, positive log)
+plus the unchanged source-world tree hash. Raw artifacts stay under the
+git-ignored `labs/fullgate-evidence/` directory of the worktree that produced
+them, so a reviewer can spot-check any pinned hash against the raw file.
+
+`integration-summary.json` is the earlier durable record of the combined
 stage-one integration run (two real labs, smoke mod, committed #18 audit mod,
-tool trajectory, gate verdict). The raw files stay under the git-ignored
-`labs/rom13-integration/` directory in the worktree that produced them:
+tool trajectory, gate verdict) before the #15 fixture landed; the gate was
+honestly `blocked` there, and that record is kept as history. The raw files of
+that run stay under the git-ignored `labs/rom13-integration/` directory in the
+worktree that produced them:
 
 ```
 labs/rom13-integration/
