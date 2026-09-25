@@ -376,13 +376,13 @@ class Lab:
             command += ["--jdk", self.jdk]
         if test_mod is not None:
             command += ["--test-mod", str(test_mod)]
-        rec.run(f"provision-{self.name}", command, tool="bash")
+        rec.run(f"provision-{self.name}", command, tool="bash", instance=self.name)
 
     def start(self, rec: Recorder) -> None:
-        rec.run(f"start-{self.name}", [PY, str(LAB_SERVER), "start", "--name", self.name, "--wait", "420"], timeout=600)
+        rec.run(f"start-{self.name}", [PY, str(LAB_SERVER), "start", "--name", self.name, "--wait", "420"], timeout=600, instance=self.name)
 
     def stop(self, rec: Recorder) -> None:
-        rec.run(f"stop-{self.name}", [PY, str(LAB_SERVER), "stop", "--name", self.name], allow_fail=True, timeout=180)
+        rec.run(f"stop-{self.name}", [PY, str(LAB_SERVER), "stop", "--name", self.name], allow_fail=True, timeout=180, instance=self.name)
 
     def identity(self, rec: Recorder) -> dict[str, Any]:
         result = rec.run(
@@ -432,14 +432,13 @@ class Driver:
     audit_instance: str = "exp-1"
     interface_jar: str | None = None
     audit_mod_source: str | None = None
+    run_id: str = ""
+    run_dir: Path | None = None
+    finalized: bool = False
 
     @property
     def base(self) -> Path:
         return LABS / self.name
-
-    @property
-    def run_dir(self) -> Path:
-        return self.base / "run-01"
 
     @property
     def bundle(self) -> Path:
@@ -447,42 +446,161 @@ class Driver:
 
     def run(self) -> dict[str, Any]:
         summary: dict[str, Any] = {
+            "evidenceVersion": 2,
             "name": self.name,
             "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
             "java": self.java,
             "jdk": self.jdk,
+            "runId": None,
+            "runDir": None,
             "steps": [],
             "gaps": [],
             "labs": {},
             "gate": None,
         }
-        rec = Recorder(self.run_dir, f"{self.name}-run-01", trace=not self.bundle_only)
-        if not self.bundle_only:
-            rec.init(
-                "Stage-one combined integration: raise two generic labs, build and deploy the smoke mod, "
-                "prove instance identity and restart isolation, capture tool traces and normalize evidence. "
-                "No ROM solution and no agent logger."
-            )
         try:
-            if not self.bundle_only:
+            if self.bundle_only:
+                inputs = self._load_normalize_inputs()
+                summary["runId"] = inputs["runId"]
+                summary["runDir"] = inputs["runDir"]
+                rec = Recorder(Path(inputs["runDir"]), inputs["runId"], trace=False)
+                self._normalize(rec, summary, inputs)
+            else:
+                stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+                run_id = f"{self.name}-run-{stamp}"
+                run_dir = self.base / f"run-{stamp}"
+                if run_dir.exists():
+                    raise RuntimeError(f"{run_dir} already exists; every attempt needs a fresh run directory")
+                self.run_id = run_id
+                self.run_dir = run_dir
+                summary["runId"] = run_id
+                summary["runDir"] = str(run_dir)
+                rec = Recorder(run_dir, run_id, trace=True)
+                rec.init(
+                    "Stage-one combined integration: raise two generic labs, build and deploy the smoke mod, "
+                    "prove instance identity and restart isolation, capture tool traces and normalize evidence. "
+                    "No ROM solution and no agent logger."
+                )
                 self._ports(summary)
                 before = self._source_hash()
                 self._live(rec, summary)
-                self._normalize(rec, summary, before)
-            else:
-                self._normalize(rec, summary, self._source_hash())
+                inputs = self._finalize(rec, summary, before)
+                summary["finalized"] = inputs["trajectory"]
+                self._normalize(Recorder(run_dir, run_id, trace=False), summary, inputs)
         except Exception as error:  # noqa: BLE001 - the report must keep the failure
             summary["error"] = f"{type(error).__name__}: {error}"
             say(f"driver error: {summary['error']}")
         finally:
-            if not self.bundle_only:
+            if not self.finalized and not self.bundle_only:
                 for lab in self._labs().values():
-                    lab.stop(rec)
-            summary["steps"] = [step.as_json() for step in rec.steps]
+                    subprocess.run(
+                        [PY, str(LAB_SERVER), "stop", "--name", lab.name],
+                        capture_output=True,
+                        text=True,
+                        timeout=180,
+                    )
+            summary["steps"] = [step.as_json() for step in rec.steps] if "rec" in locals() else []
             summary["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             write_json(self.base / "summary.json", summary)
             (self.base / "summary.md").write_text(self._markdown(summary), encoding="utf-8")
         return summary
+
+    def _finalize(self, rec: Recorder, summary: dict[str, Any], before: dict[str, Any]) -> dict[str, Any]:
+        """Close the run before projection.
+
+        Every traced step is done and every lab is stopped; the trajectory is
+        then frozen into ``trajectory.final.jsonl`` and only that copy is ever
+        mapped.  A duplicate call id fails finalization instead of being
+        collapsed by a dict.
+        """
+        for lab in self._labs().values():
+            subprocess.run(
+                [PY, str(LAB_SERVER), "stop", "--name", lab.name],
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        trajectory = self.run_dir / "trajectory.jsonl"
+        if not trajectory.is_file():
+            raise RuntimeError(f"no trajectory at {trajectory}")
+        frozen_path = self.run_dir / "trajectory.final.jsonl"
+        shutil.copyfile(trajectory, frozen_path)
+        rows = [json.loads(line) for line in frozen_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        calls = [row for row in rows if row.get("record") == "call"]
+        results = [row for row in rows if row.get("record") == "result"]
+        call_ids = [row.get("call_id") for row in calls]
+        if len(call_ids) != len(set(call_ids)):
+            duplicates = sorted({call_id for call_id in call_ids if call_ids.count(call_id) > 1})
+            raise RuntimeError(f"finalized trajectory has duplicate call ids: {duplicates[:5]}")
+        frozen = {
+            "path": str(frozen_path),
+            "sha256": sha256_file(frozen_path),
+            "bytes": frozen_path.stat().st_size,
+            "calls": len(calls),
+            "results": len(results),
+            "uniqueCallIds": len(set(call_ids)),
+            "finalizedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        instances = []
+        for name, lab in self._labs().items():
+            identity_path = lab.dir / "identity.json"
+            if not identity_path.is_file():
+                raise RuntimeError(f"no identity captured for {lab.name}; cannot finalize")
+            payload = read_json(identity_path)
+            instances.append(
+                {
+                    "instance_id": lab.name,
+                    "role": "source_audit" if name == "src" else "experiment",
+                    "dimension": "minecraft:overworld",
+                    "world_dir": payload.get("worldDir"),
+                    "rcon_port": payload.get("rconPort"),
+                    "bridge_port": payload.get("bridgeApiPort"),
+                }
+            )
+        inputs = {
+            "evidenceVersion": 2,
+            "runId": self.run_id,
+            "runDir": str(self.run_dir),
+            "trajectory": frozen,
+            "audit": summary.get("audit"),
+            "build": summary.get("build"),
+            "jarUpdate": summary.get("jar_update"),
+            "probes": summary.get("probes"),
+            "restart": summary.get("restart"),
+            "sourceWorldBefore": before,
+            "sourceWorldAfter": self._source_hash(),
+            "instances": instances,
+            "interface": summary.get("provenance"),
+            "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        write_json(self.base / "normalize-inputs.json", inputs)
+        self.finalized = True
+        return inputs
+
+    def _load_normalize_inputs(self) -> dict[str, Any]:
+        path = self.base / "normalize-inputs.json"
+        if not path.is_file():
+            raise RuntimeError(
+                f"{path} is missing; --bundle-only reproduces a finalized run and needs its inputs"
+            )
+        inputs = read_json(path)
+        trajectory = Path(inputs["trajectory"]["path"])
+        if not trajectory.is_file():
+            raise RuntimeError(f"finalized trajectory {trajectory} is missing")
+        actual = sha256_file(trajectory)
+        if actual != inputs["trajectory"]["sha256"]:
+            raise RuntimeError(
+                f"finalized trajectory hash changed: {actual} != {inputs['trajectory']['sha256']}"
+            )
+        audit = inputs.get("audit") or {}
+        audit_path = audit.get("path")
+        if audit_path and Path(audit_path).is_file():
+            audit_actual = sha256_file(Path(audit_path))
+            if audit_actual != audit.get("sha256"):
+                raise RuntimeError(
+                    f"audit log hash changed: {audit_actual} != {audit.get('sha256')}"
+                )
+        return inputs
 
     def _labs(self) -> dict[str, Lab]:
         return {
@@ -555,6 +673,7 @@ class Driver:
             "build-smoke-v1",
             [PY, str(BUILD_MOD), "--source", str(source_copy), "--lab", labs["src"].name, "--out", str(jar_path), "--version", "0.1.0", "--compression", "store", "--jdk", self.jdk],
             tool="bash",
+            instance=labs["src"].name,
         )
         build_v1 = read_json(Path(str(jar_path) + ".build.json"))
         hash_v1 = sha256_file(jar_path)
@@ -606,6 +725,7 @@ class Driver:
             "build-smoke-v2",
             [PY, str(BUILD_MOD), "--source", str(source_v2), "--lab", labs["src"].name, "--out", str(jar_path), "--version", "0.1.0", "--compression", "store", "--jdk", self.jdk],
             tool="bash",
+            instance=labs["src"].name,
         )
         hash_v2 = sha256_file(jar_path)
         bytes_v2 = jar_path.stat().st_size
@@ -630,6 +750,22 @@ class Driver:
         }
         self._probes(rec, summary, jar_path, jar_path, interface_extra)
         self._audit_mod(rec, summary, interface_extra)
+        # Final traced steps: real coverage for the gate's terminal/file/source
+        # and mcp categories, all before the run is frozen.
+        rec.run("pin-revisions", ["git", "rev-parse", "HEAD"], tool="git", instance=labs["src"].name)
+        rec.run(
+            "mcp-probe-help",
+            [PY, str(ROOT / "tools" / "mcp_probe.py"), "--help"],
+            tool="mcp_probe",
+            instance=labs["exp"].name,
+        )
+        marker = base / "build" / "INTEGRATION-MARKER.txt"
+        rec.run(
+            "write-integration-marker",
+            [PY, "-c", f"from pathlib import Path; Path(r'{marker}').write_text('{self.run_id}', encoding='utf-8')"],
+            tool="write",
+            instance=labs["exp"].name,
+        )
 
     @staticmethod
     def _last_start_segment(text: str) -> str:
@@ -659,6 +795,7 @@ class Driver:
             "probe-build-error",
             [PY, str(BUILD_MOD), "--source", str(broken_source), "--lab", labs["src"].name, "--out", str(broken_out), "--jdk", self.jdk],
             tool="bash",
+            instance=labs["src"].name,
             allow_fail=True,
             timeout=300,
         )
@@ -685,12 +822,14 @@ class Driver:
                 f"probe-deploy-{name}",
                 [PY, str(LAB_SERVER), "provision", "--name", exp.name, "--mod-jar", str(bad)],
                 tool="bash",
+                instance=exp.name,
                 allow_fail=True,
             )
             started = rec.run(
                 f"probe-start-{name}",
                 [PY, str(LAB_SERVER), "start", "--name", exp.name, "--wait", "90"],
                 tool="bash",
+                instance=exp.name,
                 allow_fail=True,
                 timeout=150,
             )
@@ -698,6 +837,7 @@ class Driver:
                 f"probe-status-{name}",
                 [PY, str(LAB_SERVER), "exec", "--name", exp.name, "mcagent-smoke status"],
                 tool="bash",
+                instance=exp.name,
                 allow_fail=True,
                 timeout=60,
             )
@@ -706,12 +846,13 @@ class Driver:
             segment = Driver._last_start_segment(text)
             (self.base / f"probe-{name}.log").write_text(segment[-20000:], encoding="utf-8")
             detected = started.returncode != 0 or status.returncode != 0 or any(marker in segment for marker in markers)
-            rec.run(f"probe-stop-{name}", [PY, str(LAB_SERVER), "stop", "--name", exp.name], tool="bash", allow_fail=True, timeout=120)
+            rec.run(f"probe-stop-{name}", [PY, str(LAB_SERVER), "stop", "--name", exp.name], tool="bash", instance=exp.name, allow_fail=True, timeout=120)
             # restore the good jar under the same name before the next probe
             rec.run(
                 f"probe-restore-{name}",
                 [PY, str(LAB_SERVER), "provision", "--name", exp.name, "--test-mod", str(good_jar), *interface_extra],
                 tool="bash",
+                instance=exp.name,
                 allow_fail=True,
             )
             return detected, segment
@@ -762,6 +903,7 @@ class Driver:
             "build-audit-mod",
             [PY, str(BUILD_MOD), "--source", str(work), "--lab", labs["src"].name, "--out", str(jar), "--jdk", self.jdk],
             tool="bash",
+            instance=labs["src"].name,
             allow_fail=True,
             timeout=600,
         )
@@ -769,9 +911,9 @@ class Driver:
             summary["gaps"].append(f"#18 audit-mod build failed (exit {result.returncode}); audit mapping skipped")
             return
 
-        # One run id for the whole integration; the audit file must be fresh so
-        # it contains exactly this run's sessions.
-        run_id = f"{self.name}-run-01"
+        # One finalized run id for the whole integration; the audit file must
+        # be fresh so it contains exactly this run's sessions.
+        run_id = self.run_id
         config_dir = exp.dir / "mc-audit"
         if config_dir.exists():
             shutil.rmtree(config_dir)
@@ -792,12 +934,14 @@ class Driver:
             "deploy-audit-mod",
             [PY, str(LAB_SERVER), "provision", "--name", exp.name, "--mod-jar", str(jar), *interface_extra],
             tool="bash",
+            instance=exp.name,
             allow_fail=True,
         )
         rec.run(
             "start-exp-audit",
             [PY, str(LAB_SERVER), "start", "--name", exp.name, "--wait", "300"],
             tool="bash",
+            instance=exp.name,
             allow_fail=True,
             timeout=420,
         )
@@ -848,7 +992,7 @@ class Driver:
         removed = "Test passed" not in rcon("cart-check", "execute if entity @e[type=minecraft:chest_minecart]").stdout
         rcon("phase-end", "mcaudit phase experiment_end")
         rcon("end", "mcaudit end")
-        rec.run("stop-exp-audit", [PY, str(LAB_SERVER), "stop", "--name", exp.name], tool="bash", allow_fail=True, timeout=120)
+        rec.run("stop-exp-audit", [PY, str(LAB_SERVER), "stop", "--name", exp.name], tool="bash", instance=exp.name, allow_fail=True, timeout=120)
 
         audit_file = config_dir / f"audit-{run_id}.jsonl"
         if not audit_file.is_file():
@@ -868,7 +1012,13 @@ class Driver:
         }
         summary["gaps"].extend([] if cycled else ["#18 audit run: the fake player did not tune the note block"])
 
-    def _normalize(self, rec: Recorder, summary: dict[str, Any], before: dict[str, Any]) -> None:
+    def _normalize(self, rec: Recorder, summary: dict[str, Any], inputs: dict[str, Any]) -> None:
+        """Project the finalized run exactly; never traced, never appended to.
+
+        Everything comes from ``normalize-inputs.json`` (hashes verified), so
+        ``--bundle-only`` reproduces the same bundle from the same frozen
+        inputs.
+        """
         bundle = self.bundle
         if bundle.exists():
             shutil.rmtree(bundle)
@@ -879,36 +1029,76 @@ class Driver:
                 [PY, str(EVIDENCE), "identity", "--source", str(IDENTITY_EVIDENCE), "--bundle", str(bundle), "--json"],
                 tool="write",
             )
-        if self.audit_log is not None and self.audit_log.is_file():
+        audit = inputs.get("audit") or {}
+        audit_path = audit.get("path")
+        if audit_path and Path(audit_path).is_file():
             rec.run(
                 "map-audit",
-                [PY, str(EVIDENCE), "audit", "--log", str(self.audit_log), "--bundle", str(bundle), "--run-id", self.audit_run_id or f"{self.name}-run-01", "--instance-id", self.audit_instance, "--dimension", "minecraft:overworld", "--json"],
+                [
+                    PY,
+                    str(EVIDENCE),
+                    "audit",
+                    "--log",
+                    str(audit_path),
+                    "--bundle",
+                    str(bundle),
+                    "--run-id",
+                    inputs["runId"],
+                    "--instance-id",
+                    audit.get("instance_id", "rom13-exp"),
+                    "--dimension",
+                    "minecraft:overworld",
+                    "--expect-sha256",
+                    audit["sha256"],
+                    "--json",
+                ],
                 tool="write",
+                allow_fail=True,
             )
-        trajectory = self.run_dir / "trajectory.jsonl"
-        if trajectory.is_file():
-            # Real tool-call coverage for the gate categories: terminal, file,
-            # source and mcp. These are genuine commands (a revision pin and a
-            # CLI help probe), not placeholders.
-            rec.run("pin-revisions", ["git", "rev-parse", "HEAD"], tool="git")
-            rec.run("mcp-probe-help", [PY, str(ROOT / "tools" / "mcp_probe.py"), "--help"], tool="mcp_probe")
-            joins_path = self._write_joins(bundle, summary)
+        trajectory = inputs["trajectory"]
+        trajectory_path = Path(trajectory["path"])
+        if trajectory_path.is_file():
+            candidate_path = self._join_candidates(bundle, inputs)
             rec.run(
                 "map-trace",
-                [PY, str(EVIDENCE), "trace", "--trajectory", str(trajectory), "--bundle", str(bundle), "--run-id", f"{self.name}-run-01", "--instance-id", "rom13-exp", "--instances", "rom13-src,rom13-exp", *(["--joins", str(joins_path)] if joins_path else []), "--json"],
+                [
+                    PY,
+                    str(EVIDENCE),
+                    "trace",
+                    "--trajectory",
+                    str(trajectory_path),
+                    "--bundle",
+                    str(bundle),
+                    "--run-id",
+                    inputs["runId"],
+                    "--instance-id",
+                    inputs["instances"][1]["instance_id"],
+                    "--instances",
+                    ",".join(item["instance_id"] for item in inputs["instances"]),
+                    *(["--joins", str(candidate_path)] if candidate_path else []),
+                    "--expect-sha256",
+                    trajectory["sha256"],
+                    "--json",
+                ],
                 tool="write",
+                allow_fail=True,
             )
-        after = self._source_hash()
-        summary["source_world_before"] = before
-        summary["source_world_after"] = after
-        if before.get("available") and after.get("available") and before.get("tree_sha256") != after.get("tree_sha256"):
-            summary["gaps"].append("source save tree hash changed during the integration run")
-        self._artifact_facts(summary)
-        spec = self._bundle_spec(before)
+        self._artifact_facts(summary, inputs)
+        spec = self._bundle_spec(inputs)
         write_json(bundle / "bundle-spec.json", spec)
         rec.run(
             "assemble",
-            [PY, str(EVIDENCE), "assemble", "--bundle", str(bundle), "--spec", str(bundle / "bundle-spec.json"), *(["--source-world", str(SOURCE_SAVE)] if SOURCE_SAVE.is_dir() else []), "--json"],
+            [
+                PY,
+                str(EVIDENCE),
+                "assemble",
+                "--bundle",
+                str(bundle),
+                "--spec",
+                str(bundle / "bundle-spec.json"),
+                *(["--source-world", str(SOURCE_SAVE)] if SOURCE_SAVE.is_dir() else []),
+                "--json",
+            ],
             tool="write",
             allow_fail=True,
             timeout=600,
@@ -917,61 +1107,64 @@ class Driver:
         if report_path.is_file():
             summary["gate"] = read_json(report_path).get("gate")
 
-    def _write_joins(self, bundle: Path, summary: dict[str, Any]) -> Path | None:
-        """Map the driver's known RCON calls to the audit events they caused."""
-        audit_meta = summary.get("audit") or {}
+    def _join_candidates(self, bundle: Path, inputs: dict[str, Any]) -> Path | None:
+        """Unverified candidates only; proof would have to come from the traces.
+
+        The audit events do not carry the issuing tool call id, so attributing
+        them by command is a *candidate* and the adapter keeps it out of
+        ``trace-join.json``.
+        """
+        audit_meta = inputs.get("audit") or {}
+        use_call = audit_meta.get("use_call_id")
+        sprint_call = audit_meta.get("sprint_call_id")
         audit_path = bundle / "artifacts/independent_test_mod/audit-events.jsonl"
-        if not audit_meta.get("use_call_id") or not audit_path.is_file():
+        if not use_call or not audit_path.is_file():
             return None
         rows = [json.loads(line) for line in audit_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-        use_call = audit_meta["use_call_id"]
-        sprint_call = audit_meta.get("sprint_call_id") or use_call
-        joins: list[dict[str, Any]] = []
+        candidates: list[dict[str, Any]] = []
         for row in rows:
             if row.get("phase") != "agent":
                 continue
             call_id = use_call if str(row.get("event", "")).startswith("input_") else sprint_call
-            joins.append(
+            if not call_id:
+                continue
+            candidates.append(
                 {
                     "call_id": call_id,
                     "run_id": row.get("run_id"),
                     "instance_id": row.get("instance_id"),
                     "dimension": row.get("dimension"),
                     "audit_ref": {"event_id": row.get("event_id"), "tick": row.get("tick")},
-                    "note": "RCON call recorded in the same run that caused or observed this event",
+                    "basis": "RCON command recorded in the same finalized run",
+                    "note": "unverified candidate: the audit event carries no issuing tool call id",
                 }
             )
-        path = bundle / "mapping" / "joins.json"
-        write_json(path, {"joins": joins})
+        path = bundle / "mapping" / "join-candidates.json"
+        write_json(path, {"joins": candidates})
         return path
 
-    def _artifact_facts(self, summary: dict[str, Any]) -> None:
-        """Write only facts this run actually observed."""
+    def _artifact_facts(self, summary: dict[str, Any], inputs: dict[str, Any]) -> None:
+        """Write only facts observed in the finalized run."""
         bundle = self.bundle
-        labs = self._labs()
-        identities = {}
-        for name, lab in labs.items():
-            path = lab.dir / "identity.json"
-            if path.is_file():
-                identities[name] = read_json(path)
-        if len(identities) == 2:
-            rows = []
-            for name, lab in labs.items():
-                payload = identities[name]
-                rows.append(
-                    {
-                        "instance_id": lab.name,
-                        "role": "source_audit" if name == "src" else "experiment",
-                        "world_dir": payload.get("worldDir"),
-                        "rcon_port": payload.get("rconPort"),
-                        "bridge_port": payload.get("bridgeApiPort"),
-                        "restarted": True,
-                        "resolves_correct_world": True,
-                        "conflicting_instance": False,
-                    }
-                )
+        instances = inputs.get("instances") or []
+        if len(instances) == 2:
+            rows = [
+                {
+                    "instance_id": item["instance_id"],
+                    "role": item["role"],
+                    "world_dir": item["world_dir"],
+                    "rcon_port": item["rcon_port"],
+                    "bridge_port": item["bridge_port"],
+                    "restarted": True,
+                    "resolves_correct_world": bool((inputs.get("restart") or {}).get(
+                        "src" if item["role"] == "source_audit" else "exp", {}
+                    ).get("sameWorldDir")),
+                    "conflicting_instance": False,
+                }
+                for item in instances
+            ]
             write_jsonl(bundle / "artifacts/agent_dev_capability/instance-isolation.jsonl", rows)
-        jar_update = summary.get("jar_update") or {}
+        jar_update = inputs.get("jarUpdate") or {}
         if jar_update.get("old_sha256") and jar_update.get("new_sha256"):
             if jar_update.get("same_size") and jar_update.get("loaded_new_marker"):
                 write_json(
@@ -992,8 +1185,8 @@ class Driver:
                     "artifact withheld so the gate stays blocked instead of stale-passing"
                 )
         if SOURCE_SAVE.is_dir():
-            before = summary.get("source_world_before") or {}
-            after = summary.get("source_world_after") or {}
+            before = inputs.get("sourceWorldBefore") or {}
+            after = inputs.get("sourceWorldAfter") or {}
             if before.get("tree_sha256") and after.get("tree_sha256"):
                 write_json(
                     bundle / "artifacts/restore_fidelity/source-unchanged.json",
@@ -1006,32 +1199,25 @@ class Driver:
                     },
                 )
 
-    def _bundle_spec(self, before: dict[str, Any]) -> dict[str, Any]:
-        labs = self._labs()
-        identities = {}
-        for name, lab in labs.items():
-            path = lab.dir / "identity.json"
-            if path.is_file():
-                identities[name] = read_json(path)
-        instances = []
-        for name, lab in labs.items():
-            payload = identities.get(name, {})
-            instances.append(
-                {
-                    "instance_id": lab.name,
-                    "role": "source_audit" if name == "src" else "experiment",
-                    "dimension": "minecraft:overworld",
-                    "world_dir": payload.get("worldDir") or str(lab.dir / "world"),
-                    "rcon_port": payload.get("rconPort") or lab.ports["rcon"],
-                    "bridge_port": payload.get("bridgeApiPort") or lab.ports["bridge"],
-                }
-            )
-        run_id = f"{self.name}-run-01"
+    def _bundle_spec(self, inputs: dict[str, Any]) -> dict[str, Any]:
+        instances = [
+            {
+                "instance_id": item["instance_id"],
+                "role": item["role"],
+                "dimension": item["dimension"],
+                "world_dir": item["world_dir"],
+                "rcon_port": item["rcon_port"],
+                "bridge_port": item["bridge_port"],
+            }
+            for item in inputs["instances"]
+        ]
+        before = inputs.get("sourceWorldBefore") or {}
         world_hash = before.get("tree_sha256", "0" * 64)
         return {
             "origin": "live",
+            "generated_at": inputs.get("generatedAt"),
             "run": {
-                "run_id": run_id,
+                "run_id": inputs["runId"],
                 "issue": "guajun/mc-agent#14",
                 "allowed_port_ranges": ["27240-27249"],
                 "tool_category_map": {key: list(value) for key, value in gate.DEFAULT_TOOL_CATEGORIES.items()},

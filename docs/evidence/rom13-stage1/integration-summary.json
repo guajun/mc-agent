@@ -1,15 +1,23 @@
 {
   "kind": "stage1-integration-summary",
+  "evidenceVersion": 2,
   "issue": "guajun/mc-agent#14",
-  "date": "2026-09-25T17:29:32Z",
+  "date": "2026-09-25T17:50:24Z",
   "gateRepoHeadAtRun": "32aa245",
-  "runId": "rom13-integration-run-01",
+  "runId": "rom13-integration-run-20260925T174503Z",
+  "runDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-20260925T174503Z",
+  "finalization": {
+    "trajectoryPath": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-20260925T174503Z\\trajectory.final.jsonl",
+    "sha256": "76ab7da8fe641104fca61c74b290f6106a1fe7493748fc929c760bacecb0b049",
+    "calls": 71,
+    "results": 71,
+    "uniqueCallIds": 71,
+    "finalizedAt": "2026-09-25T17:48:30Z",
+    "mappingSourceSha256Matches": true
+  },
   "java": {
     "path": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\java.exe",
-    "version": "openjdk version \"25.0.1\" 2025-10-21 LTS"
-  },
-  "jdk": {
-    "path": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon"
+    "jdk": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon"
   },
   "interfaceModJar": {
     "interface_jar": "F:\\mc-agent-worktrees\\rom13\\meta16\\labs\\_build\\mods\\mc-agent-interface-0.6.0.jar",
@@ -19,6 +27,7 @@
   },
   "smokeMod": {
     "v1": {
+      "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
       "sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
       "build": {
         "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
@@ -46,10 +55,11 @@
             "sha256": "9a3e101b8716d91d45077d0f06968181559d2d1e7d2c77b8a8959b8dd0ef6f72"
           }
         ],
-        "builtAt": 1790357114.3770506
+        "builtAt": 1790358346.939759
       }
     },
     "v2": {
+      "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
       "sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
       "build": {
         "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
@@ -77,7 +87,7 @@
             "sha256": "9a3e101b8716d91d45077d0f06968181559d2d1e7d2c77b8a8959b8dd0ef6f72"
           }
         ],
-        "builtAt": 1790357197.0543232
+        "builtAt": 1790358421.2721164
       }
     }
   },
@@ -87,6 +97,8 @@
     "old_bytes": 15177,
     "new_bytes": 15177,
     "same_size": true,
+    "status_output": "[mc-agent-smoke] build=smoke-de2 version=0.1.0 lab=rom13-exp instance=8cf7f17ce42f4f29a97d95fa872fa950 tick=19 audit=F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\audit\n",
+    "runtime_evidence": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\logs\\console.log",
     "loaded_new_marker": true
   },
   "probes": {
@@ -94,7 +106,7 @@
     "load_failure_detected": true,
     "missing_dependency_detected": true
   },
-  "children": {
+  "restarts": {
     "src": {
       "worldDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\world",
       "sameWorldDir": true
@@ -105,30 +117,51 @@
     }
   },
   "instances": [
-    "rom13-src",
-    "rom13-exp"
+    {
+      "instance_id": "rom13-src",
+      "role": "source_audit",
+      "dimension": "minecraft:overworld",
+      "world_dir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\world",
+      "rcon_port": 27241,
+      "bridge_port": 27243
+    },
+    {
+      "instance_id": "rom13-exp",
+      "role": "experiment",
+      "dimension": "minecraft:overworld",
+      "world_dir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\world",
+      "rcon_port": 27245,
+      "bridge_port": 27247
+    }
   ],
-  "sourceWorld": {
-    "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
-    "tree_sha256_before": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
-    "tree_sha256_after": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
-    "unchanged": true
+  "traceAttribution": {
+    "rows": 71,
+    "byInstance": {
+      "rom13-src": 18,
+      "rom13-exp": 53
+    },
+    "defaultedInstances": 0,
+    "rawCalls": 71,
+    "verifiedJoins": 0,
+    "joinCandidates": 135,
+    "traceJoinWithheld": true
   },
   "audit18": {
-    "path": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-01.jsonl",
-    "sha256": "0fe662f45c738122e85f40caac17af219b649bb57c3568089847951b05b058ed",
-    "raw_events": 303,
-    "mapping_report": {
+    "path": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-20260925T174503Z.jsonl",
+    "sha256": "f9d2bf766cf3f0e272c5680131ab03b5099fbd39efdc19b92894922049a1df99",
+    "rawEvents": 299,
+    "mappedEvents": 296,
+    "mapping": {
       "tool": "#18 audit JSONL -> gate audit-events",
-      "source": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-01.jsonl",
-      "source_sha256": "0fe662f45c738122e85f40caac17af219b649bb57c3568089847951b05b058ed",
+      "source": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-20260925T174503Z.jsonl",
+      "source_sha256": "f9d2bf766cf3f0e272c5680131ab03b5099fbd39efdc19b92894922049a1df99",
       "mapped": [
         "artifacts\\independent_test_mod\\audit-events.jsonl"
       ],
       "counts": {
         "phase": 4,
         "cart_tracked": 1,
-        "cart_sample": 289,
+        "cart_sample": 285,
         "input_attempt": 2,
         "input_request": 1,
         "input_processed": 1,
@@ -140,42 +173,72 @@
         "audit_ready": 1,
         "audit_end": 1
       },
+      "lifecycle": {
+        "sessions": [
+          {
+            "session": "s1790358481908",
+            "started": true,
+            "ready": true,
+            "ended": true,
+            "status": "complete"
+          }
+        ],
+        "open_sessions": [],
+        "incomplete": [],
+        "truncated": false,
+        "end_statuses": [
+          "complete"
+        ]
+      },
+      "join_candidates": [],
       "gaps": [],
       "notes": [
-        "303 raw event(s), 300 mapped, 3 session-meta excluded"
+        "299 raw event(s), 296 mapped, 3 session-meta validated/excluded"
       ],
       "ok": true
     },
-    "source_commit": "502f561",
-    "note_cycled": true,
-    "cart_removed": true
+    "sourceCommit": "502f561",
+    "noteCycled": true,
+    "cartRemoved": true
   },
-  "trajectory": {
-    "path": "labs\\rom13-integration\\run-01\\trajectory.jsonl",
-    "sha256": "482778d270de6c0720a5c492f0ff602d2cae380bfd1873670ae21cb7555eee68",
-    "step_report": {
-      "tool": "#19 trajectory.jsonl -> gate tool-trace",
-      "source": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-01\\trajectory.jsonl",
-      "source_sha256": "e585c27fca244becb71bb6d295527aa19094140787fe86bb1a3ea636b625a20a",
-      "mapped": [
-        "artifacts\\trace_persistence\\tool-trace.jsonl",
-        "artifacts\\trace_persistence\\trace-join.json"
-      ],
-      "counts": {
-        "calls": 131,
-        "joins": 136
-      },
-      "excluded": {},
-      "gaps": [],
-      "notes": [
-        "unmatched counts are computed from the mapped artifacts, not copied from a declaration"
-      ],
-      "ok": true
-    }
+  "sourceWorld": {
+    "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
+    "before": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "after": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "unchanged": true
+  },
+  "bundleOnlyReproduction": {
+    "command": "python tools/stage1_integration.py run --bundle-only",
+    "artifactsIdentical": {
+      "bundle/artifacts/trace_persistence/tool-trace.jsonl": "1e9f9a4e0c6d0174e2005630912f8f480da906b2d683580d3c04cb70a9a447e4",
+      "bundle/artifacts/independent_test_mod/audit-events.jsonl": "c2645dcc055ea0cdc13a0facb6e290e2365d4c21d38f4a58c35f678ea2b36472",
+      "bundle/mapping/trace-report.json": "cebb58a82c3b403954d03f620500e94f2af5989ccfbc1adb886d9cc21732b895",
+      "bundle/mapping/audit-report.json": "12f790caf2feaaafdc0fced94670bc9a8b3465ddc97920e4a0c0dac164495211",
+      "bundle/bundle.json": "59cae3d61a48471e723fcf5119ce97c42775668ea5108654ff5059ffc9f14bc8",
+      "bundle/artifacts/smoke_fixture_validity/evidence-index.json": "95d9420f2d073f74a28737f261506a422550a3b8e25722ec09b16c10efc5eed5"
+    },
+    "note": "two consecutive bundle-only runs reproduced these files byte for byte from normalize-inputs.json"
+  },
+  "bridge6RestoreCollection": {
+    "ok": true,
+    "sameRunBinding": false,
+    "orderHash": "a663c5c0dfd7ec6f",
+    "restoreProblems": [],
+    "sourceUnchangedProblems": [],
+    "failureEvidence": {
+      "wrongEndpointRejected": true,
+      "duplicatePreExistingRejected": true,
+      "inventoryMutationTested": true,
+      "unverifiedScenarioRows": 5
+    },
+    "copied": {
+      "snapshot-before": "f0a5ee36bb3afe69b3338399b33beb2da3a4b5155aa6b56d955859bcde429b02",
+      "snapshot-after": "a7a1069054ac12fc103325bd0ba4ac0b8fff61533c12b176a0bf1fb83654a7d1"
+    },
+    "bridgeFinalHead": "4116ebb34b60e962e95834791d521b369fd52c65"
   },
   "gate": {
     "overall": "blocked",
-    "exit_code": 3,
     "checks": [
       {
         "id": "fixture_map",
@@ -213,10 +276,10 @@
   },
   "gaps": [],
   "remaining": [
-    "#15 fixture map: map manifest, 3 init runs, fixture player identity, command-block scan, cleanup",
-    "bridge#6 restore: snapshot-before/after trees, restore record, failure cases",
-    "#18 test-mod completeness: test-mod manifest, negative cases, audit lifecycle",
+    "#15 fixture map (PR27 candidates f2a636f exist but are not accepted yet)",
+    "bridge#6 restore same-run binding: the collected bridge6 evidence is a separate run and is not joined here",
+    "#18 test-mod completeness: test-mod manifest, negative cases, audit lifecycle declaration",
     "#19 cold-start harness: tool environment, missing-log detection, version lock, smoke suites",
-    "agent-phase joins: this run joins test-side RCON calls; the stage-two agent must join its own tool calls"
+    "agent-phase joins: the agent must join its own tool calls with explicit proof"
   ]
 }

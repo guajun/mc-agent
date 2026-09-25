@@ -84,7 +84,7 @@ mc-agent-loop/             智能体 loop 与它的后端
 | `fake_player.py` | 生成、驱动、查询 Carpet 假人——不需要第二个客户端就有身体 |
 | `game_cmd.py` | 执行一条游戏命令并打印它产生的反馈 |
 | `mcp_probe.py` | 像智能体一样调用某一个 MCP 工具 |
-| `stage1_evidence.py` | 把 #16 身份、#18 审计 JSONL 与 #19 轨迹记录无损投影到门禁 schema；缺口如实报告，不制造事实 |
+| `stage1_evidence.py` | 把 #16 身份、#18 审计 JSONL 与 #19 轨迹记录无损投影到门禁 schema（校验生命周期/请求链接/capturedPath），并独立校验与收集已合并的 bridge#6 恢复证据；缺口如实报告，不制造事实 |
 | `stage1_integration.py` | 在端口 27240-27249 上可复现的双 lab 通用集成：构建/部署、重启隔离、同大小 jar 更新、响亮失败探针、轨迹、门禁包与结论 |
 | `stage1_gate.py` | issue #14 的失败关闭式阶段一证据门禁：校验前置证据包，重算哈希/顺序/源存档状态，缺证据绝不通过 |
 | `harness_preflight.py` | 检查固定的 Harness/model 契约：终端、文件、源码获取、JDK 构建、bridge CLI/MCP、保留端口与真实实验室，证据全部带哈希 |

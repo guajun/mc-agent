@@ -175,6 +175,8 @@ class MappingReport:
     mapped: list[str] = field(default_factory=list)
     counts: dict[str, int] = field(default_factory=dict)
     excluded: dict[str, int] = field(default_factory=dict)
+    lifecycle: dict[str, Any] = field(default_factory=dict)
+    join_candidates: list[dict[str, Any]] = field(default_factory=list)
     gaps: list[Gap] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
 
@@ -190,6 +192,8 @@ class MappingReport:
             "mapped": self.mapped,
             "counts": self.counts,
             "excluded": self.excluded,
+            "lifecycle": self.lifecycle,
+            "join_candidates": self.join_candidates,
             "gaps": [gap.as_json() for gap in self.gaps],
             "notes": self.notes,
             "ok": self.ok,
@@ -231,6 +235,120 @@ def _actor_fields(row: dict[str, Any], mapped_type: str) -> tuple[dict[str, Any]
     return {}, [Gap("audit_events", "actor_type", f"operator is not a string or object: {actor!r}")]
 
 
+def _epoch_of(row: dict[str, Any]) -> int | None:
+    """``epoch`` is part of the cart identity; do not coerce a missing/0 value."""
+    epoch = row.get("epoch")
+    if isinstance(epoch, int) and not isinstance(epoch, bool) and epoch >= 1:
+        return epoch
+    return None
+
+
+def _processed_links(
+    row: dict[str, Any],
+    by_seq: dict[int, dict[str, Any]],
+    used_requests: dict[tuple[str, int], Any],
+    used_attempts: dict[tuple[str, int], Any],
+    session: str,
+    where: str,
+) -> tuple[dict[str, Any], list[Gap]]:
+    """Promote and validate ``requestSeq``/``attemptSeq``/``agentOp``.
+
+    The published #18 P1 (request/attempt reuse) must stay visible: a repeated
+    reference or a dangling one is a gap, never a silent duplicate.
+    """
+    promoted: dict[str, Any] = {}
+    gaps: list[Gap] = []
+    request_seq = row.get("requestSeq")
+    attempt_seq = row.get("attemptSeq")
+    agent_op = row.get("agentOp")
+    if request_seq is not None:
+        referenced = by_seq.get(request_seq) if _is_int(request_seq) else None
+        if referenced is None or referenced.get("type") != "input_request":
+            gaps.append(
+                Gap(
+                    "audit_events",
+                    "request_missing",
+                    f"{where}: requestSeq {request_seq!r} does not reference an input_request",
+                )
+            )
+        else:
+            key = (session, request_seq)
+            if key in used_requests:
+                gaps.append(
+                    Gap(
+                        "audit_events",
+                        "request_reused",
+                        f"{where}: requestSeq {request_seq!r} was already processed at seq "
+                        f"{used_requests[key]!r}",
+                    )
+                )
+            used_requests[key] = row.get("seq")
+            promoted["request_seq"] = request_seq
+    if attempt_seq is not None:
+        referenced = by_seq.get(attempt_seq) if _is_int(attempt_seq) else None
+        if referenced is None or referenced.get("type") != "input_attempt":
+            gaps.append(
+                Gap(
+                    "audit_events",
+                    "attempt_missing",
+                    f"{where}: attemptSeq {attempt_seq!r} does not reference an input_attempt",
+                )
+            )
+        else:
+            key = (session, attempt_seq)
+            if key in used_attempts:
+                gaps.append(
+                    Gap(
+                        "audit_events",
+                        "attempt_reused",
+                        f"{where}: attemptSeq {attempt_seq!r} was already processed at seq "
+                        f"{used_attempts[key]!r}",
+                    )
+                )
+            used_attempts[key] = row.get("seq")
+            promoted["attempt_seq"] = attempt_seq
+    if agent_op is True and attempt_seq is None:
+        gaps.append(
+            Gap(
+                "audit_events",
+                "agent_op_without_attempt",
+                f"{where}: agentOp=true without an attemptSeq",
+            )
+        )
+    if agent_op is not None:
+        promoted["agent_op"] = agent_op
+    return promoted, gaps
+
+
+def _promoted_input_fields(row: dict[str, Any]) -> dict[str, Any]:
+    """Fields the acceptance criteria read directly; kept out of ``detail``."""
+    promoted: dict[str, Any] = {}
+    for source, target in (
+        ("targetInput", "target_input"),
+        ("note", "note"),
+        ("instrument", "instrument"),
+        ("source", "trigger_source"),
+        ("from", "from"),
+        ("to", "to"),
+        ("hand", "hand"),
+        ("item", "item"),
+        ("result", "result"),
+        ("requested", "requested"),
+    ):
+        value = row.get(source)
+        if value is not None:
+            promoted[target] = value
+    operator = row.get("operator")
+    if isinstance(operator, dict):
+        for source, target in (("name", "operator_name"), ("uuid", "operator_uuid")):
+            value = operator.get(source)
+            if isinstance(value, str) and value:
+                promoted[target] = value
+    elif isinstance(operator, str) and operator:
+        promoted["operator_uuid"] = operator
+    return promoted
+
+
 def map_audit_events(
     events: Sequence[dict[str, Any]],
     *,
@@ -238,33 +356,77 @@ def map_audit_events(
     instance_id: str,
     dimension: str,
     source_sha256: str,
-) -> tuple[list[dict[str, Any]], list[Gap], dict[str, int], dict[str, int]]:
+) -> tuple[list[dict[str, Any]], list[Gap], dict[str, int], dict[str, int], dict[str, Any]]:
     """Project #18 events into gate audit events.
 
-    Returns (rows, gaps, counts, excluded).  Session lifecycle records are
-    excluded from the canonical tick stream and counted instead; the raw file
-    is retained and hashed.
+    Returns ``(rows, gaps, counts, excluded, lifecycle)``.  Session lifecycle
+    records stay in the raw file (hashed) and are validated instead of being
+    silently dropped: an open session, a non-complete ``audit_end``, a
+    ``truncated`` log or an ``audit_incomplete`` marker withhold the artifact.
+    ``requestSeq``/``attemptSeq``/``agentOp`` are promoted and checked for
+    dangling references and reuse.
     """
     gaps: list[Gap] = []
     rows: list[dict[str, Any]] = []
     counts: dict[str, int] = {}
     excluded: dict[str, int] = {}
+    lifecycle: dict[str, Any] = {
+        "sessions": [],
+        "open_sessions": [],
+        "incomplete": [],
+        "truncated": False,
+        "end_statuses": [],
+    }
+    session_state: dict[str, dict[str, Any]] = {}
+
+    def session_of(row: dict[str, Any]) -> str:
+        return str(row.get("session") or row.get("sessionId") or "legacy")
+
+    by_seq: dict[int, dict[str, Any]] = {}
+    for row in events:
+        if _is_int(row.get("seq")):
+            by_seq[row["seq"]] = row
 
     removals: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for row in events:
-        if row.get("type") == "cart_remove":
-            key = (str(row.get("uuid")), int(row.get("epoch") or 1))
-            removals.setdefault(key, []).append(row)
+        if row.get("type") != "cart_remove":
+            continue
+        epoch = _epoch_of(row)
+        uuid = row.get("uuid")
+        if epoch is not None and isinstance(uuid, str) and uuid:
+            removals.setdefault((uuid, epoch), []).append(row)
 
     seen_event_ids: set[str] = set()
+    used_requests: dict[tuple[str, int], Any] = {}
+    used_attempts: dict[tuple[str, int], Any] = {}
     for index, row in enumerate(events):
         where = f"event[{index}]"
         raw_type = str(row.get("type") or "")
         if raw_type in AUDIT_META_TYPES:
             excluded[raw_type] = excluded.get(raw_type, 0) + 1
+            session_id = session_of(row)
+            state = session_state.setdefault(session_id, {"session": session_id, "started": False, "ready": False, "ended": False, "status": None})
+            if raw_type == "session_start":
+                state["started"] = True
+            elif raw_type == "audit_ready":
+                state["ready"] = True
+            elif raw_type == "audit_incomplete":
+                lifecycle["incomplete"].append(
+                    {"session": session_id, "reason": f"audit_incomplete: {row.get('reason')!r}"}
+                )
+            elif raw_type == "audit_end":
+                state["ended"] = True
+                state["status"] = row.get("status")
+                lifecycle["end_statuses"].append(row.get("status"))
+                if row.get("status") != "complete":
+                    lifecycle["incomplete"].append(
+                        {"session": session_id, "reason": f"audit_end status={row.get('status')!r}"}
+                    )
+                if row.get("truncated"):
+                    lifecycle["truncated"] = True
+                    lifecycle["incomplete"].append({"session": session_id, "reason": "truncated log"})
             continue
         mapped_type = AUDIT_TYPE_MAP.get(raw_type, raw_type)
-        counts[mapped_type] = counts.get(mapped_type, 0) + 1
         seq = row.get("seq")
         tick = row.get("tick")
         if not _is_int(seq) or not _is_int(tick):
@@ -297,7 +459,8 @@ def map_audit_events(
             )
             continue
 
-        session = row.get("session") or row.get("sessionId") or "legacy"
+        session = session_of(row)
+        counts[mapped_type] = counts.get(mapped_type, 0) + 1
         event_id = f"{session}:{seq}"
         if event_id in seen_event_ids:
             gaps.append(Gap("audit_events", "duplicate_event_id", f"{where}: {event_id!r} repeats"))
@@ -323,23 +486,60 @@ def map_audit_events(
         actor, actor_gaps = _actor_fields(row, mapped_type)
         record.update(actor)
         gaps.extend(actor_gaps)
+        if mapped_type in ("input_attempt", "input_processed"):
+            record.update(_promoted_input_fields(row))
+            if mapped_type == "input_processed":
+                promoted, link_gaps = _processed_links(
+                    row, by_seq, used_requests, used_attempts, session, where
+                )
+                record.update(promoted)
+                gaps.extend(link_gaps)
 
         if mapped_type in ("cart_emitted", "cart_removed"):
             uuid = row.get("uuid")
             if not isinstance(uuid, str) or not uuid:
                 gaps.append(Gap("audit_events", "missing_cart_uuid", f"{where}: {raw_type} has no uuid"))
                 continue
+            epoch = _epoch_of(row)
+            if epoch is None:
+                gaps.append(
+                    Gap("audit_events", "missing_epoch", f"{where}: {raw_type} needs an integer epoch >= 1")
+                )
+                continue
             record["cart_uuid"] = uuid
+            record["epoch"] = epoch
         if mapped_type == "cart_emitted":
-            key = (record.get("cart_uuid", ""), int(row.get("epoch") or 1))
+            key = (record["cart_uuid"], record["epoch"])
             captured = any(
                 _is_int(candidate.get("seq"))
-                and candidate.get("seq") > seq
+                and candidate["seq"] > seq
+                and isinstance(candidate.get("capturedPath"), str)
+                and "before_drop" in candidate["capturedPath"]
                 and isinstance(candidate.get("inventory"), list)
                 for candidate in removals.get(key, [])
             )
             record["captured_before_removal"] = captured
+            record["detail"]["captured_from_remove_seq"] = [
+                candidate.get("seq")
+                for candidate in removals.get(key, [])
+                if isinstance(candidate.get("capturedPath"), str)
+                and "before_drop" in candidate["capturedPath"]
+                and isinstance(candidate.get("inventory"), list)
+            ]
         if mapped_type == "cart_removed":
+            captured_path = row.get("capturedPath")
+            if not isinstance(captured_path, str) or not captured_path:
+                gaps.append(
+                    Gap(
+                        "audit_events",
+                        "captured_path_missing",
+                        f"{where}: cart_remove has no recorded capturedPath; a pre-drop capture cannot be proven",
+                    )
+                )
+                continue
+            record["captured_path"] = captured_path
+            record["captured_before_drop"] = "before_drop" in captured_path
+            record["detail"]["inventory_present"] = isinstance(row.get("inventory"), list)
             reason = row.get("reason")
             if isinstance(reason, str) and reason:
                 record["removal_reason"] = reason
@@ -347,7 +547,31 @@ def map_audit_events(
         if pos is not None:
             record["pos"] = pos
         rows.append(record)
-    return rows, gaps, counts, excluded
+
+    lifecycle["sessions"] = [session_state[key] for key in sorted(session_state)]
+    for state in lifecycle["sessions"]:
+        if not state.get("ended"):
+            lifecycle["open_sessions"].append(state["session"])
+    if session_state and lifecycle["open_sessions"]:
+        gaps.append(
+            Gap(
+                "audit_events",
+                "session_open",
+                f"open session(s) without audit_end: {lifecycle['open_sessions']}",
+            )
+        )
+    if lifecycle["incomplete"]:
+        gaps.append(
+            Gap(
+                "audit_events",
+                "audit_incomplete",
+                f"{len(lifecycle['incomplete'])} incomplete/truncated marker(s): "
+                f"{lifecycle['incomplete'][:3]}",
+            )
+        )
+    if not session_state:
+        gaps.append(Gap("audit_events", "missing_sessions", "no session_start/audit_end records"))
+    return rows, gaps, counts, excluded, lifecycle
 
 
 def cmd_audit(args: argparse.Namespace) -> int:
@@ -355,10 +579,19 @@ def cmd_audit(args: argparse.Namespace) -> int:
     if not log_path.is_file():
         print(f"error: {log_path} is not a file", file=sys.stderr)
         return 2
+    source_sha = sha256_file(log_path)
+    if args.expect_sha256:
+        expected = str(args.expect_sha256)
+        if source_sha != expected:
+            print(
+                f"error: audit log sha256 {source_sha} does not match --expect-sha256 {expected}; "
+                "the input is not the finalized file",
+                file=sys.stderr,
+            )
+            return 2
     events = read_jsonl(log_path)
     bundle = Path(args.bundle)
-    source_sha = sha256_file(log_path)
-    rows, gaps, counts, excluded = map_audit_events(
+    rows, gaps, counts, excluded, lifecycle = map_audit_events(
         events,
         run_id=args.run_id,
         instance_id=args.instance_id,
@@ -368,11 +601,11 @@ def cmd_audit(args: argparse.Namespace) -> int:
     report = MappingReport("#18 audit JSONL -> gate audit-events", str(log_path), source_sha)
     report.counts = counts
     report.excluded = excluded
+    report.lifecycle = lifecycle
     report.gaps = gaps
-    report.notes.append(f"{len(events)} raw event(s), {len(rows)} mapped, {sum(excluded.values())} session-meta excluded")
-    if args.exclude_before is not None:
-        report.notes.append("filtering is intentionally not applied: lossless means every event")
-        _ = args.exclude_before
+    report.notes.append(
+        f"{len(events)} raw event(s), {len(rows)} mapped, {sum(excluded.values())} session-meta validated/excluded"
+    )
     out = bundle / CANONICAL["audit_events"]
     if report.ok:
         write_jsonl(out, rows)
@@ -385,9 +618,6 @@ def cmd_audit(args: argparse.Namespace) -> int:
     return 0 if report.ok else 1
 
 
-# --------------------------------------------------------------------------- #19 trajectory
-
-
 def map_trajectory(
     trajectory: Sequence[dict[str, Any]],
     *,
@@ -396,37 +626,96 @@ def map_trajectory(
     instance_ids: Sequence[str] | None = None,
     joins: Sequence[dict[str, Any]] | None = None,
     audit_events: Sequence[dict[str, Any]] | None = None,
-) -> tuple[list[dict[str, Any]], dict[str, Any], list[Gap]]:
-    """Pair call/result records; compute joins and unmatched counts from facts."""
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None, list[Gap], list[dict[str, Any]]]:
+    """Pair call/result records without collapsing duplicates.
+
+    A repeated ``call_id`` is a gap (an overlay of two attempts cannot be
+    projected), a missing instance is a gap when several instances are
+    declared, and a producer join is only ``verified`` when it carries explicit
+    proof (producer, basis, clock).  Everything else stays in the candidate
+    list and is never handed to the gate as a verified join.
+    """
     gaps: list[Gap] = []
     allowed_instances = {instance_id, *(instance_ids or [])} - {""}
-    calls: dict[str, dict[str, Any]] = {}
-    results: dict[str, dict[str, Any]] = {}
+    require_instance = len(allowed_instances) > 1
+
+    calls: dict[str, list[dict[str, Any]]] = {}
+    results: dict[str, list[dict[str, Any]]] = {}
     for index, row in enumerate(trajectory):
         kind = row.get("record")
-        if kind == "call":
-            call_id = row.get("call_id")
-            if not isinstance(call_id, str) or not call_id:
+        row_run = row.get("run_id")
+        if row_run is not None and str(row_run) != run_id:
+            gaps.append(
+                Gap(
+                    "tool_trace",
+                    "run_id_mismatch",
+                    f"trajectory[{index}]: run_id {row_run!r} != declared {run_id!r}",
+                )
+            )
+            continue
+        call_id = row.get("call_id")
+        if not isinstance(call_id, str) or not call_id:
+            if kind in ("call", "result"):
                 gaps.append(Gap("tool_trace", "missing_call_id", f"trajectory[{index}]: no call_id"))
-                continue
-            calls[call_id] = row
+            continue
+        if kind == "call":
+            calls.setdefault(call_id, []).append(row)
         elif kind == "result":
-            call_id = row.get("call_id")
-            if isinstance(call_id, str) and call_id:
-                results[call_id] = row
+            results.setdefault(call_id, []).append(row)
+
+    for call_id, entries in calls.items():
+        if len(entries) > 1:
+            gaps.append(
+                Gap(
+                    "tool_trace",
+                    "duplicate_call_id",
+                    f"call {call_id!r} appears {len(entries)} times (an overlaid attempt cannot be projected)",
+                )
+            )
+    for call_id, entries in results.items():
+        if len(entries) > 1:
+            gaps.append(
+                Gap(
+                    "tool_trace",
+                    "duplicate_result",
+                    f"call {call_id!r} has {len(entries)} result records",
+                )
+            )
+    for call_id in results:
+        if call_id not in calls:
+            gaps.append(Gap("tool_trace", "orphan_result", f"result {call_id!r} has no call record"))
 
     rows: list[dict[str, Any]] = []
-    for call_id, call in calls.items():
-        result = results.get(call_id)
-        if result is None:
+    for call_id, entries in calls.items():
+        if len(entries) != 1:
+            continue
+        call = entries[0]
+        result_entries = results.get(call_id, [])
+        if not result_entries:
             gaps.append(Gap("tool_trace", "missing_result", f"call {call_id!r} has no result record"))
             continue
+        if len(result_entries) != 1:
+            continue
+        result = result_entries[0]
         status = result.get("status")
         if status not in ("ok", "error", "open"):
             gaps.append(Gap("tool_trace", "bad_status", f"call {call_id!r}: status {status!r}"))
             continue
-        record_instance = call.get("instance") or instance_id
-        if str(record_instance) not in allowed_instances:
+        record_instance = call.get("instance")
+        instance_source = "recorded"
+        if not isinstance(record_instance, str) or not record_instance:
+            if require_instance:
+                gaps.append(
+                    Gap(
+                        "tool_trace",
+                        "missing_instance",
+                        f"call {call_id!r}: no instance recorded and several instances are declared",
+                    )
+                )
+                continue
+            record_instance = instance_id
+            instance_source = "single-declared-instance-default"
+        elif allowed_instances and str(record_instance) not in allowed_instances:
             gaps.append(
                 Gap(
                     "tool_trace",
@@ -443,7 +732,6 @@ def map_trajectory(
         payload = result.get("result")
         if payload is None and "text" in result:
             payload = result.get("text")
-        record_instance = call.get("instance") or instance_id
         rows.append(
             {
                 "call_id": call_id,
@@ -460,64 +748,126 @@ def map_trajectory(
                     "raw_result": result,
                     "phase": call.get("phase"),
                     "actor": call.get("actor"),
+                    "instance_source": instance_source,
                 },
             }
         )
 
-    join_rows: list[dict[str, Any]] = []
     event_by_id: dict[str, dict[str, Any]] = {}
     if audit_events is not None:
         event_by_id = {str(row.get("event_id")): row for row in audit_events}
+    verified: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+    resolved_event_ids: set[str] = set()
     for index, join in enumerate(joins or []):
         call_id = join.get("call_id")
         ref = join.get("audit_ref")
+        candidate = {
+            "call_id": call_id,
+            "audit_ref": ref,
+            "basis": join.get("basis") or join.get("note"),
+            "verified": False,
+            "problems": [],
+        }
         if not isinstance(call_id, str) or not isinstance(ref, dict):
-            gaps.append(Gap("trace_join", "malformed_join", f"joins[{index}]: needs call_id + audit_ref"))
+            candidate["problems"].append("needs call_id + audit_ref")
+            candidates.append(candidate)
             continue
-        if calls and call_id not in calls:
-            gaps.append(Gap("trace_join", "unknown_call", f"joins[{index}]: call {call_id!r} not in trace"))
+        if call_id not in calls or len(calls.get(call_id, [])) != 1:
+            candidate["problems"].append(f"call {call_id!r} is not a unique trace call")
+            candidates.append(candidate)
             continue
         event_id = ref.get("event_id")
         event = event_by_id.get(str(event_id))
         if audit_events is not None and event is None:
-            gaps.append(
-                Gap("trace_join", "unknown_event", f"joins[{index}]: event {event_id!r} not in audit events")
+            candidate["problems"].append(f"event {event_id!r} is not in the mapped audit events")
+            candidates.append(candidate)
+            continue
+        if event is not None:
+            for field in ("run_id", "instance_id", "dimension"):
+                value = join.get(field, ref.get(field))
+                if value is not None and value != event.get(field):
+                    candidate["problems"].append(
+                        f"{field}={value!r} does not match the event value {event.get(field)!r}"
+                    )
+            if ref.get("tick") is not None and ref.get("tick") != event.get("tick"):
+                candidate["problems"].append(
+                    f"tick={ref.get('tick')!r} does not match the event tick {event.get('tick')!r}"
+                )
+            if event.get("phase") != "agent":
+                candidate["problems"].append(f"event phase {event.get('phase')!r} is not agent")
+        proof = join.get("proof")
+        proof_ok = (
+            isinstance(proof, dict)
+            and isinstance(proof.get("producer"), str)
+            and bool(proof["producer"].strip())
+            and isinstance(proof.get("basis"), str)
+            and bool(proof["basis"].strip())
+            and isinstance(proof.get("clock"), str)
+            and bool(proof["clock"].strip())
+        )
+        if candidate["problems"]:
+            candidates.append(candidate)
+            continue
+        if not proof_ok:
+            candidate["problems"].append(
+                "no explicit proof (producer/basis/clock); kept as an unverified candidate"
             )
+            candidates.append(candidate)
             continue
         full_ref = {
-            "run_id": join.get("run_id", run_id),
-            "instance_id": join.get("instance_id", instance_id),
-            "dimension": join.get("dimension"),
+            "run_id": event.get("run_id", run_id),
+            "instance_id": event.get("instance_id", instance_id),
+            "dimension": event.get("dimension"),
             "event_id": event_id,
-            "tick": ref.get("tick", event.get("tick") if event else None),
+            "tick": event.get("tick"),
         }
-        if event is not None:
-            full_ref["dimension"] = event.get("dimension", full_ref["dimension"])
-        join_rows.append({"call_id": call_id, "audit_ref": full_ref, "verified": True})
+        verified.append(
+            {
+                "call_id": call_id,
+                "audit_ref": full_ref,
+                "verified": True,
+                "proof": proof,
+                "note": join.get("note"),
+            }
+        )
+        resolved_event_ids.add(str(event_id))
 
-    joined_calls = {row["call_id"] for row in join_rows}
-    joined_events = {str(row["audit_ref"].get("event_id")) for row in join_rows}
-    agent_event_ids = {
-        str(row.get("event_id"))
-        for row in (audit_events or [])
-        if row.get("phase") == "agent" and row.get("event_id")
-    }
-    join_doc = {
-        "joins": join_rows,
-        "unmatched_tool_calls": len(set(calls) - joined_calls),
-        "unmatched_agent_events": len(agent_event_ids - joined_events),
-        "derived_from": {
-            "trajectory_calls": len(calls),
-            "audit_agent_events": len(agent_event_ids),
-        },
-    }
-    return rows, join_doc, gaps
+    if verified:
+        joined_calls = {row["call_id"] for row in verified}
+        agent_event_ids = {
+            str(row.get("event_id"))
+            for row in (audit_events or [])
+            if row.get("phase") == "agent" and row.get("event_id")
+        }
+        join_doc = {
+            "joins": verified,
+            "unmatched_tool_calls": len(set(calls) - joined_calls),
+            "unmatched_agent_events": len(agent_event_ids - resolved_event_ids),
+            "derived_from": {
+                "trajectory_calls": len(calls),
+                "audit_agent_events": len(agent_event_ids),
+                "verified_joins": len(verified),
+                "unverified_candidates": len(candidates),
+            },
+        }
+    else:
+        join_doc = None
+    return rows, join_doc, gaps, candidates
 
 
 def cmd_trace(args: argparse.Namespace) -> int:
     trajectory_path = Path(args.trajectory)
     if not trajectory_path.is_file():
         print(f"error: {trajectory_path} is not a file", file=sys.stderr)
+        return 2
+    source_sha = sha256_file(trajectory_path)
+    if args.expect_sha256 and source_sha != str(args.expect_sha256):
+        print(
+            f"error: trajectory sha256 {source_sha} does not match --expect-sha256 "
+            f"{args.expect_sha256}; the input is not the finalized file",
+            file=sys.stderr,
+        )
         return 2
     trajectory = read_jsonl(trajectory_path)
     bundle = Path(args.bundle)
@@ -530,8 +880,7 @@ def cmd_trace(args: argparse.Namespace) -> int:
         joins = read_json(Path(args.joins))
         if isinstance(joins, dict):
             joins = joins.get("joins")
-    source_sha = sha256_file(trajectory_path)
-    rows, join_doc, gaps = map_trajectory(
+    rows, join_doc, gaps, candidates = map_trajectory(
         trajectory,
         run_id=args.run_id,
         instance_id=args.instance_id,
@@ -540,33 +889,38 @@ def cmd_trace(args: argparse.Namespace) -> int:
         audit_events=audit_events,
     )
     report = MappingReport("#19 trajectory.jsonl -> gate tool-trace", str(trajectory_path), source_sha)
-    report.counts = {"calls": len(rows), "joins": len(join_doc["joins"])}
+    report.counts = {
+        "calls": len(rows),
+        "calls_raw": sum(1 for row in trajectory if row.get("record") == "call"),
+        "results_raw": sum(1 for row in trajectory if row.get("record") == "result"),
+        "verified_joins": len(join_doc["joins"]) if join_doc else 0,
+        "join_candidates": len(candidates),
+    }
     report.gaps = gaps
+    report.join_candidates = candidates
     report.notes.append(
-        "unmatched counts are computed from the mapped artifacts, not copied from a declaration"
+        "duplicate call ids are gaps; verified joins require explicit producer/basis/clock proof"
     )
     if report.ok:
         trace_out = bundle / CANONICAL["tool_trace"]
         write_jsonl(trace_out, rows)
         report.mapped.append(str(trace_out.relative_to(bundle)))
-        if join_doc["joins"]:
+        if join_doc is not None:
             join_out = bundle / CANONICAL["trace_join"]
             write_json(join_out, join_doc)
             report.mapped.append(str(join_out.relative_to(bundle)))
         else:
             report.notes.append(
-                "no joins emitted: this run has no agent-phase audit events to join "
-                "(trace_join.json withheld so the gate blocks instead of failing)"
+                "no verified joins: trace-join.json withheld so the gate blocks instead of asserting causality"
             )
             stale = bundle / CANONICAL["trace_join"]
             if stale.exists():
                 stale.unlink()
+    if candidates:
+        write_json(bundle / "mapping" / "join-candidates.json", {"candidates": candidates})
     write_json(bundle / "mapping" / "trace-report.json", report.as_json())
     print(json.dumps(report.as_json(), indent=2) if args.json else _summary(report))
     return 0 if report.ok else 1
-
-
-# --------------------------------------------------------------------------- #16 identity
 
 
 def _player_fields(player: dict[str, Any]) -> dict[str, Any]:
@@ -741,6 +1095,231 @@ def cmd_identity(args: argparse.Namespace) -> int:
 # --------------------------------------------------------------------------- assemble
 
 
+# ------------------------------------------------------------------ bridge6 restore
+
+
+BRIDGE6_EVIDENCE = Path("F:/mc-agent-worktrees/rom13/bridge6/labs/evidence")
+
+
+def _compare_snapshots(before: Any, after: Any) -> tuple[list[str], str, str]:
+    """The gate's restore comparison, applied to two protocol snapshots."""
+    problems: list[str] = []
+    order_before = gate.fork_verify.order_hash(before.entities)
+    order_after = gate.fork_verify.order_hash(after.entities)
+    if order_before != order_after:
+        problems.append(f"orderHash before={order_before} after={order_after}")
+    counts_before = gate.fork_verify.type_counts(before.entities)
+    counts_after = gate.fork_verify.type_counts(after.entities)
+    if counts_before != counts_after:
+        problems.append(f"per-type counts differ: {counts_before} vs {counts_after}")
+    if len(before.entities) != len(after.entities):
+        problems.append(f"entity counts {len(before.entities)} vs {len(after.entities)}")
+        return problems, order_before, order_after
+    for left, right in zip(before.entities, after.entities):
+        if left.nbt != right.nbt:
+            problems.append(f"{left.uuid}: NBT differs")
+            break
+        if left.pos is not None and right.pos is not None:
+            if any(abs(a - b) > 1e-6 for a, b in zip(left.pos, right.pos)):
+                problems.append(f"{left.uuid}: position differs")
+                break
+        if left.vel is not None and right.vel is not None:
+            if any(abs(a - b) > 1e-6 for a, b in zip(left.vel, right.vel)):
+                problems.append(f"{left.uuid}: velocity differs")
+                break
+    return problems, order_before, order_after
+
+
+def collect_restore_evidence(evidence_dir: Path, out: Path) -> dict[str, Any]:
+    """Independently verify and copy the merged bridge#6 restore evidence.
+
+    This is a *separate* live run (bridge6-src/bridge6-dst).  It is collected
+    and verified here, but it is never joined to the generic integration run:
+    there is no shared tool/event clock between the two, so the gate's
+    same-run binding is not claimed.
+    """
+    report: dict[str, Any] = {
+        "tool": "bridge6 restore evidence collection",
+        "evidenceDir": str(evidence_dir),
+        "ok": False,
+        "checks": [],
+        "problems": [],
+        "sameRunBinding": False,
+    }
+    index_path = evidence_dir / "index.json"
+    if not index_path.is_file():
+        report["problems"].append(f"missing {index_path}")
+        return report
+    index = read_json(index_path)
+    repo_root = evidence_dir.parents[1]
+
+    for stage in index.get("stages", []):
+        rel = stage.get("file")
+        expected = stage.get("sha256")
+        path = repo_root / rel if isinstance(rel, str) else None
+        if path is None or not path.is_file():
+            report["problems"].append(f"stage {stage.get('stage')}: {rel} is missing")
+            continue
+        actual = sha256_file(path)
+        report["checks"].append(
+            {"check": f"stage-hash:{stage.get('stage')}", "path": str(path), "sha256": actual, "ok": actual == expected}
+        )
+        if actual != expected:
+            report["problems"].append(f"stage {stage.get('stage')}: sha256 {actual} != {expected}")
+
+    def list_rows(name: str) -> list[dict[str, Any]]:
+        path = evidence_dir / name
+        return read_json(path) if path.is_file() else []
+
+    fork_rows = list_rows("fork.json")
+    source_snapshot_dir = next(
+        (Path(row["result"]["snapshotDir"]) for row in fork_rows if row.get("method") == "fork" and row.get("ok")),
+        None,
+    )
+    after_rows = list_rows("after-reload.json")
+    destination_snapshot_dir = next(
+        (Path(row["result"]["snapshotDir"]) for row in after_rows if row.get("method") == "verify" and row.get("ok")),
+        None,
+    )
+    report["sourceSnapshotDir"] = str(source_snapshot_dir)
+    report["destinationSnapshotDir"] = str(destination_snapshot_dir)
+    if source_snapshot_dir is None or destination_snapshot_dir is None:
+        report["problems"].append("source or destination snapshot directory is missing from the evidence")
+        return report
+
+    try:
+        before = gate.fork_verify.load_snapshot(source_snapshot_dir)
+        after = gate.fork_verify.load_snapshot(destination_snapshot_dir)
+    except gate.fork_verify.SnapshotError as error:
+        report["problems"].append(f"snapshot cannot be read: {error}")
+        return report
+    validation = gate.fork_verify.validate_snapshot(before) + gate.fork_verify.validate_snapshot(after)
+    if validation:
+        report["problems"].extend(gate.fork_verify.format_issues(validation))
+    compare_problems, order_before, order_after = _compare_snapshots(before, after)
+    report["restoreComparison"] = {
+        "orderHashBefore": order_before,
+        "orderHashAfter": order_after,
+        "problems": compare_problems,
+    }
+    if compare_problems:
+        report["problems"].extend(f"restore: {problem}" for problem in compare_problems)
+
+    # source unchanged: the source lab snapshots before the restore and after it
+    snapshot_root = source_snapshot_dir.parent
+    source_before_dir = snapshot_root / "source-before"
+    source_after_dir = snapshot_root / "source-after-restore"
+    if source_before_dir.is_dir() and source_after_dir.is_dir():
+        try:
+            source_before = gate.fork_verify.load_snapshot(source_before_dir)
+            source_after = gate.fork_verify.load_snapshot(source_after_dir)
+            source_problems, source_hash_before, source_hash_after = _compare_snapshots(source_before, source_after)
+        except gate.fork_verify.SnapshotError as error:
+            source_problems, source_hash_before, source_hash_after = [str(error)], "", ""
+        report["sourceUnchanged"] = {
+            "before": str(source_before_dir),
+            "after": str(source_after_dir),
+            "orderHashBefore": source_hash_before,
+            "orderHashAfter": source_hash_after,
+            "problems": source_problems,
+        }
+        if source_problems:
+            report["problems"].extend(f"source unchanged: {problem}" for problem in source_problems)
+    else:
+        report["problems"].append("source-before/source-after-restore snapshots are missing")
+
+    restore_rows = list_rows("restore.json")
+    duplicate_rows = list_rows("duplicate.json")
+    mutate_rows = list_rows("mutate.json")
+    report["failureEvidence"] = {
+        "wrongEndpointRejected": any(
+            row.get("ok") is False and "endpoint check failed" in str(row.get("error", ""))
+            for row in restore_rows
+        ),
+        "duplicatePreExistingRejected": any(
+            row.get("ok") is False and "duplicate" in str(row.get("error", "")).lower()
+            for row in duplicate_rows
+        ),
+        "inventoryMutationTested": any(row.get("method") in ("verify", "snapshot", "command_output") for row in mutate_rows),
+        "unverifiedScenarioRows": len(list_rows("unverified.json")),
+    }
+    for label in ("wrongEndpointRejected", "duplicatePreExistingRejected"):
+        if not report["failureEvidence"][label]:
+            report["problems"].append(f"failure evidence missing: {label}")
+
+    # copy only the protocol files the gate reads; the raw peer tree stays read-only
+    out.mkdir(parents=True, exist_ok=True)
+    for label, snapshot in (("snapshot-before", before), ("snapshot-after", after)):
+        target = out / label
+        target.mkdir(parents=True, exist_ok=True)
+        for name in ("meta.json", "entities.jsonl"):
+            source = snapshot.path / name
+            (target / name).write_bytes(source.read_bytes())
+    provenance = {
+        "kind": "bridge6-restore-evidence",
+        "evidenceDir": str(evidence_dir),
+        "bridgeFinalHead": index.get("bridgeFinalHead"),
+        "fixtureOrderHash": (index.get("fixture") or {}).get("orderHash"),
+        "sourceSnapshotDir": str(source_snapshot_dir),
+        "destinationSnapshotDir": str(destination_snapshot_dir),
+        "interfaceSha256": (index.get("interface") or {}).get("jarSha256"),
+        "copied": {
+            "snapshot-before": sha256_file(out / "snapshot-before" / "entities.jsonl"),
+            "snapshot-after": sha256_file(out / "snapshot-after" / "entities.jsonl"),
+        },
+        "sameRunBinding": False,
+        "note": "separate live run; not joined to the generic integration run",
+    }
+    write_json(out / "provenance.json", provenance)
+    report["copied"] = provenance["copied"]
+    report["gateCompatibility"] = {
+        "snapshotStateComparison": "ok" if not compare_problems else "problems",
+        "sameRunBinding": False,
+        "withheld": [
+            "restore_record bound to one declared run",
+            "failure_cases covering all six gate cases",
+            "source_unchanged bound to the gate run's declared source",
+        ],
+    }
+    report["ok"] = not report["problems"]
+    return report
+
+
+def cmd_restore_evidence(args: argparse.Namespace) -> int:
+    evidence_dir = Path(args.evidence_dir)
+    if not evidence_dir.is_dir():
+        print(f"error: {evidence_dir} is not a directory", file=sys.stderr)
+        return 2
+    report = collect_restore_evidence(evidence_dir, Path(args.out))
+    write_json(Path(args.out) / "collection-report.json", report)
+    print(json.dumps(report, indent=2) if args.json else _restore_summary(report))
+    return 0 if report["ok"] else 1
+
+
+def _restore_summary(report: dict[str, Any]) -> str:
+    lines = [
+        f"bridge6 restore collection: {'ok' if report['ok'] else 'PROBLEMS'}",
+        f"  evidence {report.get('evidenceDir')}",
+    ]
+    for check in report.get("checks", []):
+        lines.append(f"  [{'ok' if check['ok'] else 'FAIL'}] {check['check']}")
+    comparison = report.get("restoreComparison") or {}
+    if comparison:
+        lines.append(
+            f"  restore order {comparison.get('orderHashBefore')} -> {comparison.get('orderHashAfter')} "
+            f"({len(comparison.get('problems') or [])} problem(s))"
+        )
+    source = report.get("sourceUnchanged") or {}
+    if source:
+        lines.append(
+            f"  source unchanged {source.get('orderHashBefore')} -> {source.get('orderHashAfter')} "
+            f"({len(source.get('problems') or [])} problem(s))"
+        )
+    for problem in report.get("problems", []):
+        lines.append(f"  problem: {problem}")
+    return "\n".join(lines)
+
+
 def assemble(
     bundle: Path,
     spec: dict[str, Any],
@@ -856,6 +1435,7 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--run-id", required=True)
     audit.add_argument("--instance-id", required=True)
     audit.add_argument("--dimension", required=True)
+    audit.add_argument("--expect-sha256", help="refuse to project unless the log matches this finalized hash")
     audit.add_argument("--exclude-before", help=argparse.SUPPRESS)
     audit.add_argument("--json", action="store_true")
     audit.set_defaults(func=cmd_audit)
@@ -867,6 +1447,7 @@ def build_parser() -> argparse.ArgumentParser:
     trace.add_argument("--instance-id", required=True)
     trace.add_argument("--instances", help="comma-separated declared instance ids for multi-instance traces")
     trace.add_argument("--joins", help="optional JSON list of {call_id, audit_ref} joins")
+    trace.add_argument("--expect-sha256", help="refuse to project unless the trajectory matches this finalized hash")
     trace.add_argument("--json", action="store_true")
     trace.set_defaults(func=cmd_trace)
 
@@ -883,6 +1464,12 @@ def build_parser() -> argparse.ArgumentParser:
     assemble_cmd.add_argument("--no-gate", action="store_true")
     assemble_cmd.add_argument("--json", action="store_true")
     assemble_cmd.set_defaults(func=cmd_assemble)
+
+    restore = sub.add_parser("restore-evidence", help="independently verify and copy the merged bridge#6 restore evidence")
+    restore.add_argument("--evidence-dir", default=str(BRIDGE6_EVIDENCE))
+    restore.add_argument("--out", required=True)
+    restore.add_argument("--json", action="store_true")
+    restore.set_defaults(func=cmd_restore_evidence)
 
     sub.add_parser("selftest", help="mapping tests (no game, no live evidence)")
     return parser
@@ -919,28 +1506,40 @@ class _Selftest:
 
 def _fixture_audit() -> list[dict[str, Any]]:
     return [
-        {"seq": 1, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "bootstrap", "type": "audit_ready", "config": {"dimension": "minecraft:overworld"}},
-        {"seq": 2, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": "aaaa", "from": [0, 0, 0], "to": [0, 0, 0]},
-        {"seq": 3, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
-        {"seq": 4, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": "aaaa", "targetInput": True, "agentOp": True, "requestSeq": 3, "attemptSeq": 2, "note": 0, "instrument": "harp"},
-        {"seq": 5, "tick": 30, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_tracked", "uuid": "cart-1", "epoch": 1, "inventory": []},
-        {"seq": 6, "tick": 40, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_exit", "uuid": "cart-1", "epoch": 1, "pos": [2.5, 60.0, 0.5]},
-        {"seq": 7, "tick": 80, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_remove", "uuid": "cart-1", "epoch": 1, "reason": "DISCARDED", "pos": [2.5, -70.0, 0.5], "inventory": [{"slot": 0, "id": "minecraft:stone", "count": 3}]},
-        {"seq": 8, "tick": 90, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "audit_end", "status": "complete"},
+        {"seq": 1, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
+        {"seq": 2, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready", "config": {"dimension": "minecraft:overworld"}},
+        {"seq": 3, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "init", "type": "phase", "from": "bootstrap", "to": "init"},
+        {"seq": 4, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}, "from": [0, 0, 0], "to": [0, 0, 0]},
+        {"seq": 5, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+        {"seq": 6, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "targetInput": True, "agentOp": True, "requestSeq": 5, "attemptSeq": 4, "note": 0, "instrument": "harp"},
+        {"seq": 7, "tick": 30, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_tracked", "uuid": "cart-1", "epoch": 1, "inventory": []},
+        {"seq": 8, "tick": 40, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_exit", "uuid": "cart-1", "epoch": 1, "pos": [2.5, 60.0, 0.5]},
+        {"seq": 9, "tick": 80, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_remove", "uuid": "cart-1", "epoch": 1, "reason": "DISCARDED", "pos": [2.5, -70.0, 0.5], "capturedPath": "minecart_container_remove_before_drop", "inventory": [{"slot": 0, "id": "minecraft:stone", "count": 3}]},
+        {"seq": 10, "tick": 90, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete", "truncated": False},
     ]
 
 
 def _fixture_trajectory() -> list[dict[str, Any]]:
     return [
-        {"record": "call", "call_id": "c1", "tool": "bash", "arguments": {"command": "python tools/lab_server.py status"}, "at": "2026-09-26T00:00:00Z", "phase": "prepare", "actor": "operator"},
+        {"record": "call", "call_id": "c1", "tool": "bash", "arguments": {"command": "status"}, "at": "2026-09-26T00:00:00Z", "phase": "prepare", "actor": "operator", "instance": "exp-1"},
         {"record": "result", "call_id": "c1", "status": "ok", "result": {"text": "up"}, "at": "2026-09-26T00:00:01Z"},
-        {"record": "call", "call_id": "c2", "tool": "write", "arguments": {"path": "notes.md"}, "at": "2026-09-26T00:00:02Z", "phase": "prepare", "actor": "operator"},
+        {"record": "call", "call_id": "c2", "tool": "write", "arguments": {"path": "notes.md"}, "at": "2026-09-26T00:00:02Z", "phase": "prepare", "actor": "operator", "instance": "src-1"},
         {"record": "result", "call_id": "c2", "status": "ok", "result": "written", "at": "2026-09-26T00:00:03Z"},
-        {"record": "call", "call_id": "c3", "tool": "git", "arguments": {"args": ["rev-parse", "HEAD"]}, "at": "2026-09-26T00:00:04Z", "phase": "prepare", "actor": "operator"},
+        {"record": "call", "call_id": "c3", "tool": "git", "arguments": {"args": ["rev-parse", "HEAD"]}, "at": "2026-09-26T00:00:04Z", "phase": "prepare", "actor": "operator", "instance": "src-1"},
         {"record": "result", "call_id": "c3", "status": "ok", "result": "abc", "at": "2026-09-26T00:00:05Z"},
-        {"record": "call", "call_id": "c4", "tool": "mcp_probe", "arguments": {"tool": "mc_state"}, "at": "2026-09-26T00:00:06Z", "phase": "prepare", "actor": "operator"},
+        {"record": "call", "call_id": "c4", "tool": "mcp_probe", "arguments": {"tool": "mc_state"}, "at": "2026-09-26T00:00:06Z", "phase": "prepare", "actor": "operator", "instance": "exp-1"},
         {"record": "result", "call_id": "c4", "status": "ok", "result": {"tick": 21}, "at": "2026-09-26T00:00:07Z"},
     ]
+
+
+def _map_audit(events=None):
+    return map_audit_events(
+        events if events is not None else _fixture_audit(),
+        run_id="r1",
+        instance_id="exp-1",
+        dimension="minecraft:overworld",
+        source_sha256="0" * 64,
+    )
 
 
 def run_selftest(out: TextIO | None = None) -> int:
@@ -949,80 +1548,149 @@ def run_selftest(out: TextIO | None = None) -> int:
     with tempfile.TemporaryDirectory(prefix="stage1-evidence-selftest-") as tmp:
         base = Path(tmp)
 
-        # audit mapping -----------------------------------------------------------
-        rows, gaps, counts, excluded = map_audit_events(
-            _fixture_audit(), run_id="r1", instance_id="exp-1", dimension="minecraft:overworld", source_sha256="0" * 64
-        )
+        # audit positives ---------------------------------------------------------
+        rows, gaps, counts, excluded, lifecycle = _map_audit()
         test.check("audit maps without gaps", not gaps, str([g.as_json() for g in gaps]))
         by_type = {str(row["event"]) for row in rows}
         test.check("audit maps cart_exit to cart_emitted", "cart_emitted" in by_type)
         test.check("audit maps cart_remove to cart_removed", "cart_removed" in by_type)
         emitted = next(row for row in rows if row["event"] == "cart_emitted")
-        test.check("audit capture-before-removal is derived", emitted.get("captured_before_removal") is True)
+        test.check("audit capture-before-removal uses capturedPath", emitted.get("captured_before_removal") is True)
         processed = next(row for row in rows if row["event"] == "input_processed")
         test.equal("audit keeps the raw event", processed["detail"]["raw"]["type"], "input_processed")
         test.equal("audit maps phase experiment -> agent", processed["phase"], "agent")
-        test.equal("audit event id", processed["event_id"], "s1:4")
+        test.equal("audit event id", processed["event_id"], "s1:6")
+        test.equal("audit promotes requestSeq", processed.get("request_seq"), 5)
+        test.equal("audit promotes attemptSeq", processed.get("attempt_seq"), 4)
+        test.equal("audit promotes agentOp", processed.get("agent_op"), True)
+        test.equal("audit promotes operator name", processed.get("operator_name"), "Bot")
+        test.equal("audit lifecycle end status", lifecycle["end_statuses"], ["complete"])
+        test.equal("audit session meta excluded", excluded, {"session_start": 1, "audit_ready": 1, "audit_end": 1})
+        removed = next(row for row in rows if row["event"] == "cart_removed")
+        test.equal("audit promotes capturedPath", removed.get("captured_path"), "minecart_container_remove_before_drop")
+        test.check("audit marks before-drop", removed.get("captured_before_drop") is True)
 
-        bad = list(_fixture_audit())
-        bad[1]["run"] = "other-run"
-        _, gaps, _, _ = map_audit_events(
-            bad, run_id="r1", instance_id="exp-1", dimension="minecraft:overworld", source_sha256="0" * 64
-        )
+        # audit negatives ---------------------------------------------------------
+        no_end = [row for row in _fixture_audit() if row.get("type") != "audit_end"]
+        _, gaps, _, _, lifecycle = _map_audit(no_end)
+        test.check("open session is a gap", any(gap.code == "session_open" for gap in gaps))
+        test.equal("open session recorded", lifecycle["open_sessions"], ["s1"])
+        incomplete = [dict(row) for row in _fixture_audit()]
+        incomplete.append({"seq": 11, "tick": 91, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_incomplete", "reason": "hook error"})
+        _, gaps, _, _, _ = _map_audit(incomplete)
+        test.check("audit_incomplete is a gap", any(gap.code == "audit_incomplete" for gap in gaps))
+        truncated = [dict(row) for row in _fixture_audit()]
+        truncated[-1]["truncated"] = True
+        _, gaps, _, _, _ = _map_audit(truncated)
+        test.check("truncated log is a gap", any(gap.code == "audit_incomplete" for gap in gaps))
+        no_capture = [dict(row) for row in _fixture_audit()]
+        no_capture[-2].pop("capturedPath")
+        _, gaps, _, _, _ = _map_audit(no_capture)
+        test.check("missing capturedPath is a gap", any(gap.code == "captured_path_missing" for gap in gaps))
+        after_drop = [dict(row) for row in _fixture_audit()]
+        after_drop[-2]["capturedPath"] = "minecart_container_remove_after_drop"
+        after_rows, after_gaps, _, _, _ = _map_audit(after_drop)
+        after_emitted = next(row for row in after_rows if row["event"] == "cart_emitted")
+        test.check("after-drop capture is not before-removal", after_emitted.get("captured_before_removal") is False)
+        test.check("after-drop path has no gap", not after_gaps, str([g.as_json() for g in after_gaps]))
+        no_epoch = [dict(row) for row in _fixture_audit()]
+        no_epoch[-3].pop("epoch")
+        _, gaps, _, _, _ = _map_audit(no_epoch)
+        test.check("missing epoch is a gap", any(gap.code == "missing_epoch" for gap in gaps))
+        reuse = [dict(row) for row in _fixture_audit()]
+        reuse.append({"seq": 11, "tick": 22, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "requestSeq": 5, "attemptSeq": 4, "agentOp": True})
+        _, gaps, _, _, _ = _map_audit(reuse)
+        test.check("request reuse is a gap", any(gap.code == "request_reused" for gap in gaps))
+        test.check("attempt reuse is a gap", any(gap.code == "attempt_reused" for gap in gaps))
+        dangling = [dict(row) for row in _fixture_audit()]
+        next(row for row in dangling if row["type"] == "input_processed")["attemptSeq"] = 999
+        _, gaps, _, _, _ = _map_audit(dangling)
+        test.check("dangling attemptSeq is a gap", any(gap.code == "attempt_missing" for gap in gaps))
+        no_attempt = [dict(row) for row in _fixture_audit()]
+        processed_row = next(row for row in no_attempt if row["type"] == "input_processed")
+        processed_row.pop("attemptSeq")
+        _, gaps, _, _, _ = _map_audit(no_attempt)
+        test.check("agentOp without attemptSeq is a gap", any(gap.code == "agent_op_without_attempt" for gap in gaps))
+        foreign = [dict(row) for row in _fixture_audit()]
+        foreign[3]["run"] = "other"
+        _, gaps, _, _, _ = _map_audit(foreign)
         test.check("audit rejects foreign run", any(gap.code == "run_mismatch" for gap in gaps))
-        missing_dim = [dict(row) for row in _fixture_audit()]
-        del missing_dim[1]["seq"]
-        _, gaps, _, _ = map_audit_events(
-            missing_dim, run_id="r1", instance_id="exp-1", dimension="minecraft:overworld", source_sha256="0" * 64
-        )
-        test.check("audit gaps on missing seq", any(gap.code == "missing_seq_tick" for gap in gaps))
 
-        no_actor = [dict(row) for row in _fixture_audit()]
-        del no_actor[1]["operator"]
-        mapped, _, _, _ = map_audit_events(
-            no_actor, run_id="r1", instance_id="exp-1", dimension="minecraft:overworld", source_sha256="0" * 64
-        )
-        attempt = next(row for row in mapped if row["event"] == "input_attempt")
-        test.check("audit withholds actor when nothing recorded", "actor_uuid" not in attempt)
-        sourced = [dict(row) for row in no_actor]
-        sourced[1]["operatorSource"] = "redstone"
-        mapped, _, _, _ = map_audit_events(
-            sourced, run_id="r1", instance_id="exp-1", dimension="minecraft:overworld", source_sha256="0" * 64
-        )
-        attempt = next(row for row in mapped if row["event"] == "input_attempt")
-        test.equal("audit records explicit absent actor provenance", attempt.get("actor_provenance"), "redstone")
-
-        # trace mapping -----------------------------------------------------------
-        trace_rows, join_doc, trace_gaps = map_trajectory(
-            _fixture_trajectory(), run_id="r1", instance_id="exp-1", joins=None, audit_events=rows
+        # trace positives ---------------------------------------------------------
+        trace_rows, join_doc, trace_gaps, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=None, audit_events=rows
         )
         test.check("trace maps without gaps", not trace_gaps, str([g.as_json() for g in trace_gaps]))
         test.equal("trace row count", len(trace_rows), 4)
         test.equal("trace categories present", {row["tool"] for row in trace_rows}, {"bash", "write", "git", "mcp_probe"})
-        test.equal("trace unmatched agent events computed", join_doc["unmatched_agent_events"], 6)
-        join = [{"call_id": "c4", "audit_ref": {"tick": 21, "event_id": "s1:4"}}]
-        _, join_doc, trace_gaps = map_trajectory(
-            _fixture_trajectory(), run_id="r1", instance_id="exp-1", joins=join, audit_events=rows
+        test.equal("trace keeps explicit instances", {row["instance_id"] for row in trace_rows}, {"exp-1", "src-1"})
+        test.check("no joins means no trace-join doc", join_doc is None)
+
+        # trace negatives ---------------------------------------------------------
+        duplicated = _fixture_trajectory() + [dict(_fixture_trajectory()[0])]
+        _, _, trace_gaps, _ = map_trajectory(
+            duplicated, run_id="r1", instance_id="exp-1", instance_ids=None, joins=None, audit_events=rows
         )
-        test.check("join resolves without gaps", not trace_gaps, str([g.as_json() for g in trace_gaps]))
-        test.equal("join unmatched agent events drops to 5", join_doc["unmatched_agent_events"], 5)
-        test.equal("join unmatched tool calls", join_doc["unmatched_tool_calls"], 3)
-        bogus = [{"call_id": "c4", "audit_ref": {"tick": 21, "event_id": "nope"}}]
-        _, _, trace_gaps = map_trajectory(
-            _fixture_trajectory(), run_id="r1", instance_id="exp-1", joins=bogus, audit_events=rows
+        test.check("duplicate call_id is a gap", any(gap.code == "duplicate_call_id" for gap in trace_gaps))
+        orphan = [dict(row) for row in _fixture_trajectory()]
+        orphan.append({"record": "result", "call_id": "c9", "status": "ok", "at": "2026-09-26T00:00:09Z"})
+        _, _, trace_gaps, _ = map_trajectory(
+            orphan, run_id="r1", instance_id="exp-1", instance_ids=None, joins=None, audit_events=rows
         )
-        test.check("unknown join event is a gap", any(gap.code == "unknown_event" for gap in trace_gaps))
-        missing_result = [
-            row
-            for row in _fixture_trajectory()
-            if not (row.get("record") == "result" and row.get("call_id") == "c2")
-        ]
-        _, _, trace_gaps = map_trajectory(
-            missing_result, run_id="r1", instance_id="exp-1", joins=None, audit_events=rows
+        test.check("orphan result is a gap", any(gap.code == "orphan_result" for gap in trace_gaps))
+        missing_result = [row for row in _fixture_trajectory() if not (row.get("record") == "result" and row.get("call_id") == "c2")]
+        _, _, trace_gaps, _ = map_trajectory(
+            missing_result, run_id="r1", instance_id="exp-1", instance_ids=None, joins=None, audit_events=rows
         )
         test.check("call without result is a gap", any(gap.code == "missing_result" for gap in trace_gaps))
+        no_instance = [dict(row) for row in _fixture_trajectory()]
+        for row in no_instance:
+            if row.get("record") == "call":
+                row.pop("instance")
+        _, _, trace_gaps, _ = map_trajectory(
+            no_instance, run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=None, audit_events=rows
+        )
+        test.check("missing instance with several declared is a gap", any(gap.code == "missing_instance" for gap in trace_gaps))
+        single_rows, _, single_gaps, _ = map_trajectory(
+            no_instance, run_id="r1", instance_id="exp-1", instance_ids=None, joins=None, audit_events=rows
+        )
+        test.check("single declared instance may default", not single_gaps)
+        test.equal(
+            "defaulted instance is marked",
+            {row["detail"]["instance_source"] for row in single_rows},
+            {"single-declared-instance-default"},
+        )
+        wrong_run = [dict(row) for row in _fixture_trajectory()]
+        wrong_run[0]["run_id"] = "other"
+        _, _, trace_gaps, _ = map_trajectory(
+            wrong_run, run_id="r1", instance_id="exp-1", instance_ids=None, joins=None, audit_events=rows
+        )
+        test.check("trajectory run_id mismatch is a gap", any(gap.code == "run_id_mismatch" for gap in trace_gaps))
 
-        # identity mapping --------------------------------------------------------
+        # joins: verified requires explicit proof ---------------------------------
+        unproven = [{"call_id": "c4", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld", "audit_ref": {"event_id": "s1:6", "tick": 21}, "basis": "nearest call"}]
+        _, join_doc, join_gaps, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=unproven, audit_events=rows
+        )
+        test.check("unproven join has no gaps", not join_gaps)
+        test.check("unproven join is not verified", join_doc is None)
+        test.check("unproven join is a candidate", len(candidates) == 1 and not candidates[0]["verified"])
+        proven = [dict(unproven[0])]
+        proven[0]["proof"] = {"producer": "integration driver", "basis": "requestSeq 5 -> attemptSeq 4", "clock": "tick 21"}
+        _, join_doc, join_gaps, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=proven, audit_events=rows
+        )
+        test.check("proven join has no gaps", not join_gaps)
+        test.check("proven join is verified", join_doc is not None and len(join_doc["joins"]) == 1)
+        test.equal("verified join unmatched agent events", join_doc["unmatched_agent_events"], 5)
+        test.check("proven join leaves no candidates", candidates == [])
+        bogus = [{"call_id": "c4", "audit_ref": {"tick": 21, "event_id": "nope"}, "proof": {"producer": "x", "basis": "y", "clock": "z"}}]
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=bogus, audit_events=rows
+        )
+        test.check("unknown join event stays unverified", join_doc is None and len(candidates) == 1)
+
+        # #16 identity ------------------------------------------------------------
         evidence = ROOT / "docs/evidence/rom13-meta16/live-identity.json"
         if evidence.is_file():
             payload, identity_gaps = map_identity(read_json(evidence))
@@ -1040,11 +1708,10 @@ def run_selftest(out: TextIO | None = None) -> int:
         else:
             test.check("real #16 identity evidence present", False, f"missing {evidence}")
 
-        # assemble ---------------------------------------------------------------
+        # assemble ----------------------------------------------------------------
         bundle = base / "bundle"
         write_jsonl(bundle / CANONICAL["audit_events"], rows)
         write_jsonl(bundle / CANONICAL["tool_trace"], trace_rows)
-        write_json(bundle / CANONICAL["trace_join"], join_doc)
         spec = {
             "run": {
                 "run_id": "r1",
@@ -1053,17 +1720,18 @@ def run_selftest(out: TextIO | None = None) -> int:
                 "child_runs": [{"run_id": f"init-{i}", "instance_id": "exp-1"} for i in range(1, 4)],
                 "source_world": {"label": "x", "path": str(base / "world"), "before_tree_sha256": "1" * 64, "after_tree_sha256": "1" * 64},
                 "instances": [
-                    {"instance_id": "src-audit", "role": "source_audit", "dimension": "minecraft:overworld", "world_dir": "labs/src/world", "rcon_port": 27240, "bridge_port": 27241},
+                    {"instance_id": "src-1", "role": "source_audit", "dimension": "minecraft:overworld", "world_dir": "labs/src/world", "rcon_port": 27240, "bridge_port": 27241},
                     {"instance_id": "exp-1", "role": "experiment", "dimension": "minecraft:overworld", "world_dir": "labs/exp/world", "rcon_port": 27242, "bridge_port": 27243},
                 ],
             }
         }
         report = assemble(bundle, spec, run_gate=False)
-        test.check("assemble declares mapped artifacts", report["index_entries"] >= 3)
+        test.check("assemble declares mapped artifacts", report["index_entries"] >= 2)
         index = read_json(bundle / CANONICAL["evidence_index"])
         index_paths = {entry["path"] for entry in index["entries"]}
         test.check("assemble index covers audit events", CANONICAL["audit_events"] in index_paths)
         test.check("assemble index covers tool trace", CANONICAL["tool_trace"] in index_paths)
+        test.check("assemble index never pins itself", CANONICAL["evidence_index"] not in index_paths)
 
     if test.failures:
         stream.write(f"selftest FAILED: {len(test.failures)} of {test.total} check(s): {', '.join(test.failures)}\n")

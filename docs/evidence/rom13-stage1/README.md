@@ -8,22 +8,27 @@ tool trajectory, gate verdict). The raw files stay under the git-ignored
 ```
 labs/rom13-integration/
   summary.json, summary.md          driver report + step table
-  run-01/trajectory.jsonl           #19 canonical trajectory (all operator commands)
+  run-<stamp>/trajectory.jsonl      #19 append-only trajectory
+  run-<stamp>/trajectory.final.jsonl frozen copy; only this is ever mapped
+  normalize-inputs.json             pinned inputs (hashes) for bundle-only reproduction
   bundle/                           gate bundle, mapping reports, assemble report
   bundle/artifacts/...              canonical gate artifacts (audit events, trace, identity)
   bundle-spec.json                  run/instance declarations used for the gate
   build/                            smoke-mod v1/v2 jars + build metadata
   audit-mod-src/                    read-only copy of the committed #18 source (502f561)
+  bridge6-restore-collection/       verified bridge6 snapshots + collection report
 labs/rom13-exp/mc-audit/            raw #18 audit JSONL + status/config
 ```
 
 The summary pins the sha256 of the raw audit JSONL and trajectory, so a raw
-copy can be verified against it. To reproduce without a game server:
+copy can be verified against it. To reproduce without a game server (byte-identical bundle from the frozen
+inputs, all pinned hashes re-checked):
 
 ```bash
 python tools/stage1_evidence.py selftest
+python tools/stage1_evidence.py restore-evidence --out labs/rom13-integration/bridge6-restore-collection
 python tools/stage1_integration.py plan
-python tools/stage1_integration.py run --bundle-only   # re-normalize the last run
+python tools/stage1_integration.py run --bundle-only
 ```
 
 To reproduce end to end (needs Java 25, the Minecraft 26.2-Fabric install and
