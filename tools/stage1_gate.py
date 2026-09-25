@@ -83,6 +83,9 @@ PORT_RANGE = re.compile(r"([0-9]{1,5})\s*-\s*([0-9]{1,5})\Z")
 #: This issue's allocated port range; the integration run must use it.
 DEFAULT_PORT_RANGE = "27240-27249"
 
+#: Run id used by the selftest fixture bundle.
+SELFTEST_RUN_ID = "rom13-stage1-selftest"
+
 #: Files whose bytes are volatile, not part of a world's identity.
 DEFAULT_TREE_EXCLUSIONS: tuple[str, ...] = (
     "session.lock",
@@ -401,6 +404,13 @@ class Bundle:
         return self.manifest.get("origin")
 
     @property
+    def run_id(self) -> Any:
+        run = self.manifest.get("run")
+        if not isinstance(run, dict):
+            return None
+        return run.get("run_id")
+
+    @property
     def instances(self) -> list[dict[str, Any]]:
         run = self.manifest.get("run")
         if not isinstance(run, dict):
@@ -409,6 +419,17 @@ class Bundle:
         if not isinstance(instances, list):
             return []
         return [item for item in instances if isinstance(item, dict)]
+
+    @property
+    def instance_dimensions(self) -> dict[str, str]:
+        """The declared ``instance_id -> dimension`` pairs for provenance."""
+        result: dict[str, str] = {}
+        for instance in self.instances:
+            instance_id = instance.get("instance_id")
+            dimension = instance.get("dimension")
+            if isinstance(instance_id, str) and instance_id and isinstance(dimension, str) and dimension:
+                result[instance_id] = dimension
+        return result
 
     @property
     def source_world(self) -> dict[str, Any]:
@@ -1034,6 +1055,87 @@ def _check_agent_dev_capability(ctx: CheckContext) -> None:
     ctx.assert_("instances isolated", len(world_dirs) == len(set(world_dirs)) and len(ports) == len(set(ports)))
 
 
+def _identity_of(row: dict[str, Any]) -> tuple[Any, Any, Any]:
+    """The full provenance key an audit event must be joined on."""
+    return (row.get("run_id"), row.get("instance_id"), row.get("dimension"))
+
+
+def _validate_audit_provenance(
+    ctx: CheckContext,
+    events: Sequence[dict[str, Any]],
+    run_id: Any,
+    instance_dimensions: dict[str, str],
+) -> list[dict[str, Any]]:
+    """Bind audit events to the declared run/instance/dimension and order them.
+
+    Mixing evidence from another run, instance or dimension is an ordinary
+    stale-evidence failure: the events must not be joined at all.  Event ids
+    must be unique, and ``(tick, seq)`` must be strictly increasing per full
+    identity, so a repeated or colliding sequence cannot silently establish an
+    ordering.  Returns the ``phase == "agent"`` subset for chain checks.
+    """
+    agent_events: list[dict[str, Any]] = []
+    if not isinstance(run_id, str) or not run_id:
+        ctx.fail("audit_provenance", "bundle.run.run_id is not declared; audit events cannot be bound")
+        return [row for row in events if row.get("phase") == "agent"]
+    if not instance_dimensions:
+        ctx.fail(
+            "audit_provenance",
+            "bundle.run.instances declares no instance_id/dimension pair; audit events cannot be bound",
+        )
+        return [row for row in events if row.get("phase") == "agent"]
+
+    seen_ids: set[str] = set()
+    last_order: dict[tuple[Any, Any, Any], tuple[int, int]] = {}
+    for index, row in enumerate(events):
+        where = f"audit_events[{index}]."
+        event_id = row.get("event_id")
+        if isinstance(event_id, str) and event_id:
+            if event_id in seen_ids:
+                ctx.fail("audit_event_id_duplicate", f"{where}event_id {event_id!r} repeats")
+            seen_ids.add(event_id)
+        row_run = row.get("run_id")
+        instance_id = row.get("instance_id")
+        dimension = row.get("dimension")
+        if row_run != run_id:
+            ctx.fail(
+                "audit_provenance",
+                f"{where}run_id {row_run!r} is not the declared run {run_id!r}",
+            )
+        elif not isinstance(instance_id, str) or instance_id not in instance_dimensions:
+            ctx.fail(
+                "audit_provenance",
+                f"{where}instance_id {instance_id!r} is not declared in bundle.run.instances",
+            )
+        elif dimension != instance_dimensions[instance_id]:
+            ctx.fail(
+                "audit_provenance",
+                f"{where}dimension {dimension!r} does not match the declared "
+                f"{instance_id!r}/{instance_dimensions[instance_id]!r}",
+            )
+        tick = row.get("tick")
+        seq = row.get("seq")
+        if (
+            _is_int(tick)
+            and _is_int(seq)
+            and isinstance(row_run, str)
+            and isinstance(instance_id, str)
+            and isinstance(dimension, str)
+        ):
+            key = (row_run, instance_id, dimension)
+            previous = last_order.get(key)
+            if previous is not None and (tick, seq) <= previous:
+                ctx.fail(
+                    "audit_order",
+                    f"{where}non-strict tick/seq {tick}/{seq} after "
+                    f"{previous[0]}/{previous[1]} for {key[0]}/{key[1]}/{key[2]}",
+                )
+            last_order[key] = (tick, seq)
+        if row.get("phase") == "agent":
+            agent_events.append(row)
+    return agent_events
+
+
 def _check_independent_test_mod(ctx: CheckContext) -> None:
     manifest = ctx.json("test_mod_manifest")
     if manifest is not None:
@@ -1052,32 +1154,22 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
     events = ctx.jsonl("audit_events")
     agent_events: list[dict[str, Any]] = []
     if events is not None:
-        last_order: dict[tuple[Any, Any], tuple[int, int]] = {}
         seen_events: set[str] = set()
         for index, row in enumerate(events):
             where = f"audit_events[{index}]."
             ctx.require(row, "event_id", "string", nonempty=True, where=where)
-            run_id = ctx.require(row, "run_id", "string", nonempty=True, where=where)
-            instance_id = ctx.require(row, "instance_id", "string", nonempty=True, where=where)
+            ctx.require(row, "run_id", "string", nonempty=True, where=where)
+            ctx.require(row, "instance_id", "string", nonempty=True, where=where)
             ctx.require(row, "dimension", "string", nonempty=True, where=where)
-            tick = ctx.require(row, "tick", "int", minimum=0, where=where)
-            seq = ctx.require(row, "seq", "int", minimum=0, where=where)
+            ctx.require(row, "tick", "int", minimum=0, where=where)
+            ctx.require(row, "seq", "int", minimum=0, where=where)
             event = ctx.require(row, "event", "string", nonempty=True, where=where)
             ctx.one_of(row, "phase", ("init", "agent", "restore"), where=where)
-            if _is_int(tick) and _is_int(seq) and isinstance(run_id, str) and isinstance(instance_id, str):
-                key = (run_id, instance_id)
-                previous = last_order.get(key)
-                if previous is not None and (tick, seq) < previous:
-                    ctx.fail(
-                        "audit_order",
-                        f"{where}tick/seq goes backwards for {key[0]}/{key[1]}: "
-                        f"({tick},{seq}) after {previous}",
-                    )
-                last_order[key] = (tick, seq)
             if isinstance(event, str):
                 seen_events.add(event)
-                if row.get("phase") == "agent":
-                    agent_events.append(row)
+        agent_events = _validate_audit_provenance(
+            ctx, events, ctx.bundle.run_id, ctx.bundle.instance_dimensions
+        )
         required = {"input_attempt", "input_processed", "cart_emitted", "cart_removed"}
         missing = sorted(required - seen_events)
         if missing:
@@ -1106,24 +1198,63 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
         def order_of(row: dict[str, Any]) -> tuple[int, int]:
             return (int(row.get("tick", -1)), int(row.get("seq", -1)))
 
+        # The chain is only meaningful on the full run/instance/dimension identity.
         matched = 0
         for row in processed:
-            if any(
-                attempt.get("instance_id") == row.get("instance_id") and order_of(attempt) < order_of(row)
-                for attempt in attempts
-            ):
+            for attempt in attempts:
+                if _identity_of(attempt) != _identity_of(row):
+                    continue
+                if order_of(attempt) >= order_of(row):
+                    continue
+                actor = attempt.get("actor_uuid")
+                row_actor = row.get("actor_uuid")
+                if isinstance(actor, str) and isinstance(row_actor, str) and actor != row_actor:
+                    ctx.fail(
+                        "audit_chain",
+                        f"audit_events: input_processed actor {row_actor!r} differs from its "
+                        f"input_attempt actor {actor!r} on {_identity_of(row)}",
+                    )
+                    continue
                 matched += 1
+                break
         if processed and matched == 0:
-            ctx.fail("audit_chain", "audit_events: no input_processed follows an input_attempt")
+            ctx.fail(
+                "audit_chain",
+                "audit_events: no input_processed follows an input_attempt on the same "
+                "run/instance/dimension",
+            )
+        matched_emitted = 0
         for row in emitted:
-            if not any(
-                processed_row.get("instance_id") == row.get("instance_id")
+            if any(
+                _identity_of(processed_row) == _identity_of(row)
                 and order_of(processed_row) <= order_of(row)
                 for processed_row in processed
             ):
-                ctx.fail("audit_chain", f"audit_events: cart {row.get('cart_uuid')!r} has no prior input")
-                break
-        ctx.assert_("input -> processing -> output chain", matched > 0 and bool(emitted))
+                matched_emitted += 1
+        if emitted and matched_emitted != len(emitted):
+            ctx.fail(
+                "audit_chain",
+                "audit_events: a cart_emitted has no prior input_processed on the same "
+                "run/instance/dimension",
+            )
+        emitted_by_cart: dict[tuple[Any, Any, Any, Any], list[dict[str, Any]]] = {}
+        for row in emitted:
+            emitted_by_cart.setdefault(_identity_of(row) + (row.get("cart_uuid"),), []).append(row)
+        matched_removed = 0
+        for row in removed:
+            candidates = emitted_by_cart.get(_identity_of(row) + (row.get("cart_uuid"),), [])
+            if any(order_of(candidate) <= order_of(row) for candidate in candidates):
+                matched_removed += 1
+            else:
+                ctx.fail(
+                    "audit_removal_chain",
+                    f"audit_events: cart_removed {row.get('cart_uuid')!r} does not follow a "
+                    "cart_emitted on the same run/instance/dimension",
+                )
+        ctx.assert_(
+            "input -> processing -> output chain",
+            matched > 0 and emitted and matched_emitted == len(emitted) and matched_removed == len(removed),
+        )
 
     negatives = ctx.jsonl("negative_cases")
     if negatives is not None:
@@ -1176,17 +1307,40 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
     if trace is not None:
         call_ids = []
         errors_kept = 0
+        declared_run = ctx.bundle.run_id
+        declared_instances = ctx.bundle.instance_dimensions
+        if not isinstance(declared_run, str) or not declared_run:
+            ctx.fail("trace_provenance", "tool_trace: bundle.run.run_id is not declared")
+        if not declared_instances:
+            ctx.fail(
+                "trace_provenance",
+                "tool_trace: bundle.run.instances declares no instance_id/dimension pair",
+            )
         for index, row in enumerate(trace):
             where = f"tool_trace[{index}]."
             call_id = ctx.require(row, "call_id", "string", nonempty=True, where=where)
-            ctx.require(row, "run_id", "string", nonempty=True, where=where)
-            ctx.require(row, "instance_id", "string", nonempty=True, where=where)
+            row_run = ctx.require(row, "run_id", "string", nonempty=True, where=where)
+            row_instance = ctx.require(row, "instance_id", "string", nonempty=True, where=where)
             ctx.require(row, "tool", "string", nonempty=True, where=where)
             ctx.require(row, "args", "object", where=where)
             ctx.require_present(row, "result", where=where)
             ctx.require_present(row, "error", where=where)
             started = ctx.require(row, "started_at", "iso", where=where)
             ended = ctx.require(row, "ended_at", "iso", where=where)
+            if isinstance(declared_run, str) and declared_run and isinstance(row_run, str) and row_run != declared_run:
+                ctx.fail(
+                    "trace_provenance",
+                    f"{where}run_id {row_run!r} is not the declared run {declared_run!r}",
+                )
+            if (
+                declared_instances
+                and isinstance(row_instance, str)
+                and row_instance not in declared_instances
+            ):
+                ctx.fail(
+                    "trace_provenance",
+                    f"{where}instance_id {row_instance!r} is not declared in bundle.run.instances",
+                )
             if isinstance(call_id, str):
                 call_ids.append(call_id)
             if isinstance(row.get("error"), str) and row["error"]:
@@ -1215,6 +1369,21 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
             )
         ctx.assert_("tool categories covered", not missing, f"errors preserved: {errors_kept}")
 
+    audit_events: list[dict[str, Any]] | None = None
+    audit_ref_path = ctx.bundle.artifact_ref("independent_test_mod", "audit_events")
+    if audit_ref_path is None:
+        ctx.blocked("trace_audit_missing", "audit_events: not declared; tool/game joins cannot be verified")
+    else:
+        resolved = _resolve_rel(ctx.bundle.root, audit_ref_path)
+        if resolved is None or not resolved.is_file():
+            ctx.blocked("trace_audit_missing", f"audit_events: {audit_ref_path} is not available")
+        else:
+            rows, errors = _read_jsonl(resolved)
+            if errors:
+                ctx.fail("trace_audit_bad", "audit_events: " + "; ".join(errors[:3]))
+            else:
+                audit_events = rows
+
     join = ctx.json("trace_join")
     if join is not None and call_ids is not None:
         joins = ctx.object_list(join, "joins", minimum=1)
@@ -1227,8 +1396,28 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
             if isinstance(call_id, str) and call_id not in known:
                 ctx.fail("trace_join_unknown", f"{where}call_id {call_id!r} is not in tool_trace")
             if ref is not None:
+                ctx.require(ref, "run_id", "string", nonempty=True, where=where)
                 ctx.require(ref, "instance_id", "string", nonempty=True, where=where)
+                ctx.require(ref, "dimension", "string", nonempty=True, where=where)
                 ctx.require(ref, "event_id", "string", nonempty=True, where=where)
+                ctx.require(ref, "tick", "int", minimum=0, where=where)
+                if audit_events is not None:
+                    event_id = ref.get("event_id")
+                    matches = [row for row in audit_events if row.get("event_id") == event_id]
+                    if len(matches) != 1:
+                        ctx.fail(
+                            "trace_join_mismatch",
+                            f"{where}event_id {event_id!r} matches {len(matches)} audit event(s)",
+                        )
+                    else:
+                        matched = matches[0]
+                        for field in ("run_id", "instance_id", "dimension", "tick"):
+                            if matched.get(field) != ref.get(field):
+                                ctx.fail(
+                                    "trace_join_mismatch",
+                                    f"{where}audit_ref.{field}={ref.get(field)!r} but the audit "
+                                    f"event has {matched.get(field)!r}",
+                                )
         unmatched_tools = ctx.require(join, "unmatched_tool_calls", "int", minimum=0)
         unmatched_events = ctx.require(join, "unmatched_agent_events", "int", minimum=0)
         if _is_int(unmatched_events) and unmatched_events != 0:
@@ -1357,7 +1546,7 @@ def _run_evidence_integrity(
     ctx.require(manifest, "generated_at", "iso")
     run = ctx.require(manifest, "run", "object")
     if run is not None:
-        ctx.require(run, "run_id", "string", nonempty=True)
+        run_id = ctx.require(run, "run_id", "string", nonempty=True)
         issue = ctx.require(run, "issue", "string", nonempty=True)
         if isinstance(issue, str) and issue != ISSUE:
             ctx.fail("run_issue", f"run.issue={issue!r}, expected {ISSUE!r}")
@@ -1365,15 +1554,19 @@ def _run_evidence_integrity(
         ids: list[str] = []
         ports: list[int] = []
         roles: set[str] = set()
+        declared_dimensions: dict[str, str] = {}
         for index, instance in enumerate(instances):
             where = f"run.instances[{index}]."
             instance_id = ctx.require(instance, "instance_id", "string", nonempty=True, where=where)
             role = ctx.one_of(instance, "role", ("source_audit", "experiment"), where=where)
             ctx.require(instance, "world_dir", "string", nonempty=True, where=where)
+            dimension = ctx.require(instance, "dimension", "string", nonempty=True, where=where)
             rcon = ctx.require(instance, "rcon_port", "int", minimum=1, where=where)
             bridge = ctx.require(instance, "bridge_port", "int", minimum=1, where=where)
             if isinstance(instance_id, str):
                 ids.append(instance_id)
+                if isinstance(dimension, str) and dimension:
+                    declared_dimensions[instance_id] = dimension
             if isinstance(role, str):
                 roles.add(role)
             if _is_int(rcon):
@@ -1398,6 +1591,17 @@ def _run_evidence_integrity(
                         f"run.instances: port {port} is outside {', '.join(ranges)}",
                     )
         ctx.assert_("integration instances isolated", len(ports) == len(set(ports)))
+
+        # Audit events must belong to this run's declared instances/dimensions,
+        # even before any tool/game join is checked.
+        audit_ref = bundle.artifact_ref("independent_test_mod", "audit_events")
+        audit_path = _resolve_rel(bundle.root, audit_ref) if audit_ref else None
+        if audit_path is not None and audit_path.is_file() and isinstance(run_id, str):
+            audit_rows, audit_errors = _read_jsonl(audit_path)
+            if audit_errors:
+                ctx.fail("audit_unreadable", "audit_events: " + "; ".join(audit_errors[:3]))
+            else:
+                _validate_audit_provenance(ctx, audit_rows, run_id, declared_dimensions)
 
     world = ctx.require(manifest.get("run", {}), "source_world", "object") if isinstance(manifest.get("run"), dict) else None
     recorded_after: str | None = None
@@ -2338,11 +2542,11 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
     _write_jsonl(
         root / "artifacts/independent_test_mod/audit-events.jsonl",
         [
-            {"event_id": "e1", "run_id": "r1", "instance_id": "exp-1", "phase": "init", "dimension": "minecraft:overworld", "tick": 100, "seq": 0, "event": "machine_ready", "pos": [0, 64, 0]},
-            {"event_id": "e2", "run_id": "r1", "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 0, "event": "input_attempt", "actor_uuid": player_uuid, "pos": [1, 64, 0], "detail": {"tool_call_id": "call-3"}},
-            {"event_id": "e3", "run_id": "r1", "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 1, "event": "input_processed", "actor_uuid": player_uuid, "pos": [1, 64, 0]},
-            {"event_id": "e4", "run_id": "r1", "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 113, "seq": 0, "event": "cart_emitted", "cart_uuid": records[0]["uuid"], "pos": [2, 64, 0], "captured_before_removal": True},
-            {"event_id": "e5", "run_id": "r1", "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 125, "seq": 0, "event": "cart_removed", "cart_uuid": records[0]["uuid"], "pos": [2, -70, 0], "removal_reason": "void"},
+            {"event_id": "e1", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "init", "dimension": "minecraft:overworld", "tick": 100, "seq": 0, "event": "machine_ready", "pos": [0, 64, 0]},
+            {"event_id": "e2", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 0, "event": "input_attempt", "actor_uuid": player_uuid, "pos": [1, 64, 0], "detail": {"tool_call_id": "call-3"}},
+            {"event_id": "e3", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 1, "event": "input_processed", "actor_uuid": player_uuid, "pos": [1, 64, 0]},
+            {"event_id": "e4", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 113, "seq": 0, "event": "cart_emitted", "cart_uuid": records[0]["uuid"], "pos": [2, 64, 0], "captured_before_removal": True},
+            {"event_id": "e5", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 125, "seq": 0, "event": "cart_removed", "cart_uuid": records[0]["uuid"], "pos": [2, -70, 0], "removal_reason": "void"},
         ],
     )
     _write_jsonl(
@@ -2366,10 +2570,10 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
     _write_jsonl(
         root / "artifacts/trace_persistence/tool-trace.jsonl",
         [
-            {"call_id": "call-1", "run_id": "r1", "instance_id": "exp-1", "tool": "bash", "args": {"command": "gradle build"}, "result": "ok", "error": None, "started_at": "2026-09-25T10:00:00Z", "ended_at": "2026-09-25T10:00:05Z"},
-            {"call_id": "call-2", "run_id": "r1", "instance_id": "exp-1", "tool": "write", "args": {"path": "src/Logger.java"}, "result": "ok", "error": None, "started_at": "2026-09-25T10:00:05Z", "ended_at": "2026-09-25T10:00:06Z"},
-            {"call_id": "call-3", "run_id": "r1", "instance_id": "exp-1", "tool": "mcp_mc_player", "args": {"uuid": player_uuid}, "result": {"pos": [0.5, 64.0, 0.5]}, "error": None, "started_at": "2026-09-25T10:00:06Z", "ended_at": "2026-09-25T10:00:07Z"},
-            {"call_id": "call-4", "run_id": "r1", "instance_id": "exp-1", "tool": "git", "args": {"args": ["status"]}, "result": "clean", "error": None, "started_at": "2026-09-25T10:00:07Z", "ended_at": "2026-09-25T10:00:08Z"},
+            {"call_id": "call-1", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "tool": "bash", "args": {"command": "gradle build"}, "result": "ok", "error": None, "started_at": "2026-09-25T10:00:00Z", "ended_at": "2026-09-25T10:00:05Z"},
+            {"call_id": "call-2", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "tool": "write", "args": {"path": "src/Logger.java"}, "result": "ok", "error": None, "started_at": "2026-09-25T10:00:05Z", "ended_at": "2026-09-25T10:00:06Z"},
+            {"call_id": "call-3", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "tool": "mcp_mc_player", "args": {"uuid": player_uuid}, "result": {"pos": [0.5, 64.0, 0.5]}, "error": None, "started_at": "2026-09-25T10:00:06Z", "ended_at": "2026-09-25T10:00:07Z"},
+            {"call_id": "call-4", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "tool": "git", "args": {"args": ["status"]}, "result": "clean", "error": None, "started_at": "2026-09-25T10:00:07Z", "ended_at": "2026-09-25T10:00:08Z"},
         ],
     )
     _write_json(
@@ -2378,7 +2582,7 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
             "joins": [
                 {
                     "call_id": "call-3",
-                    "audit_ref": {"instance_id": "exp-1", "tick": 110, "event_id": "e2"},
+                    "audit_ref": {"run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "dimension": "minecraft:overworld", "tick": 110, "event_id": "e2"},
                     "verified": True,
                 }
             ],
@@ -2438,7 +2642,7 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
         "origin": "live",
         "generated_at": _now_iso(),
         "run": {
-            "run_id": "rom13-stage1-selftest",
+            "run_id": SELFTEST_RUN_ID,
             "issue": ISSUE,
             "source_world": {
                 "label": "Minecart ROM test",
@@ -2448,8 +2652,8 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
             },
             "allowed_port_ranges": [DEFAULT_PORT_RANGE],
             "instances": [
-                {"instance_id": "src-audit", "role": "source_audit", "world_dir": "labs/rom13-src/world", "rcon_port": 27240, "bridge_port": 27241},
-                {"instance_id": "exp-1", "role": "experiment", "world_dir": "labs/rom13-exp/world", "rcon_port": 27242, "bridge_port": 27243},
+                {"instance_id": "src-audit", "role": "source_audit", "world_dir": "labs/rom13-src/world", "dimension": "minecraft:overworld", "rcon_port": 27240, "bridge_port": 27241},
+                {"instance_id": "exp-1", "role": "experiment", "world_dir": "labs/rom13-exp/world", "dimension": "minecraft:overworld", "rcon_port": 27242, "bridge_port": 27243},
             ],
         },
         "checks": {
@@ -2515,6 +2719,28 @@ def _edit_jsonl(path: Path, edit: Callable[[list[dict[str, Any]]], None]) -> Non
     rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
     edit(rows)
     path.write_text("\n".join(json.dumps(row) for row in rows) + "\n", encoding="utf-8")
+
+
+def _refresh_index(root: Path, rel: str) -> None:
+    """Re-pin one artifact after a deliberate mutation, so only semantics fail."""
+    index_path = root / "artifacts/smoke_fixture_validity/evidence-index.json"
+    obj = json.loads(index_path.read_text(encoding="utf-8"))
+    target = root / rel
+    for entry in obj["entries"]:
+        if entry.get("path") != rel:
+            continue
+        if target.is_dir():
+            digest, files, total = tree_hash(target)
+            entry["tree_sha256"] = digest
+            entry["files"] = files
+            entry["bytes"] = total
+        else:
+            entry["sha256"] = _sha256_file(target)
+            entry["bytes"] = target.stat().st_size
+        break
+    else:
+        raise AssertionError(f"evidence index has no entry for {rel}")
+    index_path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
 
 
 def run_selftest(out: TextIO | None = None) -> int:
@@ -2671,6 +2897,82 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.equal("audit tick regression is fail", report.overall, STATUS_FAIL)
         test.check("tick order reason", _has_reason(_report_check(report, "independent_test_mod"), "audit_order"))
 
+        # Provenance: refreshed hashes must not launder mixed/stale evidence.
+        mixed_runs = _copy_bundle(base, valid, "mixed-runs")
+        _edit_jsonl(
+            mixed_runs / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: [row.update(run_id=f"unrelated-run-{index}") for index, row in enumerate(rows)],
+        )
+        _refresh_index(mixed_runs, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(mixed_runs)
+        test.equal("mixed audit runs is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "mixed run provenance reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_provenance"),
+        )
+        test.check(
+            "integrity binds audit runs",
+            _has_reason(_report_check(report, "evidence_integrity"), "audit_provenance"),
+        )
+
+        mixed_dimension = _copy_bundle(base, valid, "mixed-dimension")
+        _edit_jsonl(
+            mixed_dimension / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: rows[3].update(dimension="minecraft:the_nether"),
+        )
+        _refresh_index(mixed_dimension, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(mixed_dimension)
+        test.equal("mixed audit dimension is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "mixed dimension provenance reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_provenance"),
+        )
+
+        duplicate_id = _copy_bundle(base, valid, "duplicate-event-id")
+        _edit_jsonl(
+            duplicate_id / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: rows[1].update(event_id=rows[0]["event_id"]),
+        )
+        _refresh_index(duplicate_id, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(duplicate_id)
+        test.equal("duplicate audit event id is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "duplicate event id reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_event_id_duplicate"),
+        )
+
+        seq_collision = _copy_bundle(base, valid, "seq-collision")
+        _edit_jsonl(
+            seq_collision / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: rows[2].update(seq=rows[1]["seq"]),
+        )
+        _refresh_index(seq_collision, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(seq_collision)
+        test.equal("audit seq collision is fail", report.overall, STATUS_FAIL)
+        test.check("seq collision reason", _has_reason(_report_check(report, "independent_test_mod"), "audit_order"))
+
+        cross_instance = _copy_bundle(base, valid, "cross-instance-chain")
+        _edit_jsonl(
+            cross_instance / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: rows[2].update(instance_id="src-audit"),
+        )
+        _refresh_index(cross_instance, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(cross_instance)
+        test.equal("cross-instance chain is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "cross-instance chain reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_chain"),
+        )
+
+        no_dimension = _copy_bundle(base, valid, "missing-declared-dimension")
+        _edit_json(no_dimension / "bundle.json", lambda obj: obj["run"]["instances"][0].pop("dimension"))
+        report = run_gate(no_dimension)
+        test.equal("missing declared dimension is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "declared dimension reason",
+            _has_reason(_report_check(report, "evidence_integrity"), "missing_field"),
+        )
+
         command_block_mod = _copy_bundle(base, valid, "mod-command-blocks")
         _edit_json(command_block_mod / "artifacts/independent_test_mod/test-mod-manifest.json", lambda obj: obj.update(no_command_blocks=False))
         report = run_gate(command_block_mod)
@@ -2689,6 +2991,32 @@ def run_selftest(out: TextIO | None = None) -> int:
         report = run_gate(unmatched)
         test.equal("unmatched agent events is fail", report.overall, STATUS_FAIL)
         test.check("trace join reason", _has_reason(_report_check(report, "trace_persistence"), "trace_join_unmatched"))
+
+        join_run = _copy_bundle(base, valid, "trace-join-run")
+        _edit_json(
+            join_run / "artifacts/trace_persistence/trace-join.json",
+            lambda obj: obj["joins"][0]["audit_ref"].update(run_id="unrelated-run"),
+        )
+        _refresh_index(join_run, "artifacts/trace_persistence/trace-join.json")
+        report = run_gate(join_run)
+        test.equal("trace join run mismatch is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "trace join mismatch reason",
+            _has_reason(_report_check(report, "trace_persistence"), "trace_join_mismatch"),
+        )
+
+        trace_run = _copy_bundle(base, valid, "trace-provenance")
+        _edit_jsonl(
+            trace_run / "artifacts/trace_persistence/tool-trace.jsonl",
+            lambda rows: [row.update(run_id="unrelated-run") for row in rows],
+        )
+        _refresh_index(trace_run, "artifacts/trace_persistence/tool-trace.jsonl")
+        report = run_gate(trace_run)
+        test.equal("trace run provenance is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "trace provenance reason",
+            _has_reason(_report_check(report, "trace_persistence"), "trace_provenance"),
+        )
 
         smoke_fail = _copy_bundle(base, valid, "smoke-fail")
         _edit_json(smoke_fail / "artifacts/smoke_fixture_validity/smoke-report.json", lambda obj: obj["suites"][0].update(status="skip"))

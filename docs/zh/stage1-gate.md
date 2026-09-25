@@ -14,7 +14,7 @@
 
 ## 状态（2026-09-26，本分支）
 
-* 门禁工具、证据 schema 与离线自测已实现；`selftest` 通过 **85 项检查**（不涉及游戏与实机证据）。
+* 门禁工具、证据 schema 与离线自测已实现；`selftest` 通过 **104 项检查**（不涉及游戏与实机证据）。
 * **目前没有任何实机前置证据**，所以对任何真实 bundle 执行 `check` 都是 `blocked`。本文档刻意不声称门禁已通过。
 * 开发期间记录了独立基线：源存档 `D:\MC\MC_Game\.minecraft\versions\26.2-Fabric\saves\Minecart ROM test` 的只读 tree 哈希为 `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`（40 个文件、11 556 310 字节，使用下方规范排除列表）。没有写入任何文件，源存档只被以只读方式打开。
 * 集成运行预留端口：**27240-27249**（两个实例，各占 RCON + bridge，全部在该区间内）。
@@ -87,9 +87,9 @@ stage1-evidence/
     },
     "allowed_port_ranges": ["27240-27249"],
     "instances": [
-      { "instance_id": "src-audit", "role": "source_audit",
+      { "instance_id": "src-audit", "role": "source_audit", "dimension": "minecraft:overworld",
         "world_dir": "labs/rom13-src/world", "rcon_port": 27240, "bridge_port": 27241 },
-      { "instance_id": "exp-1", "role": "experiment",
+      { "instance_id": "exp-1", "role": "experiment", "dimension": "minecraft:overworld",
         "world_dir": "labs/rom13-exp/world", "rcon_port": 27242, "bridge_port": 27243 }
     ]
   },
@@ -195,10 +195,12 @@ stage1-evidence/
 
 | 字段 | 类型 | 要求 |
 | --- | --- | --- |
-| `event_id` | s | 唯一 |
-| `run_id`、`instance_id`、`dimension` | s | |
-| `tick` | i | >= 0；同一 run+instance 的 `(tick, seq)` 不得回退 |
-| `seq` | i | >= 0，同一 tick 内单调 |
+| `event_id` | s | 全文件唯一；重复即失败 |
+| `run_id` | s | 必须等于 `run.run_id` |
+| `instance_id` | s | 必须在 `run.instances` 中声明 |
+| `dimension` | s | 必须等于该 `instance_id` 声明的 `dimension` |
+| `tick` | i | >= 0；`(tick, seq)` 按 `run_id/instance_id/dimension` 严格递增 |
+| `seq` | i | >= 0；相同/碰撞的序号对失败，不能据此建立顺序 |
 | `event` | s | 见下 |
 | `phase` | s | `init`、`agent` 或 `restore` |
 | `actor_uuid`、`cart_uuid` | s | 视事件而定 |
@@ -206,7 +208,7 @@ stage1-evidence/
 | `captured_before_removal` | b | `cart_emitted` 上必须为 true |
 | `removal_reason` | s | `cart_removed` 上必须存在（如 `void`） |
 
-必需事件：`input_attempt`、`input_processed`、`cart_emitted`、`cart_removed`。门禁要求：至少一个 `input_processed` 发生在某个 `input_attempt` 之后；每个 `cart_emitted` 都有更早的处理输入；每个弹出的矿车都在移除前被持久化；每次移除都带原因。`init`/`restore` 事件永远不算 Agent 操作。
+任何关联之前先强制来源校验：即使把改动后的字节正确刷新进证据索引，来自其它 run、其它实例或其它维度的事件也会让门禁失败。必需事件：`input_attempt`、`input_processed`、`cart_emitted`、`cart_removed`。attempt -> processing -> emission -> removal 链按完整 `run_id/instance_id/dimension` 身份关联（移除另加 `cart_uuid`），`input_processed` 的 actor 必须与其 `input_attempt` 一致，每个 `cart_emitted` 都必须有同一身份上更早的处理输入，每个弹出的矿车都在移除前被持久化，每次移除都带原因。`init`/`restore` 事件永远不算 Agent 操作。
 
 `negative-cases.jsonl` 必须覆盖 `no_interaction`、`wrong_position`、`marker_only`、`answer_only`，每行含 `attempted`（b）、`processed`（= 0）与 `evidence_ref`（s）。明确归入负例的事件绝不能是 `input_processed`。
 
@@ -214,9 +216,9 @@ stage1-evidence/
 
 ### 6. `trace_persistence` —— 工具与游戏事件按 run/实例关联（#19）
 
-`tool-trace.jsonl` —— 每次工具调用一行：`call_id`（唯一）、`run_id`、`instance_id`、`tool`、`args`（对象）、`result`（任意，必须存在）、`error`（字符串或 null，必须存在）、`started_at`/`ended_at`（t，有序）。trace 必须覆盖 `terminal`、`file`、`source`、`mcp` 四类（工具名匹配模式可用 `run.tool_category_map` 覆盖）。
+`tool-trace.jsonl` —— 每次工具调用一行：`call_id`（唯一）、`run_id`、`instance_id`、`tool`、`args`（对象）、`result`（任意，必须存在）、`error`（字符串或 null，必须存在）、`started_at`/`ended_at`（t，有序）。`run_id` 必须等于 `run.run_id`，`instance_id` 必须在 `run.instances` 中声明，来自其它 run 的陈旧 trace 不会被计入。trace 必须覆盖 `terminal`、`file`、`source`、`mcp` 四类（工具名匹配模式可用 `run.tool_category_map` 覆盖）。
 
-`trace-join.json`：`joins[]` 含 `call_id`（必须存在于 trace）、`audit_ref`（`instance_id`、`event_id`、`tick`）与 `verified: true`；另有 `unmatched_tool_calls` 与 `unmatched_agent_events`（必须为 0 —— 每个 agent 侧审计事件都要有工具调用）。
+`trace-join.json`：`joins[]` 含 `call_id`（必须存在于 trace）、`audit_ref`（`run_id`、`instance_id`、`dimension`、`event_id`、`tick`）与 `verified: true`；另有 `unmatched_tool_calls` 与 `unmatched_agent_events`（必须为 0 —— 每个 agent 侧审计事件都要有工具调用）。每个 `audit_ref` 都会在 `audit-events.jsonl` 中解析，并必须在该事件的完整身份与 tick 上匹配；未知或有歧义的 `event_id` 失败。
 
 `missing-log-detection.jsonl`：场景 `trace_missing` 与 `audit_missing`，每行 `{case, detected: true, exit_nonzero: true, message_ref}`。缺日志必须明确报错，绝不能被静默忽略。
 
@@ -238,7 +240,7 @@ stage1-evidence/
 
 ### 8. `evidence_integrity` —— 包结构、哈希、端口与源存档（工具自算）
 
-无证据文件。门禁自行校验 schema 版本与 kind、`origin`、`run.issue`、运行实例（id/端口唯一、两种角色齐全、端口在允许区间内，默认 `27240-27249`）、已声明证据类型与路径、证据索引与重算哈希、以及 `run.source_world` 前后相等。带 `--source-world`（或清单中的路径）时，它会只读重算源存档哈希并比较。
+无证据文件。门禁自行校验 schema 版本与 kind、`origin`、`run.issue`、运行实例（id/端口唯一、两种角色齐全、每个实例声明 `dimension`、端口在允许区间内，默认 `27240-27249`）、已声明证据类型与路径、证据索引与重算哈希、审计事件的 run/instance/dimension 来源、以及 `run.source_world` 前后相等。带 `--source-world`（或清单中的路径）时，它会只读重算源存档哈希并比较。
 
 ## 目录树哈希
 

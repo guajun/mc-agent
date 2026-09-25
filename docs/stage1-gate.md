@@ -23,7 +23,7 @@ Exit codes: `0` pass, `1` fail, `3` blocked, `2` usage. A script cannot mistake
 ## Status (2026-09-26, this branch)
 
 * Gate tooling, schema and offline selftest are implemented; `selftest` passes
-  **85 checks** (no game, no live evidence involved).
+  **104 checks** (no game, no live evidence involved).
 * **No live prerequisite evidence exists yet**, so `check` on any real bundle is
   `blocked`. This document deliberately does not claim a gate pass.
 * Independent baseline recorded while the gate was developed: the read-only hash
@@ -104,9 +104,9 @@ inside the bundle and may not use `..`.
     },
     "allowed_port_ranges": ["27240-27249"],
     "instances": [
-      { "instance_id": "src-audit", "role": "source_audit",
+      { "instance_id": "src-audit", "role": "source_audit", "dimension": "minecraft:overworld",
         "world_dir": "labs/rom13-src/world", "rcon_port": 27240, "bridge_port": 27241 },
-      { "instance_id": "exp-1", "role": "experiment",
+      { "instance_id": "exp-1", "role": "experiment", "dimension": "minecraft:overworld",
         "world_dir": "labs/rom13-exp/world", "rcon_port": 27242, "bridge_port": 27243 }
     ]
   },
@@ -256,10 +256,12 @@ must equal `new_sha256`), `runtime_evidence` (s).
 
 | Field | Type | Requirement |
 | --- | --- | --- |
-| `event_id` | s | unique |
-| `run_id`, `instance_id`, `dimension` | s | |
-| `tick` | i | >= 0; `(tick, seq)` must not go backwards per run+instance |
-| `seq` | i | >= 0, monotonic within the tick |
+| `event_id` | s | unique across the file; duplicates fail |
+| `run_id` | s | must equal `run.run_id` |
+| `instance_id` | s | must be declared in `run.instances` |
+| `dimension` | s | must equal the declared `dimension` of that `instance_id` |
+| `tick` | i | >= 0; `(tick, seq)` strictly increasing per `run_id/instance_id/dimension` |
+| `seq` | i | >= 0; equal/colliding pairs fail, they cannot establish ordering |
 | `event` | s | see below |
 | `phase` | s | `init`, `agent` or `restore` |
 | `actor_uuid`, `cart_uuid` | s | as applicable |
@@ -267,10 +269,15 @@ must equal `new_sha256`), `runtime_evidence` (s).
 | `captured_before_removal` | b | required true on `cart_emitted` |
 | `removal_reason` | s | required on `cart_removed` (e.g. `void`) |
 
-Required events: `input_attempt`, `input_processed`, `cart_emitted`,
-`cart_removed`. The gate requires at least one `input_processed` that follows an
-`input_attempt`, every `cart_emitted` to follow a processed input, every emitted
-cart to be persisted before removal, and every removal to carry a reason.
+Provenance is enforced before any join: events from another run, another
+instance or another dimension fail the gate even when the evidence index is
+correctly refreshed for the changed bytes. Required events: `input_attempt`,
+`input_processed`, `cart_emitted`, `cart_removed`. The attempt -> processing ->
+emission -> removal chain is joined on the full
+`run_id/instance_id/dimension` identity (plus `cart_uuid` for the removal), the
+`input_processed` actor must match its `input_attempt`, every `cart_emitted`
+must follow a processed input on that identity, every emitted cart must be
+persisted before removal, and every removal must carry a reason.
 `init`/`restore` events never count as agent operations.
 
 `negative-cases.jsonl` must cover `no_interaction`, `wrong_position`,
@@ -286,14 +293,18 @@ be `input_processed`.
 
 `tool-trace.jsonl` - one record per tool call: `call_id` (unique), `run_id`,
 `instance_id`, `tool`, `args` (object), `result` (any, present), `error`
-(string or null, present), `started_at`/`ended_at` (t, ordered). The trace must
-cover the categories `terminal`, `file`, `source` and `mcp` (name patterns can
-be overridden by `run.tool_category_map`).
+(string or null, present), `started_at`/`ended_at` (t, ordered). `run_id` must
+equal `run.run_id` and `instance_id` must be declared in `run.instances`, so a
+stale trace from another run cannot be counted. The trace must cover the
+categories `terminal`, `file`, `source` and `mcp` (name patterns can be
+overridden by `run.tool_category_map`).
 
 `trace-join.json`: `joins[]` with `call_id` (must exist in the trace),
-`audit_ref` (`instance_id`, `event_id`, `tick`) and `verified: true`, plus
-`unmatched_tool_calls` and `unmatched_agent_events` (must be 0 - every
-agent-side audit event needs a tool call).
+`audit_ref` (`run_id`, `instance_id`, `dimension`, `event_id`, `tick`) and
+`verified: true`, plus `unmatched_tool_calls` and `unmatched_agent_events`
+(must be 0 - every agent-side audit event needs a tool call). Each `audit_ref`
+is resolved against `audit-events.jsonl` and must match that event on the full
+identity and tick; an unknown or ambiguous `event_id` fails.
 
 `missing-log-detection.jsonl`: cases `trace_missing` and `audit_missing`, each
 `{case, detected: true, exit_nonzero: true, message_ref}`. Missing logs must
@@ -327,11 +338,12 @@ be listed too.
 ### 8. `evidence_integrity` - bundle, hashes, ports, source world (computed)
 
 No artifact. The gate itself validates the schema version and kind, `origin`,
-`run.issue`, run instances (unique ids/ports, both roles, ports inside the
-allowed ranges, default `27240-27249`), declared evidence kinds and paths, the
-evidence index against recomputed hashes, and `run.source_world` before/after
-equality. With `--source-world` (or the path in the manifest) it re-hashes the
-save read-only and compares the result.
+`run.issue`, run instances (unique ids/ports, both roles, a declared `dimension`
+per instance, ports inside the allowed ranges, default `27240-27249`), declared
+evidence kinds and paths, the evidence index against recomputed hashes, the
+audit events' run/instance/dimension provenance, and `run.source_world`
+before/after equality. With `--source-world` (or the path in the manifest) it
+re-hashes the save read-only and compares the result.
 
 ## Tree hashing
 
