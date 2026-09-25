@@ -113,7 +113,8 @@ python tools/run_trace.py init --run-dir labs/coldstart/run-01 \
     --task-file examples/coldstart/task-minecart-rom.md --harness pi --model <model>
 python tools/run_trace.py import-pi --run-dir labs/coldstart/run-01 --session "$PI_SESSION_FILE"
 python tools/run_trace.py review --run-dir labs/coldstart/run-01 \
-    --id machine_operated.causality --status resolved --by <审查者>
+    --id machine_operated.causality --status resolved --by <审查者> \
+    --evidence trajectory:c2-noteblock
 python tools/run_audit.py run --run-dir labs/coldstart/run-01
 ```
 

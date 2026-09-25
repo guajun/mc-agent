@@ -598,6 +598,8 @@ def cmd_artifact(args: argparse.Namespace) -> int:
 
 def cmd_review(args: argparse.Namespace) -> int:
     run = ensure_open(args.run_dir)
+    if args.status == "resolved" and not (args.evidence and all(ref.strip() for ref in args.evidence)):
+        raise SystemExit("error: a resolved review needs at least one non-empty --evidence ref")
     record = {
         "id": args.id,
         "status": args.status,

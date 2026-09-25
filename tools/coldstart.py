@@ -30,7 +30,7 @@ import re
 import sys
 import time
 from pathlib import Path
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 # --------------------------------------------------------------------------- constants
 
@@ -523,7 +523,12 @@ class FlagResult:
 
 
 def load_reviews(path: Path) -> tuple[dict[str, dict[str, Any]], list[str]]:
-    """Load explicit review resolutions; the latest entry per id wins."""
+    """Load explicit review resolutions; the latest entry per id wins.
+
+    A ``resolved`` entry must carry a reviewer, a parseable timestamp and a
+    non-empty list of evidence refs; anything else is a problem the caller
+    surfaces as ``INFRA_ERROR`` so it can never restore a PASS.
+    """
     reviews: dict[str, dict[str, Any]] = {}
     problems: list[str] = []
     if not path.exists():
@@ -538,23 +543,41 @@ def load_reviews(path: Path) -> tuple[dict[str, dict[str, Any]], list[str]]:
         if not review_id or status not in REVIEW_STATUSES:
             problems.append(f"{path.name} line {number}: id and status ({REVIEW_STATUSES}) are required")
             continue
-        if status == "resolved" and not (record.get("by") and record.get("at")):
-            problems.append(f"{path.name} line {number}: a resolved review needs by and at")
-            continue
+        if status == "resolved":
+            if not record.get("by") or not record.get("at"):
+                problems.append(f"{path.name} line {number}: a resolved review needs by and at")
+                continue
+            if as_time(record.get("at")) is None:
+                problems.append(f"{path.name} line {number}: at is not a valid timestamp: {record.get('at')!r}")
+                continue
+            evidence = record.get("evidence")
+            if not isinstance(evidence, list) or not evidence or not all(
+                isinstance(ref, str) and ref.strip() for ref in evidence
+            ):
+                problems.append(
+                    f"{path.name} line {number}: a resolved review needs a non-empty evidence list of refs"
+                )
+                continue
         reviews[str(review_id)] = dict(record)
     return reviews, problems
 
 
-def apply_reviews(flags: Mapping[str, "FlagResult"], reviews: Mapping[str, dict[str, Any]]) -> None:
+def apply_reviews(
+    flags: Mapping[str, "FlagResult"],
+    reviews: Mapping[str, dict[str, Any]],
+    resolve_ref: Callable[[str], bool] | None = None,
+) -> list[str]:
     """Resolve or reject the required reviews of mechanically-satisfied flags.
 
     A required review with no entry or a ``pending`` entry keeps the flag
     PENDING; a ``rejected`` entry fails it; a ``resolved`` entry must carry the
-    reviewer and timestamp.  When every required review is resolved, the flag's
-    mechanical outcome is restored - this is the only path that turns a
-    review-gated flag back into PASS.  An unresolved ``needs_review`` can
-    therefore never be silently successful.
+    reviewer, timestamp and evidence, and every evidence ref must resolve -
+    when a ref does not, the review does not count and the flag stays PENDING.
+    When every required review is resolved, the flag's mechanical outcome is
+    restored; a mechanical FAIL is never restored.  Returns resolution
+    problems so the caller can report them.
     """
+    resolution_problems: list[str] = []
     for flag in flags.values():
         if not flag.required_review:
             continue
@@ -568,6 +591,14 @@ def apply_reviews(flags: Mapping[str, "FlagResult"], reviews: Mapping[str, dict[
                 continue
             if record.get("status") == "rejected":
                 rejected.append(review_id)
+                continue
+            refs = [str(ref) for ref in record.get("evidence") or []]
+            missing_refs = [ref for ref in refs if resolve_ref is not None and not resolve_ref(ref)]
+            if missing_refs:
+                resolution_problems.append(
+                    f"review {review_id!r} cites evidence that does not resolve: {', '.join(missing_refs)}"
+                )
+                unresolved.append(review_id)
                 continue
             flag.review_resolutions.append(
                 {key: record.get(key) for key in ("id", "status", "by", "at", "note", "evidence")}
@@ -586,6 +617,7 @@ def apply_reviews(flags: Mapping[str, "FlagResult"], reviews: Mapping[str, dict[
             flag.status = flag.mechanical_status
             flag.summary = flag.mechanical_summary
             flag.missing = [item for item in flag.missing if item not in {r["id"] for r in flag.required_review}]
+    return resolution_problems
 
 
 def event_name(record: Mapping[str, Any]) -> str:
@@ -635,13 +667,15 @@ def scope_conflicts(a: Mapping[str, Any], b: Mapping[str, Any], fields: Sequence
     return conflicts
 
 
-def compare_order(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
+def compare_order(a: Mapping[str, Any], b: Mapping[str, Any], same_stream: bool = False) -> str:
     """Order two records as 'before', 'after' or 'unknown'.
 
-    Times decide first, then ticks, then the intra-tick sequence.  If no layer
-    is present on both sides, the answer is 'unknown' - which must never be
-    treated as 'before'.  Two records at the same tick with no sequence are
-    'unknown' as well: the protocol must not guess.
+    Times decide first, then ticks.  The intra-tick ``seq`` layer is only
+    consulted when ``same_stream`` is true: a trajectory ``seq`` is the
+    recorder counter while a test-mod/logger ``seq`` is a per-file sequence,
+    so comparing them across streams would order records by unrelated
+    counters.  Cross-stream records that share a tick without a proven
+    common sequence are 'unknown' - which must never be treated as 'before'.
     """
     time_a, time_b = as_time(a.get("at")), as_time(b.get("at"))
     tick_a, tick_b = as_int(get_field(a, "tick")), as_int(get_field(b, "tick"))
@@ -658,7 +692,7 @@ def compare_order(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
     same_instant = (time_a is not None and time_b is not None and time_a == time_b) or (
         tick_a is not None and tick_b is not None and tick_a == tick_b
     )
-    if same_instant:
+    if same_stream and same_instant:
         seq_a, seq_b = as_int(get_field(a, "seq")), as_int(get_field(b, "seq"))
         if seq_a is not None and seq_b is not None:
             if seq_a < seq_b:
@@ -947,9 +981,6 @@ def flag_transient_captured(
     return result
 
 
-READ_TOOLS = ("read", "cat", "type", "get-content", "head", "tail", "less", "more", "grep", "findstr")
-
-
 def token_in_text(token: str, text: str) -> bool:
     """Match a normalized item token against raw logger text (prefix optional)."""
     token = token.lower()
@@ -1012,17 +1043,15 @@ def flag_agent_read_log(
                 if tokens and all(token_in_text(token, result_lower) for token in tokens):
                     content_hit = True
                     break
-        tool_name = str(call.get("tool") or "").lower()
-        plausible_reader = mentions_logger or any(name in tool_name for name in READ_TOOLS)
         relevant = mentions_logger or content_hit or bool(uuid_hits)
         if not relevant:
             continue
-        if content_hit and plausible_reader and order == "after":
-            strong.append((call, result_record, "content linkage to the agent logger after the last capture"))
+        if content_hit and mentions_logger and order == "after":
+            strong.append((call, result_record, "content linkage to the named agent logger after the last capture"))
         elif order == "unknown":
             ambiguous.append((call, result_record, "cannot be ordered after the last capture"))
         elif content_hit and not mentions_logger:
-            ambiguous.append((call, result_record, "matching content but the call does not reference the logger"))
+            ambiguous.append((call, result_record, "matching content but the call does not name the logger"))
         elif mentions_logger and not content_hit:
             ambiguous.append((call, result_record, "the logger is named but the result carries no captured observation content"))
         elif uuid_hits:
@@ -1055,14 +1084,17 @@ def oracle_provenance(
     oracle: Mapping[str, Any] | None,
     declared: Mapping[str, bool],
     available_seqs: Mapping[str, set[int]],
+    evidence_fields: Mapping[str, set[str]] | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
     """Resolve oracle evidence_refs against declared evidence.
 
     Returns ``(problems, independent_refs, agent_side_refs)``.  A ref is
     independent when it resolves to declared test-mod/fixture/restore/preflight
-    evidence (and, for ``seqN`` refs, to a record that exists); agent-side refs
+    evidence: ``testmod:seqN`` must name an existing record, and a
+    ``fixture:``/``restore:``/``preflight:`` suffix must name a field or scalar
+    value present in the declared payload.  Agent-side refs
     (``trajectory:``/``logger:``/``answer``) never count as independent.  An
-    unknown prefix or an unresolvable seq is a problem the caller turns into
+    unknown prefix or an unresolvable suffix is a problem the caller turns into
     PENDING.
     """
     problems: list[str] = []
@@ -1070,6 +1102,7 @@ def oracle_provenance(
     agent_side: list[str] = []
     if not oracle:
         return problems, independent, agent_side
+    index = evidence_fields or {}
     for raw in oracle.get("evidence_refs") or []:
         ref = str(raw)
         prefix, _, suffix = ref.partition(":")
@@ -1083,10 +1116,16 @@ def oracle_provenance(
                 if seq_value is None or seq_value not in available_seqs.get("testmod", set()):
                     problems.append(f"oracle ref {ref!r} does not match a test-mod record")
                     continue
+            elif not suffix:
+                problems.append(f"oracle ref {ref!r} names no test-mod record")
+                continue
             independent.append(ref)
         elif prefix in ("fixture", "restore", "preflight"):
             if not declared.get(prefix):
                 problems.append(f"oracle ref {ref!r} points at evidence that is not declared")
+                continue
+            if not suffix or suffix not in index.get(prefix, set()):
+                problems.append(f"oracle ref {ref!r} does not match a declared {prefix} field or value")
                 continue
             independent.append(ref)
         elif prefix in ORACLE_AGENT_PREFIXES:
@@ -1230,6 +1269,10 @@ def render_audit_markdown(report: Mapping[str, Any]) -> str:
         lines += ["", "## Infrastructure errors", ""] + [f"- {item}" for item in report["infra_errors"]]
     if report.get("fixture_errors"):
         lines += ["", "## Fixture errors", ""] + [f"- {item}" for item in report["fixture_errors"]]
+    if report.get("review_problems"):
+        lines += ["", "## Review resolution problems", ""] + [f"- {item}" for item in report["review_problems"]]
+    if report.get("pending_reasons"):
+        lines += ["", "## Pending", ""] + [f"- {item}" for item in report["pending_reasons"]]
     review = [item for flag in report.get("flags", []) for item in flag.get("needs_review", [])]
     if review:
         lines += ["", "## Needs human semantic review", ""] + [f"- {item}" for item in review]

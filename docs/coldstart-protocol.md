@@ -162,7 +162,8 @@ python tools/run_trace.py result --run-dir <run> --call-id c1 --status ok --resu
 python tools/run_trace.py phase  --run-dir <run> --phase restore --actor restore --instance lab-a
 python tools/run_trace.py artifact --run-dir <run> --path build/logger.jar --label "agent logger jar"
 python tools/run_trace.py review --run-dir <run> --id machine_operated.causality \
-    --status resolved --by "reviewer name" --note "watched the replay" --evidence trajectory:c2
+    --status resolved --by "reviewer name" --note "watched the replay" \
+    --evidence trajectory:c2-noteblock --evidence testmod:seq3
 python tools/run_trace.py validate --run-dir <run>
 ```
 
@@ -257,7 +258,15 @@ wins) and are written with `run_trace.py review`:
 ```
 
 - no entry or `pending` keeps the flag PENDING;
-- `resolved` (with `by` and `at`) restores the flag's mechanical outcome;
+- `resolved` must carry `by`, a parseable `at` and a **non-empty evidence list**;
+  every ref must resolve against the run (a `trajectory:<call_id>` that
+  exists, a `testmod:`/`logger:seqN` that exists, or a
+  `fixture:`/`restore:`/`preflight:` field or scalar value present in the
+  declared payload). A malformed entry (missing reviewer, invalid timestamp,
+  empty/blank evidence) is `INFRA_ERROR`; a well-formed entry whose refs do
+  not resolve keeps the flag PENDING and is reported under
+  `review_problems`. When all refs resolve, the flag's **mechanical** outcome
+  is restored - a mechanically failed flag is never flipped to PASS;
 - `rejected` fails the flag (`AGENT_FAIL`), because the reviewer judged the
   evidence insufficient.
 
@@ -285,10 +294,12 @@ fails closed on mismatches:
   check that actually started a server; a SKIP or a different environment is
   `INFRA_ERROR`;
 - oracle `evidence_refs` must resolve against declared test-mod/fixture/restore
-  evidence (a `testmod:seqN` ref must name an existing record); agent-side refs
-  (`trajectory:`, `logger:`, `answer`) never count as independent, and an
-  unresolved ref is PENDING while no independent ref fails the flag. The answer
-  must cover exactly the oracle's carts: an omitted cart is `AGENT_FAIL`.
+  evidence: a `testmod:seqN` ref must name an existing record, and a
+  `fixture:`/`restore:`/`preflight:` suffix must name a field or scalar value
+  present in the declared payload. Agent-side refs (`trajectory:`, `logger:`,
+  `answer`) never count as independent, and an unresolved ref is PENDING while
+  no independent ref fails the flag. The answer must cover exactly the
+  oracle's carts: an omitted cart is `AGENT_FAIL`.
 
 ## 6. What the audit decides: `run_audit.py`
 
@@ -320,12 +331,13 @@ it never decides PASS. The first run is allowed to need human semantic review;
 no second model is required. `audit.md` lists every required review and whether
 it is resolved.
 
-Mechanical ordering never guesses. Times decide first, then ticks, then the
-intra-tick sequence. If two records share no comparable layer the answer is
-`unknown` and becomes a required review; two records at the same tick without a
-sequence are `unknown` as well. A capture that sorts before the cart was
-ejected (for example a pre-activation inventory read) fails outright, and an
-`input_attempt` alone never proves operation.
+Mechanical ordering never guesses. Times decide first, then ticks. The
+intra-tick `seq` tie-break is only used inside one stream: a trajectory `seq`
+is the recorder counter while a test-mod/logger `seq` is per-file, so
+cross-stream records that share a tick are `unknown` and become a required
+review unless a common clock/sequence provenance orders them. A capture that
+sorts before the cart was ejected (for example a pre-activation inventory
+read) fails outright, and an `input_attempt` alone never proves operation.
 
 **Missing critical records fail closed.** With no `test_mod` file, no
 `input_processed`, no `logger_armed`, no capture, no read or no oracle, the

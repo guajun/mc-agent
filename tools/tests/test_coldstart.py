@@ -374,7 +374,7 @@ class AuditFlagTests(unittest.TestCase):
             self.assertIn("logger_armed_before_activation.ordering", [item["id"] for item in armed["required_review"]])
             self.assertNotEqual(report["overall"], "PASS")
 
-    def test_same_tick_late_arm_is_fail(self) -> None:
+    def test_same_tick_cross_stream_sequence_is_not_proof(self) -> None:
         def late_arm(logger: list[dict[str, Any]]) -> None:
             logger[0]["at"] = ts(11)
             logger[0]["tick"] = 201
@@ -382,8 +382,10 @@ class AuditFlagTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             report = audit(valid_run(Path(tmp) / "run", mutate_logger=late_arm))
-            self.assertEqual(flag(report, "logger_armed_before_activation")["status"], "FAIL")
-            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+            armed = flag(report, "logger_armed_before_activation")
+            self.assertEqual(armed["status"], "PENDING")
+            self.assertIn("logger_armed_before_activation.ordering", [item["id"] for item in armed["required_review"]])
+            self.assertNotEqual(report["overall"], "PASS")
 
     def test_instance_mismatch_is_fail(self) -> None:
         def other_instance(logger: list[dict[str, Any]]) -> None:
@@ -732,6 +734,88 @@ class AuditFlagTests(unittest.TestCase):
             self.assertEqual(transient["status"], "PENDING")
             self.assertIn("transient_outputs_captured.window", [item["id"] for item in transient["required_review"]])
 
+    def test_read_tool_without_logger_reference_is_ambiguous(self) -> None:
+        def inventory_read(records: list[dict[str, Any]]) -> None:
+            for record in records:
+                if record.get("call_id") == "c3-read-logger":
+                    record["tool"] = "read"
+                    record["arguments"] = {"path": "agent/inventory.json"}
+                if record.get("record") == "result" and record.get("call_id") == "c3-read-logger":
+                    record["result"] = {"text": "cart-1 iron_ingot redstone"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_trajectory=inventory_read))
+            read_flag = flag(report, "agent_read_log")
+            self.assertEqual(read_flag["status"], "PENDING")
+            self.assertIn("agent_read_log.linkage", [item["id"] for item in read_flag["required_review"]])
+            self.assertNotEqual(report["overall"], "PASS")
+
+    def test_oracle_fake_fixture_suffix_is_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            oracle = cs.read_json(run_dir / "oracle.json")
+            oracle["evidence_refs"] = ["fixture:not-a-real-record", "restore:also-fake"]
+            write_json(run_dir / "oracle.json", oracle)
+            evidence = cs.read_json(run_dir / cs.EVIDENCE_FILE)
+            evidence["oracle"]["sha256"] = cs.sha256_file(run_dir / "oracle.json")
+            write_json(run_dir / cs.EVIDENCE_FILE, evidence)
+            report = audit(run_dir)
+            self.assertEqual(flag(report, "answer_correct")["status"], "PENDING")
+            self.assertNotEqual(report["overall"], "PASS")
+
+    def test_resolved_review_without_evidence_is_infra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", with_reviews=False)
+            for review_id in REQUIRED_REVIEWS:
+                cs.append_jsonl(
+                    run_dir / cs.REVIEW_FILE,
+                    {"id": review_id, "status": "resolved", "by": "reviewer", "at": ts(41), "evidence": []},
+                )
+            report = audit(run_dir)
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("evidence list" in item for item in report["infra_errors"]))
+
+    def test_resolved_review_with_invalid_at_is_infra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", with_reviews=False)
+            for review_id in REQUIRED_REVIEWS:
+                cs.append_jsonl(
+                    run_dir / cs.REVIEW_FILE,
+                    {
+                        "id": review_id,
+                        "status": "resolved",
+                        "by": "reviewer",
+                        "at": "not-a-timestamp",
+                        "evidence": ["trajectory:c2-noteblock"],
+                    },
+                )
+            report = audit(run_dir)
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("valid timestamp" in item for item in report["infra_errors"]))
+
+    def test_resolved_review_with_bogus_ref_is_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", with_reviews=False)
+            add_review(run_dir, "machine_operated.causality", evidence=("bogus:ref",))
+            add_review(run_dir, "logger_armed_before_activation.running")
+            add_review(run_dir, "answer_correct.oracle_independence")
+            report = audit(run_dir)
+            self.assertEqual(report["overall"], "PENDING")
+            self.assertEqual(flag(report, "machine_operated")["status"], "PENDING")
+            self.assertTrue(any("does not resolve" in item for item in report["review_problems"]))
+
+    def test_resolved_reviews_cannot_flip_mechanical_fail(self) -> None:
+        def pre_activation(logger: list[dict[str, Any]]) -> None:
+            logger[1]["at"] = ts(12)
+            logger[1]["tick"] = 150
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", mutate_logger=pre_activation)
+            self.assertTrue((run_dir / cs.REVIEW_FILE).is_file())
+            report = audit(run_dir)
+            self.assertEqual(flag(report, "transient_outputs_captured")["status"], "FAIL")
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+
     def test_attempts_only_is_agent_fail(self) -> None:
         def only_attempts(events: list[dict[str, Any]]) -> None:
             events[:] = [event for event in events if event["event"] != "input_processed"]
@@ -1012,6 +1096,26 @@ class ReviewCommandTests(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 code = run_trace.main(["validate", "--run-dir", str(run_dir)])
             self.assertEqual(code, 1)
+
+    def test_review_command_requires_evidence_for_resolved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_trace.main(["init", "--run-dir", str(run_dir), "--run-id", "r", "--task-text", "t"])
+            with self.assertRaises(SystemExit):
+                run_trace.main(
+                    [
+                        "review",
+                        "--run-dir",
+                        str(run_dir),
+                        "--id",
+                        "machine_operated.causality",
+                        "--status",
+                        "resolved",
+                        "--by",
+                        "reviewer-1",
+                    ]
+                )
 
 
 class VisibilityTests(unittest.TestCase):

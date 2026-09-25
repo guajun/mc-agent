@@ -144,7 +144,8 @@ python tools/run_trace.py result --run-dir <run> --call-id c1 --status ok --resu
 python tools/run_trace.py phase  --run-dir <run> --phase restore --actor restore --instance lab-a
 python tools/run_trace.py artifact --run-dir <run> --path build/logger.jar --label "agent logger jar"
 python tools/run_trace.py review --run-dir <run> --id machine_operated.causality \
-    --status resolved --by "reviewer name" --note "watched the replay" --evidence trajectory:c2
+    --status resolved --by "reviewer name" --note "watched the replay" \
+    --evidence trajectory:c2-noteblock --evidence testmod:seq3
 python tools/run_trace.py validate --run-dir <run>
 ```
 
@@ -230,7 +231,12 @@ logger 怎么写由智能体决定。为了审计，其输出（或经校验的�
 ```
 
 - 没有记录或 `pending`：标志保持 PENDING；
-- `resolved`（带 `by` 和 `at`）：恢复标志的机械结论；
+- `resolved` 必须有 `by`、可解析的 `at` 和**非空的证据列表**；每条引用都要能对到
+  本次运行（存在的 `trajectory:<call_id>`、存在的 `testmod:`/`logger:seqN`，或
+  已声明 payload 里存在的 `fixture:`/`restore:`/`preflight:` 字段/标量值）。
+  格式错误（缺审查者、时间戳无效、证据为空/空白）是 `INFRA_ERROR`；格式正确但
+  引用无法解析时标志保持 PENDING，并列入 `review_problems`。全部引用解析后，
+  只恢复标志的**机械**结论——机械失败的标志绝不被翻转成 PASS；
 - `rejected`：该标志 FAIL（`AGENT_FAIL`），因为审查者判定证据不足。
 
 本次修订中的必须审查项 id：`machine_operated.causality`、
@@ -253,8 +259,9 @@ logger 怎么写由智能体决定。为了审计，其输出（或经校验的�
 - 声明的 preflight 必须与运行清单一致：Harness 名称/模型/提供方、仓库 commit、
   通过的 `ports` 检查，以及真正启动过服务器的通过态 `lab_management`；SKIP 或
   不同环境是 `INFRA_ERROR`；
-- oracle 的 `evidence_refs` 必须能对到已声明的测试 mod/fixture/restore 证据
-  （`testmod:seqN` 必须指向存在的记录）；`trajectory:`、`logger:`、`answer` 等
+- oracle 的 `evidence_refs` 必须能对到已声明的测试 mod/fixture/restore 证据：
+  `testmod:seqN` 必须指向存在的记录，`fixture:`/`restore:`/`preflight:` 后缀必须
+  是已声明 payload 里存在的字段或标量值。`trajectory:`、`logger:`、`answer` 等
   智能体侧引用不算独立；无法解析的引用是 PENDING，完全没有独立引用则失败。
   答案必须恰好覆盖 oracle 的矿车：漏掉一辆就是 `AGENT_FAIL`。
 
@@ -283,10 +290,11 @@ python tools/run_audit.py run --run-dir labs/coldstart/run-01
 PASS。第一轮允许人工语义审查；不要求另一个模型来判分。`audit.md` 会列出每个必须
 审查项及其是否已解决。
 
-机械排序绝不猜测。先比时间，再比 tick，再比同 tick 内序号。两条记录没有共同可比的
-层时结果是 `unknown`，转为必须审查项；同一 tick 且没有序号也是 `unknown`。捕获排在
-矿车弹出之前（例如触发前的盘点读取）直接 FAIL，只有 `input_attempt` 永远不能证明
-操作。
+机械排序绝不猜测。先比时间，再比 tick。同 tick 内的 `seq` 只在同一数据流内使用：
+轨迹的 `seq` 是记录器计数器，而测试 mod/logger 的 `seq` 是各文件内的序号，跨流
+比较会用无关计数排序；跨流记录同 tick 时结果是 `unknown`，除非有共同的时钟/序号
+来源，否则转为必须审查项。捕获排在矿车弹出之前（例如触发前的盘点读取）直接 FAIL，
+只有 `input_attempt` 永远不能证明操作。
 
 **关键记录缺失时失败关闭。** 没有 `test_mod` 文件、没有 `input_processed`、没有
 `logger_armed`、没有捕获、没有读取、没有 oracle，对应标志就失败或保持 pending——

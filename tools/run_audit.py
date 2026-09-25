@@ -67,6 +67,17 @@ def declared_or_override(
     return cs.load_declared_jsonl(run_dir, declared, name)
 
 
+def evidence_index(payload: Any) -> set[str]:
+    """Top-level field names plus scalar values of a declared JSON payload."""
+    index: set[str] = set()
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            index.add(str(key))
+            if isinstance(value, (str, int, bool)):
+                index.add(str(value))
+    return index
+
+
 def load_review_records(run_dir: Path, evidence: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """Explicit review resolutions, declared or at the canonical run path."""
     declared = evidence.get("review")
@@ -293,6 +304,11 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         missing_oracle = sorted(ejected_uuids - oracle_uuids)
         if missing_oracle:
             infra.append("verified oracle omits ejected cart(s): " + ", ".join(missing_oracle))
+    payload_index = {
+        "fixture": evidence_index(fixture_payload),
+        "restore": evidence_index(restore_payload),
+        "preflight": evidence_index(preflight),
+    }
     declared_evidence = {name: bool(evidence.get(name)) for name in ("test_mod", "fixture", "restore", "preflight", "agent_logger", "answer")}
     available_seqs = {
         "testmod": {
@@ -302,7 +318,7 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         }
     }
     provenance_problems, independent_refs, _agent_refs = cs.oracle_provenance(
-        oracle, declared_evidence, available_seqs
+        oracle, declared_evidence, available_seqs, payload_index
     )
 
     flags = {
@@ -318,7 +334,30 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     }
     reviews, review_problems = load_review_records(run_dir, evidence)
     infra.extend(review_problems)
-    cs.apply_reviews(flags, reviews)
+    trajectory_ids = {
+        str(record.get("call_id"))
+        for record in trajectory
+        if record.get("record") == "call" and record.get("call_id")
+    }
+    logger_seqs = {
+        seq for seq in (cs.as_int(cs.get_field(record, "seq")) for record in logger_events) if seq is not None
+    }
+
+    def resolve_ref(ref: str) -> bool:
+        prefix, _, suffix = str(ref).partition(":")
+        prefix = prefix.lower()
+        if prefix == "trajectory":
+            return suffix in trajectory_ids
+        if prefix in ("testmod", "test_mod", "auditmod", "test"):
+            return suffix.startswith("seq") and cs.as_int(suffix[3:]) in available_seqs.get("testmod", set())
+        if prefix in ("logger", "agent_logger"):
+            return suffix.startswith("seq") and cs.as_int(suffix[3:]) in logger_seqs
+        if prefix in ("fixture", "restore", "preflight"):
+            return bool(suffix) and suffix in payload_index.get(prefix, set())
+        return False
+
+    resolution_problems = cs.apply_reviews(flags, reviews, resolve_ref)
+    pending.extend(resolution_problems)
 
     overall, failure_class = cs.classify(flags, infra, fixture)
     if overall == "PASS" and pending:
@@ -335,6 +374,7 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         "infra_errors": infra,
         "fixture_errors": fixture,
         "pending_reasons": pending,
+        "review_problems": resolution_problems,
         "inputs": {
             "run": cs.RUN_FILE,
             "trajectory": f"{len(trajectory)} records",
