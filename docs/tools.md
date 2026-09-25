@@ -55,6 +55,15 @@ What an agent runtime sees when the bridge is registered as an MCP server.
 JSON for a 64-block radius, which is not something a model can read usefully.
 Ask for `types=` filtering and a larger `limit` when you want more.
 
+!!! info "The server-vantage Toolkit and its Skill"
+    The bridge is becoming a Harness-neutral server-vantage Toolkit: `player`
+    and `context` join the surface for per-player and chat-time context, and
+    `capabilities` reports exactly which operations the connected mod supports.
+    Agents learn the workflow from the portable [Toolkit Skill](toolkit-skill.md);
+    `mc-bridge call capabilities` (or `mc_capabilities`) is the authority for
+    what a given connection can do. To run that skill unattended from game
+    events, see [Unattended Hermes](hermes-unattended.md).
+
 ## mc-agent-loop
 
 | Command | Does |

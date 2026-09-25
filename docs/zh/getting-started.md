@@ -94,6 +94,10 @@ loop 把聊天变成后端的一轮对话。想先看它跑通，不需要模型
 .venv/Scripts/mc-agent-loop run --backend hermes --trigger @codex --env-file .env
 ```
 
+无人值守、由事件驱动的运行，也可以让 Hermes 自己拥有触发：用户在 Hermes
+Gateway 配置一条 webhook route，加载可移植的 [Toolkit Skill](toolkit-skill.md)，
+直接调 Bridge MCP 工具。见 [Hermes 无人值守](hermes-unattended.md)。
+
 loop 会忽略自己发出的消息（否则它会和自己无限对话），所以单机世界里触发必须来自别人：另一个玩家，或者智能体自己的玩家（见 [智能体在游戏里是谁](player-identity.md)）。单客户端场景用一次性模式：
 
 ```bash

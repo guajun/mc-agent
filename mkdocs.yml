@@ -38,6 +38,8 @@ nav:
       - Forking a live world: protocol-snapshot.md
   - Guides:
       - Running the agent on Hermes: hermes-setup.md
+      - Installing the Toolkit Skill: toolkit-skill.md
+      - "Unattended Hermes: webhook + Skill": hermes-unattended.md
       - Headless lab servers: lab-server.md
       - Checking a fork: fork-verify.md
   - Reference:
@@ -73,6 +75,8 @@ plugins:
             Forking a live world: 分叉一个活的世界
             Guides: 指南
             Running the agent on Hermes: 用 Hermes 运行智能体
+            Installing the Toolkit Skill: 安装 Toolkit Skill
+            "Unattended Hermes: webhook + Skill": "Hermes 无人值守：webhook + Skill"
             Headless lab servers: 无头实验室服务器
             Checking a fork: 校验一次分叉
             Reference: 参考
