@@ -20,15 +20,17 @@ python tools/lab_server.py list
 
 `provision` takes `--void` (a flat world of air in the void biome) or
 `--world DIR` (copy an existing save in), `--fabric-api`, `--carpet`,
-`--mod-jar PATH`, `--mod-url URL`, `--test-mod PATH` (install **and** require),
-`--require-mod NAME`, `--mc VERSION`, `--memory 2G`, `--java PATH`, `--jdk PATH`
-(the JDK to build mods with; remembered and hashed) and the four identity ports
-`--server-port`, `--rcon-port`, `--vantage-port`, `--bridge-port` (each `0`
-means "pick a free one"). `--server-dir` and `--audit-dir` override where the
-server-vantage mod and the game-side audit output live. Java comes from
-`--java`, else `$MC_AGENT_JAVA`, else the `java` on PATH; whatever provision
-resolved is remembered for `start`, so a lab can be started later without
-repeating it. `start --wait N` returns as soon as the log says `Done`.
+`--mod-jar PATH`, `--mod-url URL` (re-fetched every provision),
+`--test-mod PATH` (install **and** require), `--require-mod NAME`,
+`--forget-mod NAME` (drop a requirement explicitly), `--mc VERSION`,
+`--memory 2G`, `--java PATH`, `--jdk PATH` (the JDK to build mods with;
+remembered and hashed) and the four identity ports `--server-port`,
+`--rcon-port`, `--vantage-port`, `--bridge-port` (each `0` means "pick a free
+one"). `--server-dir` and `--audit-dir` override where the server-vantage mod
+and the game-side audit output live. Java comes from `--java`, else
+`$MC_AGENT_JAVA`, else the `java` on PATH; whatever provision resolved is
+remembered for `start`, so a lab can be started later without repeating it.
+`start --wait N` returns as soon as the log says `Done`.
 
 ```
 labs/<lab>/       fabric-server-mc.*-launcher.*.jar, server.properties,
@@ -122,10 +124,21 @@ Rules the tool enforces:
 * **A required mod cannot go missing quietly.** `--test-mod PATH` installs a
   jar and marks it required; `--require-mod NAME` only marks it. `start`
   returns a non-zero exit and names every missing jar instead of running an
-  instance that could no longer be audited.
+  instance that could no longer be audited. Required names survive a later
+  `provision` even while the jar is absent; only `--forget-mod NAME` drops one
+  explicitly.
 * **Drift is visible.** If a deployed jar's bytes no longer match `lab.json`,
   `start` refuses with both hashes. `--allow-mod-drift` starts anyway, and the
   actual bytes are recorded in `run.json` with `drift: true`.
+* **An unrecorded jar is not silently trusted.** A jar copied into `mods/`
+  after provisioning would still be loaded by Fabric, so `start` and `verify`
+  report it as a problem and name it. `--allow-unrecorded-mod` starts anyway,
+  and `run.json` keeps `recorded: false` for that jar.
+* **A mutable URL is re-fetched.** `--mod-url` downloads every provision, so a
+  rebuilt jar served under the same file name is compared by hash and deployed
+  as `replaced` instead of being served from cache as `unchanged`. Offline
+  provisioning should use `--mod-jar` with a local file (or a seeded
+  `labs/_cache/mods`).
 
 Fabric still loads mods at start, so the safe order for an experiment is:
 **deploy while stopped -> start -> restore the original in-memory entities and

@@ -49,8 +49,13 @@ A jar is compared by SHA-256, not by size: re-provisioning with a rebuilt jar
 that happens to have the same length replaces the old bytes. A lab that records
 a required mod (``--test-mod`` or ``--require-mod``) refuses to start without
 it, and refuses to start when a deployed jar's bytes no longer match lab.json
-(``--allow-mod-drift`` overrides the latter, never the former). Fabric loads
-mods at server start, so the order is always: deploy while stopped, then start.
+(``--allow-mod-drift`` overrides the latter, never the former). Required names
+survive a re-provision even while the jar is absent; ``--forget-mod`` removes
+one explicitly. A jar dropped into ``mods/`` without provisioning is also a
+problem for ``start``/``verify`` unless ``--allow-unrecorded-mod`` says
+otherwise. ``--mod-url`` re-fetches every provision, because a mutable URL can
+serve new bytes under the old file name. Fabric loads mods at server start, so
+the order is always: deploy while stopped, then start.
 
 Everything under ``labs/`` is disposable and git-ignored, and downloads happen
 only when the cached file is missing. The launcher and the mods come from the
@@ -173,9 +178,15 @@ def http_json(url: str) -> Any:
         die(f"{url} is unreachable: {error}")
 
 
-def download(url: str, dest: Path, what: str) -> Path:
-    """Fetch ``url`` to ``dest`` unless it is already there. Returns ``dest``."""
-    if dest.exists() and dest.stat().st_size > 0:
+def download(url: str, dest: Path, what: str, *, refresh: bool = False) -> Path:
+    """Fetch ``url`` to ``dest`` unless it is already there. Returns ``dest``.
+
+    ``refresh=True`` skips the cache shortcut and fetches again: a URL that
+    serves rebuilt bytes under an unchanged file name must be observed, not
+    assumed unchanged. Callers that pin a versioned URL (the Fabric launcher)
+    keep the cached path.
+    """
+    if not refresh and dest.exists() and dest.stat().st_size > 0:
         say(f"  {what}: cached {rel(dest)}")
         return dest
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -283,6 +294,19 @@ def choose_port(requested: int, used: set[int], label: str, *, allow_open: bool 
     die(f"could not find a free {label} port after 256 tries")
 
 
+def provision_port(requested: int, previous_value: Any, used: set[int], label: str) -> int:
+    """Resolve one identity port for ``provision``.
+
+    A port this lab already owns may legitimately be open on re-provision (its
+    bridge keeps listening while the Minecraft server is stopped), so an
+    explicit or carried-forward value equal to the previous one is allowed to
+    be in use. A different explicit value still has to be free.
+    """
+    prior = int(previous_value or 0)
+    want = int(requested or prior or 0)
+    return choose_port(want, used, label, allow_open=bool(prior) and want == prior)
+
+
 # --------------------------------------------------------------------------- lab state
 
 
@@ -382,13 +406,14 @@ def read_port_file(path: Path) -> str | None:
 
 
 def check_deployment(
-    lab: Path, state: dict[str, Any], *, allow_drift: bool = False
+    lab: Path, state: dict[str, Any], *, allow_drift: bool = False, allow_unrecorded: bool = False
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Hash every jar in ``mods/`` and compare it with the provisioned bytes.
 
     Returns the actual on-disk records and human-readable problems. A missing
-    recorded or required jar is always a problem; content drift is a problem
-    unless the caller explicitly allows it.
+    recorded or required jar is always a problem; content drift and jars that
+    provision never recorded are problems unless the caller allows them
+    explicitly (Fabric would load an unrecorded jar all the same).
     """
     mods_dir = lab / "mods"
     recorded = {record["name"]: record for record in mod_records(state)}
@@ -415,6 +440,12 @@ def check_deployment(
         )
 
     problems: list[str] = []
+    for item in actual:
+        if not item["recorded"] and not allow_unrecorded:
+            problems.append(
+                f"mod {item['name']}: present in {rel(mods_dir)} but never provisioned -"
+                " re-run provision to record it, or pass --allow-unrecorded-mod"
+            )
     for name, record in recorded.items():
         if not (mods_dir / name).is_file():
             problems.append(f"mod {name}: missing from {rel(mods_dir)} - re-run provision to deploy it")
@@ -472,6 +503,56 @@ def write_identity(lab: Path, state: dict[str, Any]) -> None:
     payload = identity_payload(lab, state)
     payload["generatedAt"] = time.time()
     write_json(lab / "identity.json", payload)
+
+
+def merge_jvm_args(previous: Iterable[str], extra: Iterable[str]) -> list[str]:
+    """Merge JVM arguments without duplicating them on repeated provision.
+
+    A key is the part before ``=`` for ``-D`` properties, and the whole
+    argument otherwise; a later argument replaces an earlier one with the same
+    key. Re-running the documented provision command is therefore idempotent,
+    and ``-Dfoo=2`` still replaces ``-Dfoo=1``.
+    """
+    merged: dict[str, str] = {}
+    order: list[str] = []
+    for raw in list(previous) + list(extra):
+        text = str(raw)
+        key = text.split("=", 1)[0] if text.startswith("-D") and "=" in text else text
+        if key not in merged:
+            order.append(key)
+        merged[key] = text
+    return [merged[key] for key in order]
+
+
+def merge_required_mods(
+    previous: dict[str, Any],
+    prior_records: Iterable[dict[str, Any]],
+    *,
+    require: Iterable[str] = (),
+    forget: Iterable[str] = (),
+) -> set[str]:
+    """Names that must be present for an auditable run.
+
+    A re-provision without mod flags must not silently drop a requirement just
+    because its jar is currently absent - that is exactly the state the guard
+    exists for. Only ``--forget-mod`` removes a name explicitly.
+    """
+    required = {str(name) for name in (previous.get("requiredMods") or []) if name}
+    required |= {str(name) for name in require if name}
+    required |= {
+        str(record["name"])
+        for record in prior_records
+        if record.get("required") and record.get("name")
+    }
+    required -= {str(name) for name in forget if name}
+    return required
+
+
+def deployed_at(prior: dict[str, Any], action: str, now: float) -> float:
+    """Refresh the deployment timestamp only when the bytes actually changed."""
+    if action in ("installed", "replaced"):
+        return now
+    return float(prior.get("deployedAt") or now)
 
 
 def write_properties(path: Path, updates: dict[str, str], remove: Iterable[str] = ()) -> None:
@@ -918,29 +999,13 @@ def cmd_provision(args: argparse.Namespace) -> int:
 
     # Ports first: a port mistake must not leave a half-updated deployment.
     used_ports = ports_of_other_labs(args.name)
-    rcon_port = choose_port(
-        int(args.rcon_port or previous.get("rconPort") or 0),
-        used_ports,
-        "rcon",
-        allow_open=not args.rcon_port and bool(previous.get("rconPort")),
+    rcon_port = provision_port(args.rcon_port, previous.get("rconPort"), used_ports, "rcon")
+    server_port = provision_port(args.server_port, previous.get("serverPort"), used_ports, "game")
+    vantage_port = provision_port(
+        args.vantage_port, previous.get("serverVantagePort"), used_ports, "server-vantage"
     )
-    server_port = choose_port(
-        int(args.server_port or previous.get("serverPort") or 0),
-        used_ports,
-        "game",
-        allow_open=not args.server_port and bool(previous.get("serverPort")),
-    )
-    vantage_port = choose_port(
-        int(args.vantage_port or previous.get("serverVantagePort") or 0),
-        used_ports,
-        "server-vantage",
-        allow_open=not args.vantage_port and bool(previous.get("serverVantagePort")),
-    )
-    bridge_port = choose_port(
-        int(args.bridge_port or previous.get("bridgeApiPort") or 0),
-        used_ports,
-        "bridge API",
-        allow_open=not args.bridge_port and bool(previous.get("bridgeApiPort")),
+    bridge_port = provision_port(
+        args.bridge_port, previous.get("bridgeApiPort"), used_ports, "bridge API"
     )
 
     say(f"resolving Fabric for Minecraft {mc}")
@@ -963,41 +1028,50 @@ def cmd_provision(args: argparse.Namespace) -> int:
     # keep its size is replaced instead of skipped.
     mods_dir = lab / "mods"
     mods_dir.mkdir(parents=True, exist_ok=True)
-    wanted: list[tuple[Path, str, str, bool]] = []
+    prior_records = {record["name"]: record for record in mod_records(previous)}
+    # Requirements survive a re-provision while the jar is absent; only
+    # --forget-mod removes a name.
+    required = merge_required_mods(
+        previous,
+        prior_records.values(),
+        require=args.require_mod or [],
+        forget=args.forget_mod or [],
+    )
+    wanted: list[tuple[Path, str, str]] = []
     if args.fabric_api:
         path, version = modrinth_download("fabric-api", mc)
-        wanted.append((path, "modrinth", version, False))
+        wanted.append((path, "modrinth", version))
     if args.carpet:
         path, version = modrinth_download("carpet", mc)
-        wanted.append((path, "modrinth", version, False))
+        wanted.append((path, "modrinth", version))
     for path in args.mod_jar:
         source = Path(path).expanduser()
         if not source.is_file():
             die(f"--mod-jar {path} is not a file")
-        wanted.append((source.resolve(), "local", "", False))
+        wanted.append((source.resolve(), "local", ""))
     for url in args.mod_url:
         name = urllib.parse.unquote(Path(urllib.parse.urlparse(url).path).name) or "mod.jar"
-        wanted.append((download(url, CACHE / "mods" / name, "mod"), f"url:{url}", "", False))
-    required = set(args.require_mod or [])
+        # A mutable URL is fetched every provision: same name, new bytes must be
+        # observed, not served from the cache as "unchanged".
+        wanted.append((download(url, CACHE / "mods" / name, "mod", refresh=True), f"url:{url}", ""))
     for path in args.test_mod:
         source = Path(path).expanduser()
         if not source.is_file():
             die(f"--test-mod {path} is not a file")
         source = source.resolve()
-        wanted.append((source, "test-mod", "", True))
+        wanted.append((source, "test-mod", ""))
         required.add(source.name)
 
-    prior_records = {record["name"]: record for record in mod_records(previous)}
     wanted_meta: dict[str, dict[str, Any]] = {}
     actions: list[str] = []
-    for source, origin, version, is_required in wanted:
+    for source, origin, version in wanted:
         stamp = deploy_file(source, mods_dir / source.name, f"mod {source.name}")
         actions.append(f"{source.name} ({stamp['action']}, {stamp['sha256'][:12]})")
         prior = prior_records.get(source.name) or {}
         wanted_meta[source.name] = {
             "origin": origin,
             "version": version or prior.get("version") or "",
-            "required": bool(is_required or prior.get("required")),
+            "action": stamp["action"],
         }
     if actions:
         say(f"  mods: {'; '.join(actions)}")
@@ -1013,12 +1087,10 @@ def cmd_provision(args: argparse.Namespace) -> int:
             "size": stamp["size"],
             "origin": meta.get("origin") or prior.get("origin") or "present-at-provision",
             "version": meta.get("version") or prior.get("version") or "",
-            "required": bool(meta.get("required") or prior.get("required") or jar.name in required),
-            "deployedAt": prior.get("deployedAt") or time.time(),
+            "required": jar.name in required,
+            "deployedAt": deployed_at(prior, str(meta.get("action") or ""), time.time()),
         }
         mods_state.append(record)
-        if record["required"]:
-            required.add(jar.name)
 
     rcon_state = read_json(lab / "rcon.json") or {}
     password = str(rcon_state.get("password") or secrets.token_hex(16))
@@ -1125,7 +1197,7 @@ def cmd_provision(args: argparse.Namespace) -> int:
         "world": world_kind,
         "mods": mods_state,
         "requiredMods": sorted(required),
-        "extraJvmArgs": list(previous.get("extraJvmArgs") or []) + list(args.jvm_arg or []),
+        "extraJvmArgs": merge_jvm_args(previous.get("extraJvmArgs") or [], args.jvm_arg or []),
         "provisionedAt": previous.get("provisionedAt") or time.time(),
         "updatedAt": time.time(),
         "restartPending": bool(running),
@@ -1220,18 +1292,21 @@ def cmd_start(args: argparse.Namespace) -> int:
     if running:
         die(f"lab {args.name} is already running (pid {running_pid}); stop it first")
 
-    actual_mods, problems = check_deployment(lab, state, allow_drift=args.allow_mod_drift)
+    actual_mods, problems = check_deployment(
+        lab, state, allow_drift=args.allow_mod_drift, allow_unrecorded=args.allow_unrecorded_mod
+    )
     if problems:
         joined = "\n  ".join(problems)
         die(
             f"lab {args.name} refused to start: the deployed mods do not match the provisioned lab.\n"
             f"  {joined}\n"
-            "re-run provision with the intended jars, or pass --allow-mod-drift to run anyway"
+            "re-run provision with the intended jars, or pass --allow-mod-drift /"
+            " --allow-unrecorded-mod to run anyway"
         )
 
     java = resolve_java(args.java, state.get("java", ""))
     memory = args.memory or state.get("memory") or DEFAULT_MEMORY
-    extra = list(state.get("extraJvmArgs") or []) + list(args.jvm_arg or [])
+    extra = merge_jvm_args(state.get("extraJvmArgs") or [], args.jvm_arg or [])
     identity = [
         ("mcagent.serverDir", state.get("serverDir")),
         ("mcagent.serverPort", state.get("serverVantagePort")),
@@ -1292,6 +1367,7 @@ def cmd_start(args: argparse.Namespace) -> int:
             "modsAtStart": actual_mods,
             "requiredMods": list(state.get("requiredMods") or []),
             "modDriftAllowed": bool(args.allow_mod_drift),
+            "unrecordedModsAllowed": bool(args.allow_unrecorded_mod),
         },
     )
     state["restartPending"] = False
@@ -1555,8 +1631,9 @@ def cmd_verify(args: argparse.Namespace) -> int:
         for problem in problems:
             say(f"  {problem}")
         return 1
+    recorded = sum(1 for record in actual if record["recorded"])
     say(
-        f"lab {args.name}: verified - {len(actual)} mods match the provisioned bytes,"
+        f"lab {args.name}: verified - {recorded} provisioned mods match the recorded bytes,"
         f" world {state.get('worldDir')}"
     )
     return 0
@@ -1650,7 +1727,7 @@ def build_parser() -> argparse.ArgumentParser:
     provision.add_argument("--fabric-api", action="store_true", help="add the Fabric API mod")
     provision.add_argument("--carpet", action="store_true", help="add the Carpet mod")
     provision.add_argument("--mod-jar", action="append", default=[], help="a local jar to copy in")
-    provision.add_argument("--mod-url", action="append", default=[], help="a jar URL to fetch")
+    provision.add_argument("--mod-url", action="append", default=[], help="a jar URL to fetch (re-fetched every provision)")
     provision.add_argument(
         "--test-mod",
         action="append",
@@ -1662,6 +1739,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="jar name that must be present for an auditable run (repeatable)",
+    )
+    provision.add_argument(
+        "--forget-mod",
+        action="append",
+        default=[],
+        help="explicitly drop a required-mod name (requirements otherwise survive re-provision)",
     )
     provision.add_argument("--world", default="", help="an existing save to copy in")
     provision.add_argument("--void", action="store_true", help="a flat world of air in the void biome")
@@ -1707,6 +1790,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--allow-mod-drift",
         action="store_true",
         help="start even when a deployed mod's bytes differ from what lab.json recorded",
+    )
+    start.add_argument(
+        "--allow-unrecorded-mod",
+        action="store_true",
+        help="start even when mods/ contains a jar that provision never recorded",
     )
     start.add_argument(
         "--wait",
@@ -1757,8 +1845,44 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def normalise_jvm_args(argv: list[str], known_options: set[str]) -> list[str]:
+    """Allow ``--jvm-arg -Dfoo=1``: argparse would read the ``-D`` as an option.
+
+    The next token becomes the value unless it is itself a known option of the
+    parser, so a genuinely missing value still fails loudly instead of being
+    swallowed.
+    """
+    normalised: list[str] = []
+    index = 0
+    while index < len(argv):
+        token = argv[index]
+        if token == "--jvm-arg" and index + 1 < len(argv) and argv[index + 1] not in known_options:
+            normalised.append(f"--jvm-arg={argv[index + 1]}")
+            index += 2
+            continue
+        normalised.append(token)
+        index += 1
+    return normalised
+
+
+def parser_option_strings(parser: argparse.ArgumentParser) -> set[str]:
+    """Every option string in a parser, including its subcommand parsers."""
+    options = {
+        option for action in parser._actions for option in getattr(action, "option_strings", [])
+    }
+    for action in parser._actions:
+        choices = getattr(action, "choices", None)
+        if isinstance(choices, dict):
+            for subparser in choices.values():
+                if isinstance(subparser, argparse.ArgumentParser):
+                    options |= parser_option_strings(subparser)
+    return options
+
+
 def main(argv: Iterable[str] | None = None) -> int:
-    args = build_parser().parse_args(list(argv) if argv is not None else None)
+    parser = build_parser()
+    raw = list(argv) if argv is not None else sys.argv[1:]
+    args = parser.parse_args(normalise_jvm_args(raw, parser_option_strings(parser)))
     return int(args.handler(args))
 
 

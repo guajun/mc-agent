@@ -15,7 +15,7 @@ python tools/lab_server.py stop --name smoke
 python tools/lab_server.py list
 ```
 
-`provision` 接受 `--void`（虚空生物群系的纯空气超平坦世界）或 `--world DIR`（把已有存档拷进来），以及 `--fabric-api`、`--carpet`、`--mod-jar PATH`、`--mod-url URL`、`--test-mod PATH`（安装并标记为必需）、`--require-mod NAME`、`--mc VERSION`、`--memory 2G`、`--java PATH`、`--jdk PATH`（用来构建 mod 的 JDK；会被记住并哈希）和四个身份端口 `--server-port`、`--rcon-port`、`--vantage-port`、`--bridge-port`（传 `0` 表示自动挑一个空闲的）。`--server-dir`、`--audit-dir` 覆盖 server-vantage mod 与游戏侧审计输出的位置。Java 依次取 `--java`、`$MC_AGENT_JAVA`、PATH 上的 `java`；provision 解析到的结果会被记住，之后 `start` 不必重复指定。`start --wait N` 会在日志出现 `Done` 时立刻返回。
+`provision` 接受 `--void`（虚空生物群系的纯空气超平坦世界）或 `--world DIR`（把已有存档拷进来），以及 `--fabric-api`、`--carpet`、`--mod-jar PATH`、`--mod-url URL`（每次 provision 重新拉取）、`--test-mod PATH`（安装并标记为必需）、`--require-mod NAME`、`--forget-mod NAME`（显式移除一条必需项）、`--mc VERSION`、`--memory 2G`、`--java PATH`、`--jdk PATH`（用来构建 mod 的 JDK；会被记住并哈希）和四个身份端口 `--server-port`、`--rcon-port`、`--vantage-port`、`--bridge-port`（传 `0` 表示自动挑一个空闲的）。`--server-dir`、`--audit-dir` 覆盖 server-vantage mod 与游戏侧审计输出的位置。Java 依次取 `--java`、`$MC_AGENT_JAVA`、PATH 上的 `java`；provision 解析到的结果会被记住，之后 `start` 不必重复指定。`start --wait N` 会在日志出现 `Done` 时立刻返回。
 
 ```
 labs/<lab>/       fabric-server-mc.*-launcher.*.jar、server.properties、
@@ -81,8 +81,10 @@ python tools/lab_server.py start --name lab-a --wait 300
 工具强制执行的规则：
 
 * **不支持热加载。** Fabric 只在服务端启动时加载 mod。`provision` 拒绝对运行中的实验室部署 mod；先停掉。只改属性文件可以在运行中做，并会标记 `restartPending` 直到下次启动。
-* **必需的 mod 不可能悄悄消失。** `--test-mod PATH` 安装并标记为必需；`--require-mod NAME` 只标记。缺任何一个必需 jar 时 `start` 都以非零退出并列出名字，而不会把一个无法再审计的实例跑起来。
+* **必需的 mod 不可能悄悄消失。** `--test-mod PATH` 安装并标记为必需；`--require-mod NAME` 只标记。缺任何一个必需 jar 时 `start` 都以非零退出并列出名字，而不会把一个无法再审计的实例跑起来。必需项在 jar 缺席时也能挺过后续的 `provision`；只有 `--forget-mod NAME` 才会显式移除。
 * **漂移可见。** 如果已部署 jar 的字节与 `lab.json` 记录不符，`start` 会列出两个哈希并拒绝启动。`--allow-mod-drift` 可以照常启动，真实字节会以 `drift: true` 记进 `run.json`。
+* **未记录的 jar 不会被默默信任。** provision 之后手工拷进 `mods/` 的 jar 仍会被 Fabric 加载，所以 `start` 和 `verify` 会把它列为问题并报出文件名。`--allow-unrecorded-mod` 可以照常启动，`run.json` 仍保留该 jar 的 `recorded: false`。
+* **会变化的 URL 每次重拉。** `--mod-url` 在每次 provision 时重新下载，所以同名 URL 背后的新字节会按哈希比较并以 `replaced` 部署，而不是被缓存当作 `unchanged`。离线供给请用 `--mod-jar` 配本地文件（或预先填好 `labs/_cache/mods`）。
 
 Fabric 仍在启动时加载 mod，所以实验的安全顺序是：**停止时部署 -> 启动 -> 恢复原始内存实体并校验顺序 -> 做实验。** 不要相信存档重载产生的实体顺序；那是恢复前置项要解决的事（[分叉一个活的世界](protocol-snapshot.md)）。
 
