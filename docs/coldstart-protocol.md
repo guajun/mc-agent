@@ -149,8 +149,9 @@ every append. `seq` is assigned by the recorder; `at` is RFC 3339 UTC.
 
 Phases are `prepare` (test-side setup), `restore` (copy restoration), `agent`
 (the agent's own work), `audit` (post-run review). Actors are `operator`,
-`test`, `agent`, `restore`, `harness`. This is how "test preparation", "agent
-operation" and "copy restoration" stay distinguishable in one file.
+`test`, `agent`, `restore`, `harness`, `reviewer`. This is how "test
+preparation", "agent operation" and "copy restoration" stay distinguishable in
+one file.
 
 Convenience commands:
 
@@ -160,14 +161,17 @@ python tools/run_trace.py call   --run-dir <run> --call-id c1 --tool bash \
 python tools/run_trace.py result --run-dir <run> --call-id c1 --status ok --result '{"text": "compiled"}'
 python tools/run_trace.py phase  --run-dir <run> --phase restore --actor restore --instance lab-a
 python tools/run_trace.py artifact --run-dir <run> --path build/logger.jar --label "agent logger jar"
+python tools/run_trace.py review --run-dir <run> --id machine_operated.causality \
+    --status resolved --by "reviewer name" --note "watched the replay" --evidence trajectory:c2
 python tools/run_trace.py validate --run-dir <run>
 ```
 
 `artifact` copies self-written code and build outputs into `artifacts/` and
-records their hashes in `run.json`. `validate` checks the structure: unique
-call ids, one result per call, monotonic `seq` and timestamps, known phases,
-task/visibility hashes, import and artifact hashes, and declared evidence
-hashes. Missing a result is an error, not a warning.
+records their hashes in `run.json`. `review` appends an explicit review
+resolution (section 5). `validate` checks the structure: unique call ids, one
+result per call, monotonic `seq` and timestamps, known phases,
+task/visibility hashes, import and artifact hashes, declared evidence hashes,
+and well-formed review records. Missing a result is an error, not a warning.
 
 ## 5. Evidence declarations
 
@@ -187,7 +191,8 @@ the run and, when available, a sha256 that the audit re-checks:
   "oracle":   { "path": "oracle.json", "sha256": "..." },
   "fixture":  { "path": "fixture/ready.json", "sha256": "..." },
   "restore":  { "path": "restore/verify.json", "sha256": "..." },
-  "preflight":{ "path": "preflight/preflight.json", "sha256": "..." }
+  "preflight":{ "path": "preflight/preflight.json", "sha256": "..." },
+  "review":   { "path": "reviews.jsonl", "sha256": "..." }   // default location if omitted
 }
 ```
 
@@ -230,6 +235,37 @@ If a `normalized` view is declared, every record should carry
 records do not name the current bytes. The raw output is never replaced by the
 normalized view.
 
+### Explicit review resolutions
+
+Some facts are semantic: they cannot be decided by parsing alone, and the
+protocol refuses to guess. The audit lists such facts as **required review**
+entries, and the run must carry an explicit resolution before the flag can be
+PASS. Resolutions live in `reviews.jsonl` (append-only, latest entry per id
+wins) and are written with `run_trace.py review`:
+
+```jsonc
+{
+  "id": "machine_operated.causality",   // the required-review id from audit.json
+  "status": "resolved",                 // resolved | rejected | pending
+  "by": "reviewer name",                // resolved entries must carry by + at
+  "at": "2026-09-26T00:00:00Z",
+  "note": "watched the replay; the traced command is the one the test mod processed",
+  "evidence": ["trajectory:c2-noteblock", "testmod:seq3"]
+}
+```
+
+- no entry or `pending` keeps the flag PENDING;
+- `resolved` (with `by` and `at`) restores the flag's mechanical outcome;
+- `rejected` fails the flag (`AGENT_FAIL`), because the reviewer judged the
+  evidence insufficient.
+
+The required-review ids in this revision are `machine_operated.causality`,
+`machine_operated.ordering`, `logger_armed_before_activation.running`,
+`logger_armed_before_activation.ordering`, `transient_outputs_captured.window`,
+`transient_outputs_captured.inventory`, `agent_read_log.linkage` and
+`answer_correct.oracle_independence`. A run whose mechanical checks pass but
+whose required reviews are unresolved is PENDING, never PASS.
+
 ## 6. What the audit decides: `run_audit.py`
 
 ```bash
@@ -240,20 +276,32 @@ It computes five flags, each with evidence references into the records above,
 and writes `audit/audit.json` plus `audit/audit.md`. Exit codes: `0` PASS,
 `1` FAIL, `2` PENDING.
 
-| Flag | PASS requires | Typed evidence |
-| --- | --- | --- |
-| `machine_operated` | >= 1 `input_processed` event; >= 1 agent call in the `agent` phase that precedes the first processing event | `testmod:seq…`, `trajectory:<call_id>` |
-| `logger_armed_before_activation` | a `logger_armed` record; its timestamp/tick is not after the first `input_processed`; an agent call showing the logger being written/built/started | `logger:seq…`, `testmod:seq…`, `trajectory:<call_id>` |
-| `transient_outputs_captured` | every `cart_ejected` uuid has a `cart_observed` record, and capture precedes removal when `cart_removed` exists | `testmod:seq…`, `logger:seq…` |
-| `agent_read_log` | an agent call after the last capture whose arguments name the logger file or whose result contains a captured uuid or items | `trajectory:<call_id>`, `logger:seq…` |
-| `answer_correct` | the answer matches a **verified** oracle cart by cart, and the oracle references independent game-side evidence | `oracle:<ref>`, `oracle` |
+| Flag | PASS requires | Required review (id) | Evidence |
+| --- | --- | --- | --- |
+| `machine_operated` | >= 1 `input_processed` event; >= 1 agent call in the `agent` phase ordered **before** the first processing event by time/tick/sequence | `machine_operated.causality`; `machine_operated.ordering` when no shared ordering layer exists | `testmod:seq…`, `trajectory:<call_id>` |
+| `logger_armed_before_activation` | a `logger_armed` record ordered before the first `input_processed` event (time, then tick, then same-tick sequence; same instance/dimension); an agent call showing the logger being written/built/started | `logger_armed_before_activation.running`; `.ordering` when no shared ordering layer exists | `logger:seq…`, `testmod:seq…`, `trajectory:<call_id>` |
+| `transient_outputs_captured` | every `cart_ejected` uuid has a `cart_observed` record ordered **after** ejection and **before** removal (same instance/dimension); each capture carries an items list | `.window` when there is no removal evidence or no shared ordering layer; `.inventory` when a capture has no items list | `testmod:seq…`, `logger:seq…` |
+| `agent_read_log` | an agent call after the last capture that both names the logger and returns captured observation content (a cart uuid plus its items, or the full ordered item list), with a plausible read/exec call | `agent_read_log.linkage` when the linkage is ambiguous (filename echoed, uuid alone, content without a logger reference, or unorderable) | `trajectory:<call_id>`, `logger:seq…` |
+| `answer_correct` | the answer matches a **verified** oracle cart by cart, and the oracle references independent game-side evidence | `answer_correct.oracle_independence` | `oracle:<ref>`, `oracle` |
 
 The audit is deliberately split into mechanical and semantic parts. Presence,
 ordering, hashes and item comparison are mechanical. Causality ("this traced
-call is what the test mod processed"), the human-readable semantics of an item
-list, and whether the oracle's chain is truly independent are listed under
-`needs_review`, because a wrong mechanical guess must not become a PASS. The
-first run is allowed to need human semantic review; no second model is required.
+call is what the test mod processed"), whether the armed logger was really
+loaded, whether a capture window is proven, the linkage of a reported read and
+the oracle's independence are **required reviews**: the audit reports them with
+stable ids, and `apply_reviews` keeps the flag PENDING until `reviews.jsonl`
+contains an explicit `resolved` entry (or fails it when the entry is
+`rejected`). A `needs_review` note without a review id is informational only;
+it never decides PASS. The first run is allowed to need human semantic review;
+no second model is required. `audit.md` lists every required review and whether
+it is resolved.
+
+Mechanical ordering never guesses. Times decide first, then ticks, then the
+intra-tick sequence. If two records share no comparable layer the answer is
+`unknown` and becomes a required review; two records at the same tick without a
+sequence are `unknown` as well. A capture that sorts before the cart was
+ejected (for example a pre-activation inventory read) fails outright, and an
+`input_attempt` alone never proves operation.
 
 **Missing critical records fail closed.** With no `test_mod` file, no
 `input_processed`, no `logger_armed`, no capture, no read or no oracle, the
@@ -274,9 +322,10 @@ never claims correctness early.
 | `INFRA_ERROR` | the tools or the audit itself are unavailable or inconsistent | broken trajectory, missing/hashed-mismatched evidence, failed preflight |
 
 Precedence is INFRA_ERROR, then FIXTURE_INVALID, then AGENT_FAIL. PENDING is
-not a failure: it means the run cannot be judged yet (pending oracle, or the
-fixture/restore evidence has not been declared). A run can be PENDING at stage
-19 and become decidable when the prerequisite work lands.
+not a failure: it means the run cannot be judged yet (pending oracle, the
+fixture/restore evidence has not been declared, or a required review is
+unresolved). A run can be PENDING at stage 19 and become decidable when the
+prerequisite work lands.
 
 ## 8. Relationship to the prerequisites
 

@@ -92,8 +92,8 @@ primitives above.
 | `game_cmd.py` | run a game command and print the feedback it produced |
 | `mcp_probe.py` | call one MCP tool against a running bridge, exactly as an agent would |
 | `harness_preflight.py` | check the fixed harness/model contract: terminal, files, source fetch, JDK build, bridge CLI/MCP, reserved ports and a live lab, with hashed evidence |
-| `run_trace.py` | open a cold-start run, snapshot the documents/skills the agent can see, and record the tool trajectory (calls, results, phases, artifacts, pi session import) |
-| `run_audit.py` | judge a run against the five required facts (`machine_operated`, `logger_armed_before_activation`, `transient_outputs_captured`, `agent_read_log`, `answer_correct`) with evidence references and failure classification |
+| `run_trace.py` | open a cold-start run, snapshot the documents/skills the agent can see, and record the tool trajectory (calls, results, phases, artifacts, pi session import, explicit review resolutions) |
+| `run_audit.py` | judge a run against the five required facts (`machine_operated`, `logger_armed_before_activation`, `transient_outputs_captured`, `agent_read_log`, `answer_correct`) with evidence references, required reviews and failure classification |
 
 Examples:
 
@@ -113,6 +113,8 @@ python tools/harness_preflight.py run --config examples/coldstart/harness-pi.jso
 python tools/run_trace.py init --run-dir labs/coldstart/run-01 \
     --task-file examples/coldstart/task-minecart-rom.md --harness pi --model <model>
 python tools/run_trace.py import-pi --run-dir labs/coldstart/run-01 --session "$PI_SESSION_FILE"
+python tools/run_trace.py review --run-dir labs/coldstart/run-01 \
+    --id machine_operated.causality --status resolved --by <reviewer>
 python tools/run_audit.py run --run-dir labs/coldstart/run-01
 ```
 

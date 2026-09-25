@@ -121,6 +121,15 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     artifact.add_argument("--actor", default="agent", choices=cs.ACTORS)
     artifact.add_argument("--max-bytes", type=int, default=20 * 1024 * 1024)
 
+    review = sub.add_parser("review", help="record an explicit review resolution")
+    review.add_argument("--run-dir", required=True, type=Path)
+    review.add_argument("--id", required=True, help="e.g. machine_operated.causality")
+    review.add_argument("--status", required=True, choices=cs.REVIEW_STATUSES)
+    review.add_argument("--by", required=True, help="the reviewer identity")
+    review.add_argument("--note", default="")
+    review.add_argument("--evidence", action="append", default=[])
+    review.add_argument("--at", default=None)
+
     validate = sub.add_parser("validate", help="check the run and its trajectory")
     validate.add_argument("--run-dir", required=True, type=Path)
     validate.add_argument("--json", action="store_true")
@@ -581,6 +590,34 @@ def cmd_artifact(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_review(args: argparse.Namespace) -> int:
+    run = ensure_open(args.run_dir)
+    record = {
+        "id": args.id,
+        "status": args.status,
+        "by": args.by,
+        "at": args.at or cs.utc_now(),
+        "note": args.note,
+        "evidence": list(args.evidence),
+    }
+    if args.status == "resolved" and not (args.by and record["at"]):
+        raise SystemExit("error: a resolved review needs --by and a timestamp")
+    cs.append_jsonl(args.run_dir / cs.REVIEW_FILE, record)
+    cs.append_jsonl(
+        trajectory_path(args.run_dir),
+        {
+            "schema": cs.SCHEMA_TRAJECTORY,
+            "record": "mark",
+            "name": "review",
+            "actor": "reviewer",
+            "at": record["at"],
+            "data": {"id": args.id, "status": args.status, "by": args.by, "evidence": record["evidence"]},
+        },
+    )
+    cs.say(f"review {args.id} -> {args.status} (by {args.by})")
+    return 0
+
+
 def cmd_validate(args: argparse.Namespace) -> int:
     run_dir: Path = args.run_dir
     problems: list[str] = []
@@ -633,6 +670,10 @@ def cmd_validate(args: argparse.Namespace) -> int:
                     problems.append(f"evidence {name}: {path} is missing")
                 elif declared.get("sha256") and cs.sha256_file(path) != declared["sha256"]:
                     problems.append(f"evidence {name}: sha256 changed")
+        reviews_path = run_dir / cs.REVIEW_FILE
+        if reviews_path.is_file():
+            _reviews, review_problems = cs.load_reviews(reviews_path)
+            problems.extend(review_problems)
     report = {
         "schema": "mc-agent-coldstart-validation/1",
         "valid": not problems,
@@ -658,6 +699,9 @@ def cmd_status(args: argparse.Namespace) -> int:
     cs.say(f"  calls {len(calls)}, results {len(results)}, phase records {len(phases)}")
     if phases:
         cs.say(f"  last phase {phases[-1].get('phase')}")
+    if (args.run_dir / cs.REVIEW_FILE).is_file():
+        reviews, _ = cs.load_reviews(args.run_dir / cs.REVIEW_FILE)
+        cs.say(f"  reviews {len(reviews)}")
     return 0
 
 
@@ -671,6 +715,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         "phase": cmd_phase,
         "import-pi": cmd_import_pi,
         "artifact": cmd_artifact,
+        "review": cmd_review,
         "validate": cmd_validate,
         "status": cmd_status,
     }

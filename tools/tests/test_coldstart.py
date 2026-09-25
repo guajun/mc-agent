@@ -51,6 +51,33 @@ def write_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
             handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+REQUIRED_REVIEWS = (
+    "machine_operated.causality",
+    "logger_armed_before_activation.running",
+    "answer_correct.oracle_independence",
+)
+
+
+def add_review(
+    run_dir: Path,
+    review_id: str,
+    status: str = "resolved",
+    by: str = "test-reviewer",
+    note: str = "synthetic test review",
+    evidence: tuple[str, ...] = ("trajectory:c2-noteblock",),
+    at: str | None = None,
+) -> None:
+    record = {
+        "id": review_id,
+        "status": status,
+        "by": by,
+        "at": at or ts(40 + len(cs.read_jsonl(run_dir / cs.REVIEW_FILE))),
+        "note": note,
+        "evidence": list(evidence),
+    }
+    cs.append_jsonl(run_dir / cs.REVIEW_FILE, record)
+
+
 def valid_run(
     base: Path,
     mutate_trajectory: Callable[[list[dict[str, Any]]], None] | None = None,
@@ -58,6 +85,7 @@ def valid_run(
     mutate_logger: Callable[[list[dict[str, Any]]], None] | None = None,
     mutate_evidence: Callable[[dict[str, Any]], None] | None = None,
     oracle_status: str = "verified",
+    with_reviews: bool = True,
 ) -> Path:
     run_dir = base
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -191,6 +219,9 @@ def valid_run(
     if mutate_evidence:
         mutate_evidence(evidence)
     write_json(run_dir / cs.EVIDENCE_FILE, evidence)
+    if with_reviews:
+        for review_id in REQUIRED_REVIEWS:
+            add_review(run_dir, review_id)
     return run_dir
 
 
@@ -238,7 +269,167 @@ class AuditFlagTests(unittest.TestCase):
             self.assertEqual([f["status"] for f in report["flags"]], ["PASS"] * 5)
             machine = flag(report, "machine_operated")
             self.assertTrue(machine["evidence"])
-            self.assertTrue(machine["needs_review"])
+            self.assertEqual([item["id"] for item in machine["required_review"]], ["machine_operated.causality"])
+            self.assertEqual(len(machine["review_resolutions"]), 1)
+            self.assertEqual(machine["review_resolutions"][0]["by"], "test-reviewer")
+
+    def test_unresolved_reviews_block_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", with_reviews=False))
+            self.assertEqual(report["overall"], "PENDING")
+            self.assertIsNone(report["failure_class"])
+            for name in ("machine_operated", "logger_armed_before_activation", "answer_correct"):
+                item = flag(report, name)
+                self.assertEqual(item["status"], "PENDING")
+                self.assertTrue(item["required_review"])
+                self.assertIn("awaiting explicit review", item["summary"])
+
+    def test_resolved_reviews_restore_mechanical_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", with_reviews=False)
+            for review_id in REQUIRED_REVIEWS:
+                add_review(run_dir, review_id)
+            report = audit(run_dir)
+            self.assertEqual(report["overall"], "PASS")
+
+    def test_rejected_review_is_agent_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            add_review(run_dir, "machine_operated.causality", status="rejected", note="the traced call is unrelated")
+            report = audit(run_dir)
+            self.assertEqual(report["overall"], "FAIL")
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+            self.assertEqual(flag(report, "machine_operated")["status"], "FAIL")
+
+    def test_bare_logger_filename_echo_is_not_pass(self) -> None:
+        def echo_filename(records: list[dict[str, Any]]) -> None:
+            for record in records:
+                if record.get("call_id") == "c3-read-logger":
+                    record["tool"] = "powershell"
+                    record["arguments"] = {"command": 'Write-Output "logger.jsonl"'}
+                if record.get("record") == "result" and record.get("call_id") == "c3-read-logger":
+                    record["result"] = {"text": "logger.jsonl"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", mutate_trajectory=echo_filename)
+            report = audit(run_dir)
+            read_flag = flag(report, "agent_read_log")
+            self.assertEqual(read_flag["status"], "PENDING")
+            self.assertEqual([item["id"] for item in read_flag["required_review"]], ["agent_read_log.linkage"])
+            self.assertNotEqual(report["overall"], "PASS")
+            add_review(run_dir, "agent_read_log.linkage")
+            self.assertEqual(flag(audit(run_dir), "agent_read_log")["status"], "PASS")
+
+    def test_uuid_echo_only_is_not_pass(self) -> None:
+        def echo_uuid(records: list[dict[str, Any]]) -> None:
+            for record in records:
+                if record.get("call_id") == "c3-read-logger":
+                    record["arguments"] = {"command": "Write-Output cart-1"}
+                if record.get("record") == "result" and record.get("call_id") == "c3-read-logger":
+                    record["result"] = {"text": "cart-1"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_trajectory=echo_uuid))
+            self.assertEqual(flag(report, "agent_read_log")["status"], "PENDING")
+            self.assertNotEqual(report["overall"], "PASS")
+
+    def test_content_without_logger_reference_is_ambiguous(self) -> None:
+        def unrelated_content(records: list[dict[str, Any]]) -> None:
+            for record in records:
+                if record.get("call_id") == "c3-read-logger":
+                    record["arguments"] = {"command": "Write-Output 'cart-1 iron_ingot redstone'"}
+                if record.get("record") == "result" and record.get("call_id") == "c3-read-logger":
+                    record["result"] = {"text": "cart-1 iron_ingot redstone"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_trajectory=unrelated_content))
+            read_flag = flag(report, "agent_read_log")
+            self.assertEqual(read_flag["status"], "PENDING")
+            self.assertIn("agent_read_log.linkage", [item["id"] for item in read_flag["required_review"]])
+
+    def test_missing_ordering_evidence_is_not_pass(self) -> None:
+        def strip_ordering(events: list[dict[str, Any]]) -> None:
+            for event in events:
+                if event["event"] in ("input_processed",):
+                    event.pop("at")
+                    event.pop("tick")
+                    event.pop("seq", None)
+
+        def strip_logger_ordering(logger: list[dict[str, Any]]) -> None:
+            for event in logger:
+                event.pop("at", None)
+                event.pop("tick", None)
+                event.pop("seq", None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(
+                valid_run(
+                    Path(tmp) / "run",
+                    mutate_events=strip_ordering,
+                    mutate_logger=strip_logger_ordering,
+                )
+            )
+            armed = flag(report, "logger_armed_before_activation")
+            self.assertNotEqual(armed["status"], "PASS")
+            self.assertIn("logger_armed_before_activation.ordering", [item["id"] for item in armed["required_review"]])
+            self.assertNotEqual(report["overall"], "PASS")
+
+    def test_same_tick_late_arm_is_fail(self) -> None:
+        def late_arm(logger: list[dict[str, Any]]) -> None:
+            logger[0]["at"] = ts(11)
+            logger[0]["tick"] = 201
+            logger[0]["seq"] = 999
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_logger=late_arm))
+            self.assertEqual(flag(report, "logger_armed_before_activation")["status"], "FAIL")
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+
+    def test_instance_mismatch_is_fail(self) -> None:
+        def other_instance(logger: list[dict[str, Any]]) -> None:
+            logger[0]["instance"] = "lab-b"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_logger=other_instance))
+            self.assertEqual(flag(report, "logger_armed_before_activation")["status"], "FAIL")
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+
+    def test_capture_before_ejection_is_fail(self) -> None:
+        def pre_activation(logger: list[dict[str, Any]]) -> None:
+            logger[1]["at"] = ts(12)
+            logger[1]["tick"] = 150
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_logger=pre_activation))
+            transient = flag(report, "transient_outputs_captured")
+            self.assertEqual(transient["status"], "FAIL")
+            self.assertIn("before they were ejected", transient["summary"])
+
+    def test_missing_removal_requires_review(self) -> None:
+        def no_removal(events: list[dict[str, Any]]) -> None:
+            events[:] = [event for event in events if event["event"] != "cart_removed"]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run", mutate_events=no_removal)
+            report = audit(run_dir)
+            transient = flag(report, "transient_outputs_captured")
+            self.assertEqual(transient["status"], "PENDING")
+            self.assertIn("transient_outputs_captured.window", [item["id"] for item in transient["required_review"]])
+            self.assertNotEqual(report["overall"], "PASS")
+            add_review(run_dir, "transient_outputs_captured.window")
+            report = audit(run_dir)
+            self.assertEqual(flag(report, "transient_outputs_captured")["status"], "PASS")
+            self.assertEqual(report["overall"], "PASS")
+
+    def test_capture_without_inventory_requires_review(self) -> None:
+        def no_items(logger: list[dict[str, Any]]) -> None:
+            logger[1].pop("items", None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_logger=no_items))
+            transient = flag(report, "transient_outputs_captured")
+            self.assertEqual(transient["status"], "PENDING")
+            self.assertIn("transient_outputs_captured.inventory", [item["id"] for item in transient["required_review"]])
 
     def test_attempts_only_is_agent_fail(self) -> None:
         def only_attempts(events: list[dict[str, Any]]) -> None:
@@ -451,7 +642,8 @@ class PiImportTests(unittest.TestCase):
             self.assertEqual(len(calls), 2)
             self.assertEqual(len(results), 2)
             self.assertEqual(cs.validate_trajectory(records), [])
-            code = run_trace.main(["validate", "--run-dir", str(run_dir), "--json"])
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = run_trace.main(["validate", "--run-dir", str(run_dir), "--json"])
             self.assertEqual(code, 0)
             self.assertTrue((run_dir / "imports" / "session.jsonl").is_file())
             run = cs.read_json(run_dir / cs.RUN_FILE)
@@ -467,6 +659,55 @@ class PiImportTests(unittest.TestCase):
             lines = session.read_text(encoding="utf-8").splitlines()
             session.write_text("\n".join(lines[:-1]) + "\n", encoding="utf-8", newline="\n")
             run_trace.main(["import-pi", "--run-dir", str(run_dir), "--session", str(session)])
+            with contextlib.redirect_stdout(io.StringIO()):
+                code = run_trace.main(["validate", "--run-dir", str(run_dir)])
+            self.assertEqual(code, 1)
+
+
+class ReviewCommandTests(unittest.TestCase):
+    def test_review_command_writes_review_and_mark(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_trace.main(["init", "--run-dir", str(run_dir), "--run-id", "r", "--task-text", "t"])
+                code = run_trace.main(
+                    [
+                        "review",
+                        "--run-dir",
+                        str(run_dir),
+                        "--id",
+                        "machine_operated.causality",
+                        "--status",
+                        "resolved",
+                        "--by",
+                        "reviewer-1",
+                        "--note",
+                        "watched the replay",
+                        "--evidence",
+                        "trajectory:c2-noteblock",
+                    ]
+                )
+                self.assertEqual(code, 0)
+                reviews, problems = cs.load_reviews(run_dir / cs.REVIEW_FILE)
+                self.assertEqual(problems, [])
+                self.assertEqual(reviews["machine_operated.causality"]["by"], "reviewer-1")
+                records = cs.read_jsonl(run_dir / cs.TRAJECTORY_FILE)
+                marks = [r for r in records if r.get("record") == "mark" and r.get("name") == "review"]
+                self.assertEqual(len(marks), 1)
+                self.assertEqual(marks[0]["actor"], "reviewer")
+                validate_code = run_trace.main(["validate", "--run-dir", str(run_dir)])
+            self.assertEqual(validate_code, 0)
+
+    def test_resolved_review_without_reviewer_is_invalid(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_trace.main(["init", "--run-dir", str(run_dir), "--run-id", "r", "--task-text", "t"])
+            (run_dir / cs.REVIEW_FILE).write_text(
+                json.dumps({"id": "machine_operated.causality", "status": "resolved"}) + "\n",
+                encoding="utf-8",
+                newline="\n",
+            )
             with contextlib.redirect_stdout(io.StringIO()):
                 code = run_trace.main(["validate", "--run-dir", str(run_dir)])
             self.assertEqual(code, 1)

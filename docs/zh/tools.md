@@ -80,8 +80,8 @@ mc-agent-loop/             智能体 loop 与它的后端
 | `game_cmd.py` | 执行一条游戏命令并打印它产生的反馈 |
 | `mcp_probe.py` | 像智能体一样调用某一个 MCP 工具 |
 | `harness_preflight.py` | 检查固定的 Harness/model 契约：终端、文件、源码获取、JDK 构建、bridge CLI/MCP、保留端口与真实实验室，证据全部带哈希 |
-| `run_trace.py` | 开启一次冷启动运行，快照智能体可见的文档/Skill，并记录工具轨迹（调用、返回、阶段、产物、pi 会话导入） |
-| `run_audit.py` | 对照五个必要事实判定一次运行（`machine_operated`、`logger_armed_before_activation`、`transient_outputs_captured`、`agent_read_log`、`answer_correct`），附证据引用与失败分类 |
+| `run_trace.py` | 开启一次冷启动运行，快照智能体可见的文档/Skill，并记录工具轨迹（调用、返回、阶段、产物、pi 会话导入、显式审查结论） |
+| `run_audit.py` | 对照五个必要事实判定一次运行（`machine_operated`、`logger_armed_before_activation`、`transient_outputs_captured`、`agent_read_log`、`answer_correct`），附证据引用、必须审查项与失败分类 |
 
 例子：
 
@@ -101,6 +101,8 @@ python tools/harness_preflight.py run --config examples/coldstart/harness-pi.jso
 python tools/run_trace.py init --run-dir labs/coldstart/run-01 \
     --task-file examples/coldstart/task-minecart-rom.md --harness pi --model <model>
 python tools/run_trace.py import-pi --run-dir labs/coldstart/run-01 --session "$PI_SESSION_FILE"
+python tools/run_trace.py review --run-dir labs/coldstart/run-01 \
+    --id machine_operated.causality --status resolved --by <审查者>
 python tools/run_audit.py run --run-dir labs/coldstart/run-01
 ```
 

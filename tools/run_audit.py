@@ -67,6 +67,22 @@ def declared_or_override(
     return cs.load_declared_jsonl(run_dir, declared, name)
 
 
+def load_review_records(run_dir: Path, evidence: dict[str, Any]) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Explicit review resolutions, declared or at the canonical run path."""
+    declared = evidence.get("review")
+    if declared:
+        path = cs.resolve_evidence(run_dir, declared)
+        if path is None or not path.is_file():
+            return {}, [f"review: file not found: {path}"]
+        problems: list[str] = []
+        expected = declared.get("sha256")
+        if expected and cs.sha256_file(path) != expected:
+            problems.append("review: sha256 mismatch on reviews.jsonl")
+        reviews, more = cs.load_reviews(path)
+        return reviews, problems + more
+    return cs.load_reviews(run_dir / cs.REVIEW_FILE)
+
+
 def load_agent_logger(run_dir: Path, declared: dict[str, Any] | None) -> tuple[list[dict[str, Any]], list[str]]:
     """Prefer a normalized view but verify it against the raw logger bytes."""
     if not declared:
@@ -191,6 +207,9 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
         "agent_read_log": cs.flag_agent_read_log(logger_events, trajectory, evidence.get("agent_logger")),
         "answer_correct": cs.flag_answer_correct(answer, oracle, oracle_problems),
     }
+    reviews, review_problems = load_review_records(run_dir, evidence)
+    infra.extend(review_problems)
+    cs.apply_reviews(flags, reviews)
 
     overall, failure_class = cs.classify(flags, infra, fixture)
     if overall == "PASS" and pending:
@@ -216,6 +235,7 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             "oracle": str((evidence.get("oracle") or {}).get("path") or "(none)"),
             "fixture": str((evidence.get("fixture") or {}).get("path") or "(none)"),
             "restore": str((evidence.get("restore") or {}).get("path") or "(none)"),
+            "review": str((evidence.get("review") or {}).get("path") or cs.REVIEW_FILE),
         },
     }
     code = {"PASS": 0, "FAIL": 1, "PENDING": 2}[overall]
@@ -227,7 +247,7 @@ def cmd_explain(args: argparse.Namespace) -> int:
     run = cs.read_json(run_dir / cs.RUN_FILE)
     evidence = load_evidence(run_dir, run)
     cs.say(f"run {run.get('run_id')} task sha256 {run.get('task', {}).get('sha256')}")
-    for name in ("test_mod", "agent_logger", "answer", "oracle", "fixture", "restore", "preflight"):
+    for name in ("test_mod", "agent_logger", "answer", "oracle", "fixture", "restore", "preflight", "review"):
         declared = evidence.get(name)
         if not declared:
             cs.say(f"  {name}: (not declared)")

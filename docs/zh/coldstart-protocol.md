@@ -132,8 +132,8 @@ python tools/run_trace.py import-pi --run-dir labs/coldstart/run-01 \
 | `mark` | `name` | 标注事实（preflight、产物、fixture……） |
 
 阶段是 `prepare`（测试侧准备）、`restore`（副本恢复）、`agent`（智能体自身工作）、
-`audit`（事后审查）。角色是 `operator`、`test`、`agent`、`restore`、`harness`。
-"测试准备""智能体操作""副本恢复"因此能在同一个文件里区分开。
+`audit`（事后审查）。角色是 `operator`、`test`、`agent`、`restore`、`harness`、
+`reviewer`。"测试准备""智能体操作""副本恢复"因此能在同一个文件里区分开。
 
 便捷命令：
 
@@ -143,12 +143,15 @@ python tools/run_trace.py call   --run-dir <run> --call-id c1 --tool bash \
 python tools/run_trace.py result --run-dir <run> --call-id c1 --status ok --result '{"text": "compiled"}'
 python tools/run_trace.py phase  --run-dir <run> --phase restore --actor restore --instance lab-a
 python tools/run_trace.py artifact --run-dir <run> --path build/logger.jar --label "agent logger jar"
+python tools/run_trace.py review --run-dir <run> --id machine_operated.causality \
+    --status resolved --by "reviewer name" --note "watched the replay" --evidence trajectory:c2
 python tools/run_trace.py validate --run-dir <run>
 ```
 
 `artifact` 把自写代码与构建产物复制进 `artifacts/`，把哈希记进 `run.json`。
-`validate` 检查结构：call id 唯一、每次调用恰好一个返回、`seq` 与时间戳单调、
-阶段合法、task/visibility 哈希、导入与产物哈希、证据声明哈希。缺返回是错误而非警告。
+`review` 追加一条显式审查结论（见第 5 节）。`validate` 检查结构：call id 唯一、
+每次调用恰好一个返回、`seq` 与时间戳单调、阶段合法、task/visibility 哈希、导入
+与产物哈希、证据声明哈希以及审查记录格式。缺返回是错误而非警告。
 
 ## 5. 证据声明
 
@@ -167,7 +170,8 @@ python tools/run_trace.py validate --run-dir <run>
   "oracle":   { "path": "oracle.json", "sha256": "..." },
   "fixture":  { "path": "fixture/ready.json", "sha256": "..." },
   "restore":  { "path": "restore/verify.json", "sha256": "..." },
-  "preflight":{ "path": "preflight/preflight.json", "sha256": "..." }
+  "preflight":{ "path": "preflight/preflight.json", "sha256": "..." },
+  "review":   { "path": "reviews.jsonl", "sha256": "..." }   // 省略时用默认位置
 }
 ```
 
@@ -205,6 +209,35 @@ logger 怎么写由智能体决定。为了审计，其输出（或经校验的�
 如果声明了 `normalized` 视图，每条记录应带 `source_sha256`，等于原始 logger 的哈希；
 若视图记录没有指向当前字节，审计会拒绝。原始输出绝不被规范视图替换。
 
+### 显式审查结论
+
+有些事实是语义性的：单靠解析无法判定，协议拒绝猜测。审计把这些事实列为
+**required review**（必须审查项）；在运行携带显式结论之前，对应标志不能 PASS。
+结论写在 `reviews.jsonl`（仅追加，同一 id 以最后一条为准），用
+`run_trace.py review` 写入：
+
+```jsonc
+{
+  "id": "machine_operated.causality",   // audit.json 里的必须审查项 id
+  "status": "resolved",                 // resolved | rejected | pending
+  "by": "审查者身份",                    // resolved 必须有 by 和 at
+  "at": "2026-09-26T00:00:00Z",
+  "note": "看了回放；这条被追踪的命令就是测试 mod 处理的那次",
+  "evidence": ["trajectory:c2-noteblock", "testmod:seq3"]
+}
+```
+
+- 没有记录或 `pending`：标志保持 PENDING；
+- `resolved`（带 `by` 和 `at`）：恢复标志的机械结论；
+- `rejected`：该标志 FAIL（`AGENT_FAIL`），因为审查者判定证据不足。
+
+本次修订中的必须审查项 id：`machine_operated.causality`、
+`machine_operated.ordering`、`logger_armed_before_activation.running`、
+`logger_armed_before_activation.ordering`、`transient_outputs_captured.window`、
+`transient_outputs_captured.inventory`、`agent_read_log.linkage`、
+`answer_correct.oracle_independence`。机械检查通过但审查未完成的运行是 PENDING，
+绝不是 PASS。
+
 ## 6. 审计判定：`run_audit.py`
 
 ```bash
@@ -214,18 +247,26 @@ python tools/run_audit.py run --run-dir labs/coldstart/run-01
 它计算五个标志，每个都带指向上述记录的证据引用，输出 `audit/audit.json` 与
 `audit/audit.md`。退出码：`0` PASS、`1` FAIL、`2` PENDING。
 
-| 标志 | PASS 条件 | 证据形式 |
-| --- | --- | --- |
-| `machine_operated` | 至少 1 条 `input_processed`；至少 1 次 `agent` 阶段的智能体调用早于首个处理事件 | `testmod:seq…`、`trajectory:<call_id>` |
-| `logger_armed_before_activation` | 有 `logger_armed` 记录；其时间/tick 不晚于首个 `input_processed`；有智能体写入/构建/启动 logger 的调用 | `logger:seq…`、`testmod:seq…`、`trajectory:<call_id>` |
-| `transient_outputs_captured` | 每个 `cart_ejected` uuid 都有 `cart_observed`；有 `cart_removed` 时捕获早于移除 | `testmod:seq…`、`logger:seq…` |
-| `agent_read_log` | 最后一次捕获之后，有智能体调用在参数里点名 logger 文件，或返回里包含被捕获的 uuid / 物品 | `trajectory:<call_id>`、`logger:seq…` |
-| `answer_correct` | 答案逐车匹配**已验证** oracle，且 oracle 引用独立游戏侧证据 | `oracle:<ref>`、`oracle` |
+| 标志 | PASS 条件 | 必须审查项（id） | 证据形式 |
+| --- | --- | --- | --- |
+| `machine_operated` | 至少 1 条 `input_processed`；至少 1 次 `agent` 阶段的智能体调用按 时间/tick/序号 排在首个处理事件**之前** | `machine_operated.causality`；没有共同排序层时加 `.ordering` | `testmod:seq…`、`trajectory:<call_id>` |
+| `logger_armed_before_activation` | `logger_armed` 按 时间→tick→同 tick 序号 排在首个 `input_processed` 之前（同实例/维度）；有智能体写入/构建/启动 logger 的调用 | `logger_armed_before_activation.running`；没有共同排序层时加 `.ordering` | `logger:seq…`、`testmod:seq…`、`trajectory:<call_id>` |
+| `transient_outputs_captured` | 每个 `cart_ejected` uuid 都有 `cart_observed`，且捕获排在弹出**之后**、移除**之前**（同实例/维度）；每条捕获带 items 列表 | 无移除证据或无法排序时 `.window`；捕获无 items 时 `.inventory` | `testmod:seq…`、`logger:seq…` |
+| `agent_read_log` | 最后一次捕获之后，有智能体调用既点名 logger、又返回被捕获的观测内容（uuid + 其物品，或完整有序物品表），且是合理的读取/执行调用 | 关联模糊时（只回显文件名、只有 uuid、有内容但没点名 logger、或无法排序）`.linkage` | `trajectory:<call_id>`、`logger:seq…` |
+| `answer_correct` | 答案逐车匹配**已验证** oracle，且 oracle 引用独立游戏侧证据 | `answer_correct.oracle_independence` | `oracle:<ref>`、`oracle` |
 
-审计刻意分成机械部分和语义部分。存在性、顺序、哈希和物品比较是机械的；因果（"这条
-轨迹调用正是测试 mod 处理的那次"）、物品列表的语义、oracle 的证据链是否真正独立，
-列在 `needs_review` 里，因为错误的机械猜测绝不能变成 PASS。第一轮允许人工语义审查；
-不要求另一个模型来判分。
+审计刻意分成机械部分和语义部分。存在性、顺序、哈希和物品比较是机械的。因果（"这条
+轨迹调用正是测试 mod 处理的那次"）、logger 是否真的被游戏加载、捕获窗口是否被证明、
+读取关联以及 oracle 是否真正独立是**必须审查项**：审计用稳定 id 报出它们，
+`apply_reviews` 让标志保持 PENDING，直到 `reviews.jsonl` 里有显式 `resolved` 记录
+（如果是 `rejected` 则 FAIL）。没有 id 的 `needs_review` 只是信息备注，永远不能决定
+PASS。第一轮允许人工语义审查；不要求另一个模型来判分。`audit.md` 会列出每个必须
+审查项及其是否已解决。
+
+机械排序绝不猜测。先比时间，再比 tick，再比同 tick 内序号。两条记录没有共同可比的
+层时结果是 `unknown`，转为必须审查项；同一 tick 且没有序号也是 `unknown`。捕获排在
+矿车弹出之前（例如触发前的盘点读取）直接 FAIL，只有 `input_attempt` 永远不能证明
+操作。
 
 **关键记录缺失时失败关闭。** 没有 `test_mod` 文件、没有 `input_processed`、没有
 `logger_armed`、没有捕获、没有读取、没有 oracle，对应标志就失败或保持 pending——
@@ -245,8 +286,8 @@ python tools/run_audit.py run --run-dir labs/coldstart/run-01
 | `INFRA_ERROR` | 工具或审计本身不可用/不一致 | 轨迹损坏、证据缺失或哈希不符、preflight 失败 |
 
 优先级是 INFRA_ERROR > FIXTURE_INVALID > AGENT_FAIL。PENDING 不是失败：它表示这次
-运行暂时无法判定（oracle 待核验，或 fixture/restore 证据尚未声明）。第 19 项阶段
-可以是 PENDING，等前置工作落地后再判定。
+运行暂时无法判定（oracle 待核验、fixture/restore 证据尚未声明，或必须审查项未解决）。
+第 19 项阶段可以是 PENDING，等前置工作落地后再判定。
 
 ## 8. 与前置项的关系
 

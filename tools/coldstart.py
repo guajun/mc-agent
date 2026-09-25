@@ -45,8 +45,10 @@ SCHEMA_ANSWER = "mc-agent-coldstart-answer/1"
 SCHEMA_ORACLE = "mc-agent-coldstart-oracle/1"
 
 PHASES = ("prepare", "restore", "agent", "audit")
-ACTORS = ("operator", "test", "agent", "restore", "harness")
+ACTORS = ("operator", "test", "agent", "restore", "harness", "reviewer")
 RESULT_STATUSES = ("ok", "error", "open")
+REVIEW_STATUSES = ("pending", "resolved", "rejected")
+REVIEW_FILE = "reviews.jsonl"
 
 RUN_FILE = "run.json"
 TRAJECTORY_FILE = "trajectory.jsonl"
@@ -443,6 +445,11 @@ class FlagResult:
         self.evidence: list[str] = []
         self.missing: list[str] = []
         self.needs_review: list[str] = []
+        self.required_review: list[dict[str, str]] = []
+        self.review_resolutions: list[dict[str, Any]] = []
+        self.review_gated = False
+        self.mechanical_status = "FAIL"
+        self.mechanical_summary = ""
 
     def ok(self, summary: str) -> "FlagResult":
         self.status = "PASS"
@@ -468,7 +475,26 @@ class FlagResult:
         return self
 
     def review(self, *notes: str) -> "FlagResult":
+        """Informational note; it does not block PASS."""
         self.needs_review.extend(notes)
+        return self
+
+    def require_review(self, review_id: str, question: str) -> "FlagResult":
+        """A semantic fact that must be explicitly resolved before PASS.
+
+        The flag immediately drops out of PASS while the review is unresolved;
+        ``apply_reviews`` restores the mechanical outcome only when the run's
+        review record carries a ``resolved`` entry for the id.
+        """
+        if review_id not in {item["id"] for item in self.required_review}:
+            self.required_review.append({"id": review_id, "question": question})
+        if self.status == "PASS":
+            if not self.review_gated:
+                self.review_gated = True
+                self.mechanical_status = self.status
+                self.mechanical_summary = self.summary
+            self.status = "PENDING"
+            self.summary = f"{self.mechanical_summary}; awaiting explicit review {review_id!r}"
         return self
 
     def ref(self, *refs: str) -> "FlagResult":
@@ -483,7 +509,75 @@ class FlagResult:
             "evidence": self.evidence,
             "missing": self.missing,
             "needs_review": self.needs_review,
+            "required_review": self.required_review,
+            "review_resolutions": self.review_resolutions,
         }
+
+
+def load_reviews(path: Path) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Load explicit review resolutions; the latest entry per id wins."""
+    reviews: dict[str, dict[str, Any]] = {}
+    problems: list[str] = []
+    if not path.exists():
+        return reviews, problems
+    try:
+        records = read_jsonl(path)
+    except ValueError as error:
+        return reviews, [str(error)]
+    for number, record in enumerate(records, start=1):
+        review_id = record.get("id")
+        status = record.get("status")
+        if not review_id or status not in REVIEW_STATUSES:
+            problems.append(f"{path.name} line {number}: id and status ({REVIEW_STATUSES}) are required")
+            continue
+        if status == "resolved" and not (record.get("by") and record.get("at")):
+            problems.append(f"{path.name} line {number}: a resolved review needs by and at")
+            continue
+        reviews[str(review_id)] = dict(record)
+    return reviews, problems
+
+
+def apply_reviews(flags: Mapping[str, "FlagResult"], reviews: Mapping[str, dict[str, Any]]) -> None:
+    """Resolve or reject the required reviews of mechanically-satisfied flags.
+
+    A required review with no entry or a ``pending`` entry keeps the flag
+    PENDING; a ``rejected`` entry fails it; a ``resolved`` entry must carry the
+    reviewer and timestamp.  When every required review is resolved, the flag's
+    mechanical outcome is restored - this is the only path that turns a
+    review-gated flag back into PASS.  An unresolved ``needs_review`` can
+    therefore never be silently successful.
+    """
+    for flag in flags.values():
+        if not flag.required_review:
+            continue
+        unresolved: list[str] = []
+        rejected: list[str] = []
+        for item in flag.required_review:
+            review_id = item["id"]
+            record = reviews.get(review_id)
+            if record is None or record.get("status") == "pending":
+                unresolved.append(review_id)
+                continue
+            if record.get("status") == "rejected":
+                rejected.append(review_id)
+                continue
+            flag.review_resolutions.append(
+                {key: record.get(key) for key in ("id", "status", "by", "at", "note", "evidence")}
+            )
+        if rejected:
+            flag.fail(f"review(s) rejected: {', '.join(rejected)}")
+            continue
+        if unresolved:
+            if flag.status != "FAIL":
+                flag.pending(
+                    f"mechanically satisfied but awaiting explicit review: {', '.join(unresolved)}",
+                    unresolved,
+                )
+            continue
+        if flag.review_gated and flag.status == "PENDING":
+            flag.status = flag.mechanical_status
+            flag.summary = flag.mechanical_summary
+            flag.missing = [item for item in flag.missing if item not in {r["id"] for r in flag.required_review}]
 
 
 def event_name(record: Mapping[str, Any]) -> str:
@@ -522,6 +616,71 @@ def call_text(call: Mapping[str, Any], result: Mapping[str, Any] | None) -> str:
     return json.dumps(data, ensure_ascii=False, default=str)
 
 
+def scope_conflicts(a: Mapping[str, Any], b: Mapping[str, Any], fields: Sequence[str] = ("instance", "dimension")) -> list[str]:
+    """Fields both records specify but disagree on."""
+    conflicts: list[str] = []
+    for field in fields:
+        left = get_field(a, field)
+        right = get_field(b, field)
+        if left is not None and right is not None and str(left) != str(right):
+            conflicts.append(field)
+    return conflicts
+
+
+def compare_order(a: Mapping[str, Any], b: Mapping[str, Any]) -> str:
+    """Order two records as 'before', 'after' or 'unknown'.
+
+    Times decide first, then ticks, then the intra-tick sequence.  If no layer
+    is present on both sides, the answer is 'unknown' - which must never be
+    treated as 'before'.  Two records at the same tick with no sequence are
+    'unknown' as well: the protocol must not guess.
+    """
+    time_a, time_b = as_time(a.get("at")), as_time(b.get("at"))
+    tick_a, tick_b = as_int(get_field(a, "tick")), as_int(get_field(b, "tick"))
+    if time_a is not None and time_b is not None:
+        if time_a < time_b:
+            return "before"
+        if time_a > time_b:
+            return "after"
+    if tick_a is not None and tick_b is not None:
+        if tick_a < tick_b:
+            return "before"
+        if tick_a > tick_b:
+            return "after"
+    same_instant = (time_a is not None and time_b is not None and time_a == time_b) or (
+        tick_a is not None and tick_b is not None and tick_a == tick_b
+    )
+    if same_instant:
+        seq_a, seq_b = as_int(get_field(a, "seq")), as_int(get_field(b, "seq"))
+        if seq_a is not None and seq_b is not None:
+            if seq_a < seq_b:
+                return "before"
+            if seq_a > seq_b:
+                return "after"
+    return "unknown"
+
+
+def order_key(record: Mapping[str, Any]) -> tuple[float, int, int]:
+    time_value = as_time(get_field(record, "at"))
+    tick_value = as_int(get_field(record, "tick"))
+    seq_value = as_int(get_field(record, "seq"))
+    return (
+        time_value if time_value is not None else float("inf"),
+        tick_value if tick_value is not None else 2 ** 62,
+        seq_value if seq_value is not None else 2 ** 62,
+    )
+
+
+def first_by_order(records: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    """The earliest record by time/tick/seq, or the first one when unordered."""
+    return min(records, key=order_key) if records else None
+
+
+def last_by_order(records: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+    """The latest record by time/tick/seq, or the last one when unordered."""
+    return max(records, key=order_key) if records else None
+
+
 def flag_machine_operated(
     test_events: Sequence[Mapping[str, Any]], trajectory: Sequence[Mapping[str, Any]]
 ) -> FlagResult:
@@ -544,20 +703,46 @@ def flag_machine_operated(
             f"{len(processed)} server-side processing event(s) exist but the trajectory has no agent call in the agent phase",
             ["trajectory:agent-call"],
         )
-    first = min(processed, key=lambda r: as_time(get_field(r, "at")) or 0.0)
-    first_at = as_time(get_field(first, "at"))
-    before = [c for c in agent if first_at is None or (as_time(c.get("at")) or 0.0) <= first_at + 1e-6]
+    first = first_by_order(processed)
+    assert first is not None
+    orders = [(call, compare_order(call, first)) for call in agent]
+    before = [(call, order) for call, order in orders if order == "before"]
+    unknown = [call for call, order in orders if order == "unknown"]
     if not before:
+        if unknown:
+            result.ok(
+                f"{len(processed)} processing event(s) and {len(unknown)} agent call(s) exist, "
+                "but no call can be ordered before the first processing event"
+            )
+            result.ref(call_ref(str(unknown[-1].get("call_id"))), event_ref("testmod", first))
+            result.require_review(
+                "machine_operated.ordering",
+                "provide comparable time/tick evidence that an agent call preceded the first machine processing",
+            )
+            result.require_review(
+                "machine_operated.causality",
+                "confirm the traced call is what the test mod processed, not a coincidental call in the same window",
+            )
+            return result
         return result.fail(
             "agent calls exist, but none precedes the first server-side processing event"
         )
-    witness = before[-1]
+    witness = before[-1][0]
+    conflicts = scope_conflicts(witness, first)
+    if conflicts:
+        return result.fail(
+            "the traced call and the server processing event disagree on " + ", ".join(conflicts),
+            ["trajectory:scope"],
+        )
     result.ok(
         f"{len(processed)} actual processing event(s), {len(attempts)} attempt(s); "
         f"agent call {witness.get('call_id')!r} precedes the first processing event"
     )
     result.ref(event_ref("testmod", first), call_ref(str(witness.get("call_id"))))
-    result.review("semantic cause is not mechanical: confirm the traced call is what the test mod observed")
+    result.require_review(
+        "machine_operated.causality",
+        "confirm the traced call is what the test mod processed, not a coincidental call in the same window",
+    )
     if attempts:
         result.review(f"{len(attempts)} input attempt(s) exist; attempts alone must not be accepted as operation")
     return result
@@ -575,25 +760,24 @@ def flag_logger_armed(
         return result.fail("the agent logger has no logger_armed record", ["logger:logger_armed"])
     if not processed:
         return result.fail("no server-side processing event to order the logger against", ["testmod:input_processed"])
-    first_armed = min(armed, key=lambda r: as_time(get_field(r, "at")) or 0.0)
-    first_processed = min(processed, key=lambda r: as_time(get_field(r, "at")) or 0.0)
-    armed_at = as_time(get_field(first_armed, "at"))
-    armed_tick = as_int(get_field(first_armed, "tick"))
-    processed_at = as_time(get_field(first_processed, "at"))
-    processed_tick = as_int(get_field(first_processed, "tick"))
-    if armed_at is not None and processed_at is not None and armed_at > processed_at + 1e-6:
+    first_armed = first_by_order(armed)
+    first_processed = first_by_order(processed)
+    assert first_armed is not None and first_processed is not None
+    conflicts = scope_conflicts(first_armed, first_processed)
+    if conflicts:
         return result.fail(
-            f"logger was armed at {armed_at} after the first processing event at {processed_at}"
+            "the logger_armed record and the first input_processed record disagree on " + ", ".join(conflicts),
+            ["trajectory:scope"],
         )
-    if armed_tick is not None and processed_tick is not None and armed_tick > processed_tick:
-        return result.fail(f"logger armed at tick {armed_tick}, after processing at tick {processed_tick}")
+    order = compare_order(first_armed, first_processed)
+    if order == "after":
+        return result.fail(
+            "logger_armed is ordered after the first input_processed event (time/tick/sequence)"
+        )
     arm_calls = [
         c
         for c in agent_calls(trajectory)
-        if any(
-            token in call_text(c, None).lower()
-            for token in ("log", "logger", "trace", "record")
-        )
+        if any(token in call_text(c, None).lower() for token in ("log", "logger", "trace", "record"))
     ]
     if not arm_calls:
         return result.fail(
@@ -601,13 +785,38 @@ def flag_logger_armed(
             ["trajectory:logger-arm-call"],
         )
     witness = arm_calls[0]
-    result.ok(
-        f"logger armed at {armed_at if armed_at is not None else 'tick ' + str(armed_tick)} "
-        f"before first processing at {processed_at if processed_at is not None else 'tick ' + str(processed_tick)}"
-    )
+    call_order = compare_order(witness, first_armed)
+    if call_order == "after":
+        return result.fail(
+            "the only logger-related agent call postdates the logger_armed record, so no arming action is evidenced"
+        )
+    if order == "before":
+        armed_tick = as_int(get_field(first_armed, "tick"))
+        processed_tick = as_int(get_field(first_processed, "tick"))
+        if armed_tick is not None and processed_tick is not None:
+            result.ok(
+                f"logger_armed is ordered before the first input_processed event "
+                f"(tick {armed_tick} < {processed_tick})"
+            )
+        else:
+            result.ok("logger_armed is ordered before the first input_processed event by timestamp")
+    else:
+        result.ok(
+            "logger_armed and input_processed both exist, but no shared time/tick/sequence orders them"
+        )
+        result.require_review(
+            "logger_armed_before_activation.ordering",
+            "provide comparable time/tick/sequence evidence that the logger was armed before the first machine processing",
+        )
     result.ref(event_ref("logger", first_armed), event_ref("testmod", first_processed), call_ref(str(witness.get("call_id"))))
-    result.review("confirm from game-side load/restart evidence that the armed logger was actually running, not only written")
+    result.require_review(
+        "logger_armed_before_activation.running",
+        "confirm from game-side load/restart evidence that the armed logger was actually running, not only written",
+    )
     return result
+
+
+_MISSING = object()
 
 
 def flag_transient_captured(
@@ -630,7 +839,11 @@ def flag_transient_captured(
         if uuid is not None:
             observed_by_uuid.setdefault(str(uuid), []).append(record)
     missing: list[str] = []
+    early: list[str] = []
     late: list[str] = []
+    unscoped: list[str] = []
+    window_review: list[str] = []
+    inventory_review: list[str] = []
     for eject in ejected:
         uuid = get_field(eject, "uuid")
         if uuid is None:
@@ -640,28 +853,80 @@ def flag_transient_captured(
         if not candidates:
             missing.append(f"cart {uuid}")
             continue
+        capture = first_by_order(candidates)
+        assert capture is not None
+        conflicts = scope_conflicts(capture, eject)
+        if conflicts:
+            unscoped.append(f"cart {uuid} ({', '.join(conflicts)})")
+            continue
+        ejection_order = compare_order(capture, eject)
+        if ejection_order == "before":
+            early.append(f"cart {uuid}")
+            continue
+        if ejection_order == "unknown":
+            window_review.append(str(uuid))
         removal = removed.get(str(uuid))
-        removal_at = as_time(get_field(removal, "at")) if removal else None
-        removal_tick = as_int(get_field(removal, "tick")) if removal else None
-        captured = candidates[0]
-        captured_at = as_time(get_field(captured, "at"))
-        captured_tick = as_int(get_field(captured, "tick"))
-        if removal_at is not None and captured_at is not None and captured_at > removal_at + 1e-6:
-            late.append(f"cart {uuid}")
-        elif removal_tick is not None and captured_tick is not None and captured_tick > removal_tick:
-            late.append(f"cart {uuid}")
+        if removal is None:
+            window_review.append(str(uuid))
+        else:
+            conflicts = scope_conflicts(capture, removal)
+            if conflicts:
+                unscoped.append(f"cart {uuid} removal ({', '.join(conflicts)})")
+                continue
+            removal_order = compare_order(capture, removal)
+            if removal_order == "after":
+                late.append(f"cart {uuid}")
+            elif removal_order == "unknown":
+                window_review.append(str(uuid))
+        if capture.get("items", capture.get("inventory", _MISSING)) is _MISSING:
+            inventory_review.append(str(uuid))
     if missing:
         return result.fail(f"no agent capture for ejected cart(s): {', '.join(missing)}", missing)
+    if unscoped:
+        return result.fail(
+            "capture records disagree with the ejection on instance/dimension: " + ", ".join(unscoped),
+            ["trajectory:scope"],
+        )
+    if early:
+        return result.fail(
+            "agent captured cart(s) before they were ejected - a pre-activation inventory read is not a transient capture: "
+            + ", ".join(early),
+            early,
+        )
     if late:
         return result.fail(f"agent captured cart(s) only after they were removed: {', '.join(late)}", late)
     result.ok(f"{len(observed)} capture(s) cover {len(ejected)} ejected cart(s)")
     for eject in ejected[:8]:
         uuid = str(get_field(eject, "uuid"))
         result.ref(event_ref("testmod", eject), event_ref("logger", observed_by_uuid[uuid][0]))
-    if not removed:
-        result.review("the test side recorded no cart_removed events; capture-before-removal is not mechanically provable from this run")
-    result.review("items in each captured cart still need comparison against the server-side entity NBT")
+    if window_review:
+        unique = sorted(set(window_review))
+        result.require_review(
+            "transient_outputs_captured.window",
+            "prove from removal or equivalent evidence that the capture preceded disappearance for cart(s): "
+            + ", ".join(unique),
+        )
+    if inventory_review:
+        result.require_review(
+            "transient_outputs_captured.inventory",
+            "captured cart(s) carry no items list, so inventory/order cannot be checked: "
+            + ", ".join(sorted(set(inventory_review))),
+        )
+    result.review("items and order still need comparison against the server-side entity NBT (see answer_correct/oracle)")
     return result
+
+
+READ_TOOLS = ("read", "cat", "type", "get-content", "head", "tail", "less", "more", "grep", "findstr")
+
+
+def token_in_text(token: str, text: str) -> bool:
+    """Match a normalized item token against raw logger text (prefix optional)."""
+    token = token.lower()
+    if token in text:
+        return True
+    if token.startswith("minecraft:"):
+        return token.split(":", 1)[1] in text
+    return False
 
 
 def flag_agent_read_log(
@@ -673,48 +938,77 @@ def flag_agent_read_log(
     observed = [r for r in logger_events if event_name(r) == "cart_observed"]
     if not observed:
         return result.fail("the agent logger has no cart_observed records to read", ["logger:cart_observed"])
-    captures = sorted(observed, key=lambda r: as_time(get_field(r, "at")) or 0.0)
-    last_capture_at = as_time(get_field(captures[-1], "at")) or 0.0
-    uuids = {str(get_field(r, "uuid")) for r in observed if get_field(r, "uuid") is not None}
-    item_tokens = {normalize_item(item) for r in observed for item in normalize_items(r.get("items") or r.get("inventory"))}
-    item_tokens.discard("")
+    latest_capture = last_by_order(observed)
+    assert latest_capture is not None
+    uuids = [str(uuid) for uuid in (get_field(r, "uuid") for r in observed) if uuid is not None]
+    items_by_uuid: dict[str, list[str]] = {}
+    for record in observed:
+        uuid = get_field(record, "uuid")
+        if uuid is None:
+            continue
+        tokens = [token for token in normalize_items(record.get("items") or record.get("inventory")) if token]
+        items_by_uuid.setdefault(str(uuid), []).extend(tokens)
+    logger_paths = {
+        Path(str((logger_declared or {}).get(key) or "")).name.lower()
+        for key in ("path", "normalized")
+    }
+    logger_paths.discard("")
     results = paired_results(trajectory)
-    logger_name = Path(str((logger_declared or {}).get("path") or "log")).name.lower()
-    strong: list[tuple[dict[str, Any], dict[str, Any]]] = []
-    medium: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    strong: list[tuple[dict[str, Any], dict[str, Any], str]] = []
+    ambiguous: list[tuple[dict[str, Any], dict[str, Any], str]] = []
     for call in agent_calls(trajectory):
         if call.get("record") != "call":
-            continue
-        at = as_time(call.get("at")) or 0.0
-        if at < last_capture_at:
             continue
         result_record = results.get(str(call.get("call_id")))
         if result_record is None or result_record.get("status") != "ok":
             continue
-        haystack = call_text(call, result_record)
-        args_only = json.dumps(call.get("arguments"), ensure_ascii=False, default=str).lower()
-        if logger_name and logger_name in args_only:
-            strong.append((call, result_record))
+        order = compare_order(call, latest_capture)
+        if order == "before":
             continue
-        if uuids and any(uuid in haystack for uuid in uuids):
-            strong.append((call, result_record))
+        args_text = json.dumps(call.get("arguments"), ensure_ascii=False, default=str).lower()
+        result_text = json.dumps(result_record.get("result"), ensure_ascii=False, default=str)
+        result_lower = result_text.lower()
+        mentions_logger = any(path in args_text for path in logger_paths) if logger_paths else False
+        uuid_hits = [uuid for uuid in uuids if uuid in result_text]
+        content_hit = False
+        for uuid in uuid_hits:
+            tokens = items_by_uuid.get(uuid, [])
+            if tokens and any(token_in_text(token, result_lower) for token in tokens):
+                content_hit = True
+                break
+        if not content_hit:
+            for uuid, tokens in items_by_uuid.items():
+                if tokens and all(token_in_text(token, result_lower) for token in tokens):
+                    content_hit = True
+                    break
+        tool_name = str(call.get("tool") or "").lower()
+        plausible_reader = mentions_logger or any(name in tool_name for name in READ_TOOLS)
+        relevant = mentions_logger or content_hit or bool(uuid_hits)
+        if not relevant:
             continue
-        if item_tokens and sum(1 for token in item_tokens if token in haystack) >= min(2, len(item_tokens)):
-            medium.append((call, result_record))
+        if content_hit and plausible_reader and order == "after":
+            strong.append((call, result_record, "content linkage to the agent logger after the last capture"))
+        elif order == "unknown":
+            ambiguous.append((call, result_record, "cannot be ordered after the last capture"))
+        elif content_hit and not mentions_logger:
+            ambiguous.append((call, result_record, "matching content but the call does not reference the logger"))
+        elif mentions_logger and not content_hit:
+            ambiguous.append((call, result_record, "the logger is named but the result carries no captured observation content"))
+        elif uuid_hits:
+            ambiguous.append((call, result_record, "a cart uuid appears but no captured item content follows"))
     if strong:
-        call, _ = strong[0]
-        result.ok("the agent's own trajectory reads the logger output after capture")
-        result.ref(call_ref(str(call.get("call_id"))), event_ref("logger", captures[-1]))
+        call, _result_record, reason = strong[0]
+        result.ok(f"the agent's own trajectory read the logger output ({reason})")
+        result.ref(call_ref(str(call.get("call_id"))), event_ref("logger", latest_capture))
         return result
-    if medium:
-        call, _ = medium[0]
-        result.pending(
-            "a later agent call returned text that contains captured item names, "
-            "but no call was mechanically tied to the logger file or to a cart uuid",
-            ["trajectory:read-logger"],
+    if ambiguous:
+        call, _result_record, reason = ambiguous[0]
+        result.ok("a later agent call may read the logger output, but the evidence is ambiguous")
+        result.ref(call_ref(str(call.get("call_id"))), event_ref("logger", latest_capture))
+        result.require_review(
+            "agent_read_log.linkage",
+            f"confirm the agent itself read the logger output (candidate: {call.get('call_id')!r}; {reason})",
         )
-        result.ref(call_ref(str(call.get("call_id"))))
-        result.review("human review: confirm the returned text really came from the agent's own logger read")
         return result
     return result.fail(
         "no agent call after capture reads the logger output; test-side observation does not count",
@@ -774,7 +1068,10 @@ def flag_answer_correct(
         return result.fail("answer disagrees with the verified oracle: " + "; ".join(mismatches[:6]))
     result.ok(f"answer matches the verified oracle for {len(carts)} cart(s)")
     result.ref("oracle", *(f"oracle:{ref}" for ref in refs[:6]))
-    result.review("human review: the oracle's own evidence chain (fixture plus test mod) is independent of the answer")
+    result.require_review(
+        "answer_correct.oracle_independence",
+        "confirm the oracle's evidence chain (fixture plus test mod) is independent of the agent answer",
+    )
     return result
 
 
@@ -810,6 +1107,29 @@ def render_audit_markdown(report: Mapping[str, Any]) -> str:
         lines.append(
             f"| `{flag.get('flag')}` | {flag.get('status')} | {flag.get('summary')} | {evidence} |"
         )
+    gates: list[tuple[str, dict[str, Any]]] = [
+        (flag.get("flag", ""), item)
+        for flag in report.get("flags", [])
+        for item in flag.get("required_review", [])
+    ]
+    if gates:
+        lines += ["", "## Required review (must be resolved before PASS)", ""]
+        for flag_name, item in gates:
+            flag_report = next((flag for flag in report.get("flags", []) if flag.get("flag") == flag_name), {})
+            resolution = next(
+                (
+                    record
+                    for record in flag_report.get("review_resolutions", [])
+                    if record.get("id") == item.get("id")
+                ),
+                None,
+            )
+            state = (
+                f"resolved by {resolution.get('by')} at {resolution.get('at')}"
+                if resolution
+                else "unresolved"
+            )
+            lines.append(f"- `{item.get('id')}` ({flag_name}): {item.get('question')} - **{state}**")
     if report.get("infra_errors"):
         lines += ["", "## Infrastructure errors", ""] + [f"- {item}" for item in report["infra_errors"]]
     if report.get("fixture_errors"):
