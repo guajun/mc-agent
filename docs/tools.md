@@ -97,6 +97,8 @@ primitives above.
 | `fake_player.py` | spawn, drive, and query a Carpet fake player - the agent's body without a second client |
 | `game_cmd.py` | run a game command and print the feedback it produced |
 | `mcp_probe.py` | call one MCP tool against a running bridge, exactly as an agent would |
+| `stage1_evidence.py` | losslessly project #16 identity, #18 audit JSONL and #19 trajectory records into the gate schema; report every gap instead of inventing facts |
+| `stage1_integration.py` | reproducible two-lab generic integration on ports 27240-27249: build/deploy, restart isolation, same-size jar update, loud-failure probes, traces, bundle + gate verdict |
 | `stage1_gate.py` | fail-closed stage-one evidence gate for issue #14: validate a bundle of prerequisite artifacts, recompute hashes/order/source-world state, never pass on missing evidence |
 | `harness_preflight.py` | check the fixed harness/model contract: terminal, files, source fetch, JDK build, bridge CLI/MCP, reserved ports and a live lab, with hashed evidence |
 | `run_trace.py` | open a cold-start run, snapshot the documents/skills the agent can see, and record the tool trajectory (calls, results, phases, artifacts, pi session import, explicit review resolutions) |

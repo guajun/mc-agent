@@ -1,0 +1,222 @@
+{
+  "kind": "stage1-integration-summary",
+  "issue": "guajun/mc-agent#14",
+  "date": "2026-09-25T17:29:32Z",
+  "gateRepoHeadAtRun": "32aa245",
+  "runId": "rom13-integration-run-01",
+  "java": {
+    "path": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\java.exe",
+    "version": "openjdk version \"25.0.1\" 2025-10-21 LTS"
+  },
+  "jdk": {
+    "path": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon"
+  },
+  "interfaceModJar": {
+    "interface_jar": "F:\\mc-agent-worktrees\\rom13\\meta16\\labs\\_build\\mods\\mc-agent-interface-0.6.0.jar",
+    "interface_jar_sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+    "interface_commit": "3b93ceb137f8e05624d9d443356c0db78c4b4751",
+    "note": "read-only peer-built jar, hash-pinned to the #16 evidence"
+  },
+  "smokeMod": {
+    "v1": {
+      "sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+      "build": {
+        "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
+        "sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+        "size": 15177,
+        "version": "0.1.0",
+        "compression": "store",
+        "lab": "rom13-src",
+        "minecraft": "26.2",
+        "jdk": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon",
+        "javac": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\javac.exe",
+        "javacVersion": "javac 25.0.1",
+        "release": 25,
+        "serverJar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\versions\\26.2\\server-26.2.jar",
+        "serverJarSha256": "183c0499c5f855570ee487dd38e141a53f0121f83a0b07a3bac2d8b6698823e8",
+        "classpathEntries": 88,
+        "classpathSha256": "ad5e3d9c256abe1b5cd228bc08e97b9f99211b1397739796aa4e88a3fad2fd88",
+        "sources": [
+          {
+            "path": "src/main/java/dev/mcagent/smoke/SmokeMod.java",
+            "sha256": "86bfdbb4394490c77c97fcaa6f0ff288f8241bfdc31fed9b8c3e00147045f2bb"
+          },
+          {
+            "path": "src/main/resources/fabric.mod.json",
+            "sha256": "9a3e101b8716d91d45077d0f06968181559d2d1e7d2c77b8a8959b8dd0ef6f72"
+          }
+        ],
+        "builtAt": 1790357114.3770506
+      }
+    },
+    "v2": {
+      "sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+      "build": {
+        "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
+        "sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+        "size": 15177,
+        "version": "0.1.0",
+        "compression": "store",
+        "lab": "rom13-src",
+        "minecraft": "26.2",
+        "jdk": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon",
+        "javac": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\javac.exe",
+        "javacVersion": "javac 25.0.1",
+        "release": 25,
+        "serverJar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\versions\\26.2\\server-26.2.jar",
+        "serverJarSha256": "183c0499c5f855570ee487dd38e141a53f0121f83a0b07a3bac2d8b6698823e8",
+        "classpathEntries": 89,
+        "classpathSha256": "fd53d7f1f0827f0df7a400b783a8bcbef048ab06fc02b9afa89d8af5af1041ab",
+        "sources": [
+          {
+            "path": "src/main/java/dev/mcagent/smoke/SmokeMod.java",
+            "sha256": "d996cda1cf36657641263db1493f15d7e44101cd7646a762fdc426892edcc610"
+          },
+          {
+            "path": "src/main/resources/fabric.mod.json",
+            "sha256": "9a3e101b8716d91d45077d0f06968181559d2d1e7d2c77b8a8959b8dd0ef6f72"
+          }
+        ],
+        "builtAt": 1790357197.0543232
+      }
+    }
+  },
+  "jarUpdate": {
+    "old_sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+    "new_sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+    "old_bytes": 15177,
+    "new_bytes": 15177,
+    "same_size": true,
+    "loaded_new_marker": true
+  },
+  "probes": {
+    "build_errors_detected": true,
+    "load_failure_detected": true,
+    "missing_dependency_detected": true
+  },
+  "children": {
+    "src": {
+      "worldDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\world",
+      "sameWorldDir": true
+    },
+    "exp": {
+      "worldDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\world",
+      "sameWorldDir": true
+    }
+  },
+  "instances": [
+    "rom13-src",
+    "rom13-exp"
+  ],
+  "sourceWorld": {
+    "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
+    "tree_sha256_before": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "tree_sha256_after": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "unchanged": true
+  },
+  "audit18": {
+    "path": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-01.jsonl",
+    "sha256": "0fe662f45c738122e85f40caac17af219b649bb57c3568089847951b05b058ed",
+    "raw_events": 303,
+    "mapping_report": {
+      "tool": "#18 audit JSONL -> gate audit-events",
+      "source": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-01.jsonl",
+      "source_sha256": "0fe662f45c738122e85f40caac17af219b649bb57c3568089847951b05b058ed",
+      "mapped": [
+        "artifacts\\independent_test_mod\\audit-events.jsonl"
+      ],
+      "counts": {
+        "phase": 4,
+        "cart_tracked": 1,
+        "cart_sample": 289,
+        "input_attempt": 2,
+        "input_request": 1,
+        "input_processed": 1,
+        "cart_emitted": 1,
+        "cart_removed": 1
+      },
+      "excluded": {
+        "session_start": 1,
+        "audit_ready": 1,
+        "audit_end": 1
+      },
+      "gaps": [],
+      "notes": [
+        "303 raw event(s), 300 mapped, 3 session-meta excluded"
+      ],
+      "ok": true
+    },
+    "source_commit": "502f561",
+    "note_cycled": true,
+    "cart_removed": true
+  },
+  "trajectory": {
+    "path": "labs\\rom13-integration\\run-01\\trajectory.jsonl",
+    "sha256": "482778d270de6c0720a5c492f0ff602d2cae380bfd1873670ae21cb7555eee68",
+    "step_report": {
+      "tool": "#19 trajectory.jsonl -> gate tool-trace",
+      "source": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-01\\trajectory.jsonl",
+      "source_sha256": "e585c27fca244becb71bb6d295527aa19094140787fe86bb1a3ea636b625a20a",
+      "mapped": [
+        "artifacts\\trace_persistence\\tool-trace.jsonl",
+        "artifacts\\trace_persistence\\trace-join.json"
+      ],
+      "counts": {
+        "calls": 131,
+        "joins": 136
+      },
+      "excluded": {},
+      "gaps": [],
+      "notes": [
+        "unmatched counts are computed from the mapped artifacts, not copied from a declaration"
+      ],
+      "ok": true
+    }
+  },
+  "gate": {
+    "overall": "blocked",
+    "exit_code": 3,
+    "checks": [
+      {
+        "id": "fixture_map",
+        "status": "blocked"
+      },
+      {
+        "id": "restore_fidelity",
+        "status": "blocked"
+      },
+      {
+        "id": "player_context",
+        "status": "pass"
+      },
+      {
+        "id": "agent_dev_capability",
+        "status": "blocked"
+      },
+      {
+        "id": "independent_test_mod",
+        "status": "blocked"
+      },
+      {
+        "id": "trace_persistence",
+        "status": "blocked"
+      },
+      {
+        "id": "smoke_fixture_validity",
+        "status": "blocked"
+      },
+      {
+        "id": "evidence_integrity",
+        "status": "blocked"
+      }
+    ]
+  },
+  "gaps": [],
+  "remaining": [
+    "#15 fixture map: map manifest, 3 init runs, fixture player identity, command-block scan, cleanup",
+    "bridge#6 restore: snapshot-before/after trees, restore record, failure cases",
+    "#18 test-mod completeness: test-mod manifest, negative cases, audit lifecycle",
+    "#19 cold-start harness: tool environment, missing-log detection, version lock, smoke suites",
+    "agent-phase joins: this run joins test-side RCON calls; the stage-two agent must join its own tool calls"
+  ]
+}
