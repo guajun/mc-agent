@@ -85,12 +85,12 @@ forms under the classic minecart behaviour.
 The artifact is byte-for-byte reproducible: the ZIP entries, gzip streams and
 the `exported_at` stamp inside `level.dat`/`EXPORT.json` are all deterministic
 (`--exported-at` or `SOURCE_DATE_EPOCH` override the fixed default). Exporting
-the same source twice produces the same SHA-256, and `evidence` re-exports the
+the same source path twice with the same options produces the same SHA-256, and `evidence` re-exports the
 imported world twice to prove it rather than asserting it. The manifest's
 `world` block (hash, file count, byte count) is checked against `EXPORT.json`
 and the extracted tree before a world is imported.
 
-`artifact.url` is a versioned URL pinned to commit `15173b6` of this branch.
+`artifact.url` is a versioned URL pinned to commit `f7d8e43` of this branch.
 The SHA-256 in the manifest is the check that matters: a fresh cache downloads
 that exact file and verifies it. A GitHub release asset
 (`minecart-rom-base-v1.0.0`) is optional housekeeping and would not change the
@@ -109,7 +109,7 @@ python examples/minecart-rom/runner/export_world.py `
 ```
 
 The deterministic ZIP (sorted entries, fixed timestamps, fixed modes) always
-produces the same SHA-256 for the same world.
+produces the same SHA-256 for the same world at the same source path with the same export options. `EXPORT.json` records the absolute source path, so relocating identical source bytes changes the ZIP hash while preserving the exported world hash.
 
 ## What `init` does
 
