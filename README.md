@@ -146,7 +146,7 @@ In scope, and shipped:
 * a bridge that owns the connection and re-serves it on loopback, with event
   replay;
 * an agent loop that turns chat into backend turns;
-* a Hermes-first backend, with echo (tests) and Codex (experimental) adapters.
+* a Hermes-first backend, with an echo stub for tests and offline plumbing checks.
 
 Explicitly out of scope for now:
 
