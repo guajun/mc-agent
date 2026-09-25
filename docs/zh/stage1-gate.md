@@ -14,10 +14,10 @@
 
 ## 状态（2026-09-26，本分支）
 
-* 门禁工具、证据 schema 与离线自测已实现；`selftest` 通过 **104 项检查**（不涉及游戏与实机证据）。
+* 门禁工具、证据 schema 与离线自测已实现；`selftest` 通过 **133 项检查**（不涉及游戏与实机证据）。
 * **目前没有任何实机前置证据**，所以对任何真实 bundle 执行 `check` 都是 `blocked`。本文档刻意不声称门禁已通过。
-* 开发期间记录了独立基线：源存档 `D:\MC\MC_Game\.minecraft\versions\26.2-Fabric\saves\Minecart ROM test` 的只读 tree 哈希为 `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`（40 个文件、11 556 310 字节，使用下方规范排除列表）。没有写入任何文件，源存档只被以只读方式打开。
-* 集成运行预留端口：**27240-27249**（两个实例，各占 RCON + bridge，全部在该区间内）。
+* 开发期间记录了独立基线：源存档（26.2-Fabric 实例下的 `Minecart ROM test`）的只读 tree 哈希为 `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`（40 个文件、11 556 310 字节，使用下方规范排除列表）。没有写入任何文件，源存档只被以只读方式打开。
+* 集成运行预留端口：**27240-27249**，通过 `run.allowed_port_ranges` 显式配置（编排便利，不是产品硬编码要求——见下）。
 
 ## 命令
 
@@ -26,7 +26,7 @@ python tools/stage1_gate.py scaffold labs/stage1-evidence      # 生成规范的
 python tools/stage1_gate.py list                                # 列出 check 与所需证据
 python tools/stage1_gate.py list --json                         # 机器可读目录
 python tools/stage1_gate.py check labs/stage1-evidence \
-    --source-world "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test" \
+    --source-world "<只读源存档路径>" \
     --report stage1-report.json
 python tools/stage1_gate.py hash-tree "<世界目录>"              # 确定性只读目录哈希
 python tools/stage1_gate.py selftest                            # 门禁逻辑自测，不需要游戏
@@ -40,8 +40,8 @@ python tools/stage1_gate.py selftest                            # 门禁逻辑�
 | `--json` | 打印 JSON 报告而非文本 |
 | `--verbose` | 打印每条断言，而不只是问题 |
 | `--source-world PATH` | 只读重算该目录的哈希，与 `run.source_world` 对比 |
-| `--skip-source-rehash` | 跳过独立哈希；会记录为限制，绝不能用于最终验收 |
-| `--port-range LOW-HIGH` | 覆盖允许的集成端口区间（可重复） |
+| `--skip-source-rehash` | 跳过独立哈希；整个运行会变为 **blocked**，永远不会是 pass |
+| `--port-range LOW-HIGH` | 收窄 `run.allowed_port_ranges`；超出已声明区间的值会失败 |
 
 ## 包结构
 
@@ -78,14 +78,19 @@ stage1-evidence/
   "run": {
     "run_id": "rom13-stage1-20260926",
     "issue": "guajun/mc-agent#14",
+    "allowed_port_ranges": ["27240-27249"],
     "tool_category_map": { "terminal": ["bash"], "file": ["write"], "source": ["git"], "mcp": ["mcp"] },
+    "child_runs": [
+      { "run_id": "init-child-1", "instance_id": "exp-1" },
+      { "run_id": "init-child-2", "instance_id": "exp-1" },
+      { "run_id": "init-child-3", "instance_id": "exp-1" }
+    ],
     "source_world": {
       "label": "Minecart ROM test",
-      "path": "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test",
+      "path": "<只读源存档路径>",
       "before_tree_sha256": "<64 位十六进制>",
       "after_tree_sha256": "<64 位十六进制>"
     },
-    "allowed_port_ranges": ["27240-27249"],
     "instances": [
       { "instance_id": "src-audit", "role": "source_audit", "dimension": "minecraft:overworld",
         "world_dir": "labs/rom13-src/world", "rcon_port": 27240, "bridge_port": 27241 },
@@ -107,7 +112,7 @@ stage1-evidence/
 }
 ```
 
-只有 `origin` 为 `live` 才可能通过。`scaffold`（以及其它任何值）无论其余内容多完整都是 blocked。
+只有 `origin` 为 `live` 才可能通过。`scaffold`（以及其它任何值）无论其余内容多完整都是 blocked。`child_runs` 声明各次独立初始化；每个初始化样本引用其中之一，而不必强行共用同一个父 run id。
 
 ## Check 与证据 schema
 
@@ -120,13 +125,13 @@ stage1-evidence/
 | 字段 | 类型 | 要求 |
 | --- | --- | --- |
 | `map.url` | s | 不可变/带版本的下载入口 |
-| `map.sha256` | h64 | 地图文件哈希 |
+| `map.sha256` | h64 | 地图文件哈希（与 `version_lock.fixture-map` 交叉核对） |
 | `map.bytes` | i | > 0 |
-| `map.mc_version` | s | 如 `26.2` |
+| `map.mc_version` | s | 如 `26.2`（与 `version_lock.minecraft` 交叉核对） |
 | `map.immutable` | b | true |
 | `map.download_verified` | b | 冷缓存下载已验证 |
 | `map.bad_hash_rejected` | b | 错误哈希被拒绝而非接受 |
-| `mods[]` | list | >= 1 项，每项 `{name, version, sha256(h64)}` |
+| `mods[]` | list | >= 1 项，每项 `{name, version, sha256(h64)}`；`carpet` 项与 `version_lock.carpet` 交叉核对 |
 | `world.directory` | s | 副本名，绝不是源存档本身 |
 | `world.tree_sha256` | h64 | 准备好的世界副本的 tree 哈希 |
 | `world.files` | i | > 0 |
@@ -136,7 +141,8 @@ stage1-evidence/
 | 字段 | 类型 | 要求 |
 | --- | --- | --- |
 | `init_id` | s | 每次运行唯一 |
-| `run_id` | s | |
+| `run_id` | s | 必须在 `run.child_runs` 中声明 |
+| `instance_id` | s | 必须等于该 child run 声明的实例 |
 | `state_hash` | h64 | 所有初始化一致 |
 | `order_hash` | h16 | 所有初始化一致 |
 | `entity_count` | i | > 0，各次一致 |
@@ -147,9 +153,9 @@ stage1-evidence/
 
 `player-identity.json`：`uuid`、`name`、`dimension`、`pos`（v3）、`yaw`、`pitch`（n）、`source`（s，如 `carpet`）、`facing_target`（b true）、`server_vantage_uuid`（s，必须等于 `uuid`）。
 
-`command-block-scan.json`：`method`（s）、`world_dirs`（非空列表）、`command_blocks`（i，必须为 0）、`scanned`（b true）、`placed_by_init`（b false）。
+`command-block-scan.json`：`method`（s）、`world_dirs`（非空字符串列表）、`command_blocks`（i，必须为 0）、`scanned`（b true）、`placed_by_init`（b false）。
 
-`cleanup-rebuild.json`：`steps`（非空列表）、`source_world_untouched`（b true）、`rebuild_reproducible`（b true）。
+`cleanup-rebuild.json`：`steps`（非空字符串列表）、`source_world_untouched`（b true）、`rebuild_reproducible`（b true）。
 
 ### 2. `restore_fidelity` —— 恢复经过验证，而不只是 issued（bridge#6）
 
@@ -161,11 +167,11 @@ stage1-evidence/
 | `source-unchanged.json` | 源存档恢复前后的 tree 哈希 |
 | `failure-cases.jsonl` | 每个注入失败场景一行 |
 
-门禁自行用 `fork_verify` 加载并校验两份快照，然后比较：`orderHash`、按类型计数，以及按 UUID 顺序的完整 `nbt` 字符串、`pos` 和 `vel`（容差 `1e-6`）。因此"哈希相同但库存被改"会失败。
+门禁自行用 `fork_verify` 加载并校验两份快照，然后比较：`orderHash`、按类型计数、按 UUID 顺序的完整 `nbt` 字符串，以及双方都提供时的便利字段 `pos`/`vel`。两侧每个实体都必须有**非空 NBT 字符串**——null、缺失或空 NBT 一律失败（`restore_nbt_missing`），因此完整库存比较不可能变成空谈。双方都缺 `vel` 是允许的（它是 NBT 的便利副本，见 `docs/fork-verify.md` 规则 11）；只有一侧有该字段则失败。
 
-`restore-record.json` 字段：`endpoint.source`、`endpoint.target`（s）、`endpoint.target_resolved`（true）、`endpoint.wrong_target_rejected`（true）、`dimension`（s）、`chunks_loaded`（true）、`tick_controlled`（true）、`duplicates_pre_existing`（= 0）、`commands_issued`（i >= 1）、`commands_failed`（= 0）、`partial_failure`（false）、`pause_state_preserved`（true）、`issued_is_not_success`（true —— 记录本身必须声明 issued != 已恢复）。
+`restore-record.json`：`endpoint.source` 与 `endpoint.target` 必须各自能按 `instance_id` 或唯一 `role` 解析到 `run.instances` 中声明的实例；source 必须是 `source_audit` 实例、target 必须是 `experiment` 实例，两者必须不同。`dimension` 必须等于 target 实例声明的 dimension。另外要求：`endpoint.target_resolved`（true）、`endpoint.wrong_target_rejected`（true）、`chunks_loaded`（true）、`tick_controlled`（true）、`duplicates_pre_existing`（= 0）、`commands_issued`（i >= 1）、`commands_failed`（= 0）、`partial_failure`（false）、`pause_state_preserved`（true）、`issued_is_not_success`（true —— 记录本身必须声明 issued != 已恢复）。
 
-`source-unchanged.json`：`before_tree_sha256`（h64）、`after_tree_sha256`（h64，相等）、`unchanged`（true）、`hash_tool`（s）、`exclusions`（列表；门禁重算使用自己的规范列表，见下）。
+`source-unchanged.json`：`before_tree_sha256`（h64）、`after_tree_sha256`（h64，相等）、`unchanged`（true）、`hash_tool`（s）、`exclusions`（列表）。
 
 `failure-cases.jsonl` 必须覆盖六个场景——`summon_refusal`、`duplicate_pre_existing`、`wrong_endpoint`、`inventory_mutation_order_hash`、`corrupt_metadata`、`partial_failure`——每行 `{case, injected, expected, observed, passed: true}`。
 
@@ -173,52 +179,53 @@ stage1-evidence/
 
 `identity-records.jsonl` 必须覆盖 `task_bind`、`hit`、`miss`、`two_players`、`unknown_identity`。公共字段：`case`、`uuid`、`viewed_uuid`、`dimension`、`pos`（v3）、`yaw`、`pitch`、`task_entry`、`channel`（`mcp` 或 `cli` —— 实际使用的服务端 vantage 通路）、`accepted`（b）。`task_bind`、`hit`、`miss`、`two_players` 都必须看到任务 `uuid`（不得串人）；`two_players` 还需 `other_uuid`；`unknown_identity` 必须 `accepted: false` 且有非空 `rejected_reason`。
 
-`entry-contract.json`：`mode`（`external_task` 或 `manual_external`）、`fields`（非空列表）、`native_chat_verified`（b —— 允许 `false` 并如实记录）、`unsupported_entries`（列表）。
+`entry-contract.json`：`mode`（`external_task` 或 `manual_external`）、`fields`（非空字符串列表）、`native_chat_verified`（b —— 允许 `false` 并如实记录）、`unsupported_entries`（字符串列表）。
 
-`version-pins.json`：`interface_mod` 与 `bridge` 对象，含 `repo`、`commit`（h40）与 `tested: true`。
+`version-pins.json`：`interface_mod` 与 `bridge` 对象，含 `repo`、`commit`（h40）与 `tested: true`；commit 会与 `version_lock.mc-agent-interface-mod` 和 `version_lock.mc-agent-bridge` 交叉核对。
 
 ### 4. `agent_dev_capability` —— 在可定位实例上构建并安装（#17）
 
-`tool-environment.json`：`harness`、`model`（s）、`docs_visible`（非空列表），以及 `tools` 中 `terminal`、`file`、`filesystem_write`、`source_access`、`build`、`install`、`mcp_or_cli`、`lab_manage` 全为 `true`。
+`tool-environment.json`：`harness`、`model`（s）、`docs_visible`（非空字符串列表），以及 `tools` 中 `terminal`、`file`、`filesystem_write`、`source_access`、`build`、`install`、`mcp_or_cli`、`lab_manage` 全为 `true`。
 
 `jar-update.json`：`case: same_size_different_content`、`old_sha256`、`new_sha256`（h64，不同）、`bytes`（i，大小相同）、`loaded_sha256`（h64，必须等于 `new_sha256`）、`runtime_evidence`（s）。
 
-`smoke-mod.json`：`mod_id`、`version`（s）、`built_sha256` 与 `deployed_sha256`（h64，相等）、`server_log_ref`、`sample_output_ref`（s）、`build_errors_detected`、`load_failure_detected`、`missing_dependency_detected`、`memory_state_rebuilt_after_restart`（true）、`restart_evidence_ref`（s）、`no_rom_logic`（全为 b true）。
+`smoke-mod.json`：`mod_id`、`version`（s）、`built_sha256` 与 `deployed_sha256`（h64，相等）、`server_log_ref`、`sample_output_ref`（s）、`build_errors_detected`、`load_failure_detected`、`missing_dependency_detected`、`memory_state_rebuilt_after_restart`（true）、`restart_evidence_ref`（s）、`no_rom_logic`（true —— 这里的每个布尔都必须为 true）。
 
-`instance-isolation.jsonl`：>= 2 行，含 `instance_id`、`role`（`source_audit`/`experiment`）、`world_dir`、`rcon_port`、`bridge_port`、`restarted`（true）、`resolves_correct_world`（true）、`conflicting_instance`（false）。实例 id、世界目录与端口必须唯一。
+`instance-isolation.jsonl`：>= 2 行，含 `instance_id`、`role`（`source_audit`/`experiment`）、`world_dir`、`rcon_port`、`bridge_port`、`restarted`（true）、`resolves_correct_world`（true）、`conflicting_instance`（false）。每行都必须在 id/role/world/端口上与 `run.instances` 声明一致；每个声明实例都必须被覆盖；端口必须唯一且落在已声明/生效区间内。
 
 ### 5. `independent_test_mod` —— 可审计的机器输入与瞬态输出（#18）
 
-`test-mod-manifest.json`：`mod_id`、`version`（s）、`sha256`（h64）、`read_only`（true）、`hook_overhead_ms`（n >= 0）、`fixture_behavior_unchanged`（true）、`loaded_in`（包含 `source_audit` 与 `experiment`）、`agent_mod_coexists`（true）、`no_command_blocks`（true）。
+`test-mod-manifest.json`：`mod_id`、`version`（s）、`sha256`（h64，与 `version_lock.test-mod` 交叉核对）、`read_only`（true）、`hook_overhead_ms`（n >= 0）、`fixture_behavior_unchanged`（true）、`loaded_in`（非空字符串列表，含 `source_audit` 与 `experiment`）、`agent_mod_coexists`（true）、`no_command_blocks`（true）。
 
 `audit-events.jsonl` —— 规范的服务端事件 schema：
 
 | 字段 | 类型 | 要求 |
 | --- | --- | --- |
 | `event_id` | s | 全文件唯一；重复即失败 |
-| `run_id` | s | 必须等于 `run.run_id` |
-| `instance_id` | s | 必须在 `run.instances` 中声明 |
+| `run_id` | s | 父 `run.run_id`，或 `init`/`restore` 阶段所属的 `run.child_runs` id |
+| `instance_id` | s | 在 `run.instances` 中声明；child run 则为其声明的实例 |
 | `dimension` | s | 必须等于该 `instance_id` 声明的 `dimension` |
 | `tick` | i | >= 0；`(tick, seq)` 按 `run_id/instance_id/dimension` 严格递增 |
 | `seq` | i | >= 0；相同/碰撞的序号对失败，不能据此建立顺序 |
 | `event` | s | 见下 |
-| `phase` | s | `init`、`agent` 或 `restore` |
-| `actor_uuid`、`cart_uuid` | s | 视事件而定 |
+| `phase` | s | `init`、`agent` 或 `restore`；`agent` 事件必须属于父 run |
+| `actor_uuid` | s | `input_attempt`/`input_processed` 上必需 |
+| `cart_uuid` | s | `cart_emitted` 与 `cart_removed` 上必需 |
 | `pos` | v3 | 视事件而定 |
 | `captured_before_removal` | b | `cart_emitted` 上必须为 true |
 | `removal_reason` | s | `cart_removed` 上必须存在（如 `void`） |
 
-任何关联之前先强制来源校验：即使把改动后的字节正确刷新进证据索引，来自其它 run、其它实例或其它维度的事件也会让门禁失败。必需事件：`input_attempt`、`input_processed`、`cart_emitted`、`cart_removed`。attempt -> processing -> emission -> removal 链按完整 `run_id/instance_id/dimension` 身份关联（移除另加 `cart_uuid`），`input_processed` 的 actor 必须与其 `input_attempt` 一致，每个 `cart_emitted` 都必须有同一身份上更早的处理输入，每个弹出的矿车都在移除前被持久化，每次移除都带原因。`init`/`restore` 事件永远不算 Agent 操作。
+任何关联之前先强制来源校验：即使把改动后的字节正确刷新进证据索引，来自未声明 run、实例或维度的事件也会让门禁失败。必需事件：`input_attempt`、`input_processed`、`cart_emitted`、`cart_removed`。attempt -> processing -> emission -> removal 链按完整 `run_id/instance_id/dimension` 身份关联（移除另加 `cart_uuid`），`input_processed` 的 actor 必须与其 `input_attempt` 一致，每个 `cart_emitted` 都必须有同一身份上更早的处理输入，每个弹出的矿车都必须有对应的 `cart_removed`，每个弹出的矿车都在移除前被持久化，每次移除都带原因。`init`/`restore` 事件永远不算 Agent 操作。
 
 `negative-cases.jsonl` 必须覆盖 `no_interaction`、`wrong_position`、`marker_only`、`answer_only`，每行含 `attempted`（b）、`processed`（= 0）与 `evidence_ref`（s）。明确归入负例的事件绝不能是 `input_processed`。
 
-`audit-lifecycle.json`：`states` 包含 `ready`、`init`、`experiment_start`、`experiment_end`、`flush`；`missing_log_status` 与 `overflow_status` 均为 `error`；`per_instance_files`（true）；`ring_buffer_reliance`（false）。
+`audit-lifecycle.json`：`states`（非空字符串列表）包含 `ready`、`init`、`experiment_start`、`experiment_end`、`flush`；`missing_log_status` 与 `overflow_status` 均为 `error`；`per_instance_files`（true）；`ring_buffer_reliance`（false）。
 
 ### 6. `trace_persistence` —— 工具与游戏事件按 run/实例关联（#19）
 
-`tool-trace.jsonl` —— 每次工具调用一行：`call_id`（唯一）、`run_id`、`instance_id`、`tool`、`args`（对象）、`result`（任意，必须存在）、`error`（字符串或 null，必须存在）、`started_at`/`ended_at`（t，有序）。`run_id` 必须等于 `run.run_id`，`instance_id` 必须在 `run.instances` 中声明，来自其它 run 的陈旧 trace 不会被计入。trace 必须覆盖 `terminal`、`file`、`source`、`mcp` 四类（工具名匹配模式可用 `run.tool_category_map` 覆盖）。
+`tool-trace.jsonl` —— 每次工具调用一行：`call_id`（唯一）、`run_id`（必须等于 `run.run_id`）、`instance_id`（必须在 `run.instances` 中声明）、`tool`、`args`（对象）、`result`（任意，必须存在）、`error`（字符串或 null，必须存在）、`started_at`/`ended_at`（t，有序）。trace 必须覆盖 `terminal`、`file`、`source`、`mcp` 四类。`run.tool_category_map` 可以按类别覆盖名称匹配，但它只会在默认类别之上合并（部分或空 map 不能删掉必需类别），空/全空白模式会失败。
 
-`trace-join.json`：`joins[]` 含 `call_id`（必须存在于 trace）、`audit_ref`（`run_id`、`instance_id`、`dimension`、`event_id`、`tick`）与 `verified: true`；另有 `unmatched_tool_calls` 与 `unmatched_agent_events`（必须为 0 —— 每个 agent 侧审计事件都要有工具调用）。每个 `audit_ref` 都会在 `audit-events.jsonl` 中解析，并必须在该事件的完整身份与 tick 上匹配；未知或有歧义的 `event_id` 失败。
+`trace-join.json`：`joins[]` 含 `call_id`（必须存在于 trace）、`audit_ref`（`run_id`、`instance_id`、`dimension`、`event_id`、`tick`）与 `verified: true`。每个 `audit_ref` 都会在 `audit-events.jsonl` 中解析：事件必须恰好存在一次、在完整身份与 tick 上匹配，且 `phase: agent`。`unmatched_agent_events` 必须为 0，并等于没有 join 的 agent 阶段审计事件计算值（每个 agent 侧游戏事件都要有工具调用）；`unmatched_tool_calls` 必须等于没有 join 的工具调用计算值（trace 可以包含构建、写文件等非游戏调用）。
 
 `missing-log-detection.jsonl`：场景 `trace_missing` 与 `audit_missing`，每行 `{case, detected: true, exit_nonzero: true, message_ref}`。缺日志必须明确报错，绝不能被静默忽略。
 
@@ -226,21 +233,33 @@ stage1-evidence/
 
 `smoke-report.json`：`suites[]` 覆盖 `smoke_offline`、`lab_boot`、`fake_player_mcp`、`snapshot_restore`、`test_mod_load`，每项 `{name, command, status: "pass", checks >= 1, log_ref}`。
 
-`fixture-validity.json`：`input_semantics`（s）、`stack_positions`（非空列表）、`output_boundary`（非空对象）、`void_window_ticks`（i >= 1）、`end_condition`（s）、`timeout_s`（i >= 1）、`hook_overhead_ms`（n >= 0）、`with_mod_without_mod_consistent`（true）。
+`fixture-validity.json`：`input_semantics`（s）、`stack_positions`（非空 `[x, y, z]` 列表）、`output_boundary`（非空对象）、`void_window_ticks`（i >= 1）、`end_condition`（s）、`timeout_s`（i >= 1）、`hook_overhead_ms`（n >= 0）、`with_mod_without_mod_consistent`（true）。
 
-`version-lock.json`：`components[]` 必须包含以下名称，并按下表固定：
+`version-lock.json`：`components[]` 必须包含以下名称，每项带其必需固定值（`version` 字符串在它本身就是固定值时必需，否则可选）：
 
-| 组件 | 固定方式 |
-| --- | --- |
-| `mc-agent`、`mc-agent-interface-mod`、`mc-agent-bridge` | `commit`（h40） |
-| `minecraft`、`fabric-loader`、`jdk` | `version`（s，非空） |
-| `carpet`、`test-mod`、`fixture-map` | `sha256`（h64） |
+| 组件 | 必需固定 | 交叉核对对象 |
+| --- | --- | --- |
+| `mc-agent` | `commit`（h40） | - |
+| `mc-agent-interface-mod` | `commit`（h40） | `version-pins.json` |
+| `mc-agent-bridge` | `commit`（h40） | `version-pins.json` |
+| `minecraft` | `version`（s） | `fixture-manifest.map.mc_version` |
+| `fabric-loader` | `version`（s） | - |
+| `jdk` | `version`（s） | - |
+| `carpet` | `sha256`（h64） | `fixture-manifest.mods[carpet]` |
+| `test-mod` | `sha256`（h64） | `test-mod-manifest.sha256` |
+| `fixture-map` | `sha256`（h64） | `fixture-manifest.map.sha256` |
+
+固定值与其指名的证据不一致即失败（`version_lock_conflict`）。
 
 `evidence-index.json`：`tool`（s）与 `entries[]`，每项对文件为 `{path, sha256, bytes}`、对目录为 `{path, tree_sha256, files, bytes}`。它必须固定**除自身以外的所有已声明证据**；哈希不匹配、重复、文件缺失或漏固定都会让门禁失败。额外的原始证据也可以列入。
 
 ### 8. `evidence_integrity` —— 包结构、哈希、端口与源存档（工具自算）
 
-无证据文件。门禁自行校验 schema 版本与 kind、`origin`、`run.issue`、运行实例（id/端口唯一、两种角色齐全、每个实例声明 `dimension`、端口在允许区间内，默认 `27240-27249`）、已声明证据类型与路径、证据索引与重算哈希、审计事件的 run/instance/dimension 来源、以及 `run.source_world` 前后相等。带 `--source-world`（或清单中的路径）时，它会只读重算源存档哈希并比较。
+无证据文件。门禁自行校验 schema 版本与 kind、`origin`、`run.issue`、`run.child_runs`、运行实例（id/端口唯一、两种角色齐全、每个实例声明 `dimension`）、已声明证据类型与路径、证据索引与重算哈希、审计事件的 run/instance/dimension 来源、以及 `run.source_world` 前后相等。
+
+端口区间是显式配置而非产品硬编码要求：必须声明 `run.allowed_port_ranges`（缺失即失败），每个实例与 `instance-isolation` 端口都必须落在其中，`--port-range` 只能收窄（超出已声明区间会失败 `port_range_conflict`）。
+
+带 `--source-world`（或清单中的路径）时，门禁只读重算源存档哈希并比较。`--skip-source-rehash` 跳过这项独立检查，因此整个运行会变为 **blocked** —— 不存在未重算却报 `pass` 的退出码。
 
 ## 目录树哈希
 
@@ -249,7 +268,7 @@ stage1-evidence/
 ## 集成运行手册（前置项合并之后）
 
 1. 从 #15、bridge#6、#16-#19 收集原始证据到一个包里（`scaffold` 会打印规范结构）。保留原始日志，并一并列入索引。
-2. 填写 `bundle.json`：`origin: live`、run id、源存档路径与前后 tree 哈希、端口 27240-27249 上的实例。
+2. 填写 `bundle.json`：`origin: live`、run id、child run id、源存档路径与前后 tree 哈希、声明的端口区间，以及落在这些端口上的实例。
 3. 对所有文件与目录树生成 `evidence-index.json`。
 4. 带 `--source-world` 与 `--report` 运行 `check`；把报告附到 issue #14。任何 `blocked` 或 `fail` 都阻止进入阶段二。
 5. 协调者审阅报告并抽查原始证据后才宣布门禁通过。门禁不能替代这次审阅。

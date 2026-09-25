@@ -23,16 +23,17 @@ Exit codes: `0` pass, `1` fail, `3` blocked, `2` usage. A script cannot mistake
 ## Status (2026-09-26, this branch)
 
 * Gate tooling, schema and offline selftest are implemented; `selftest` passes
-  **104 checks** (no game, no live evidence involved).
+  **133 checks** (no game, no live evidence involved).
 * **No live prerequisite evidence exists yet**, so `check` on any real bundle is
   `blocked`. This document deliberately does not claim a gate pass.
 * Independent baseline recorded while the gate was developed: the read-only hash
-  of the source save `D:\MC\MC_Game\.minecraft\versions\26.2-Fabric\saves\Minecart ROM test`
-  is `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`
+  of the source save (`Minecart ROM test` under the 26.2-Fabric instance) is
+  `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`
   (40 files, 11 556 310 bytes) with the canonical exclusion list below. No file
   was written; the save is only ever opened for reading.
-* Ports reserved for the integration run: **27240-27249** (two instances,
-  RCON + bridge each, inside that range).
+* Ports reserved for the integration run: **27240-27249**, configured explicitly
+  through `run.allowed_port_ranges` (orchestration convenience, not a hardcoded
+  requirement - see below).
 
 ## Commands
 
@@ -41,7 +42,7 @@ python tools/stage1_gate.py scaffold labs/stage1-evidence      # canonical empty
 python tools/stage1_gate.py list                                # checks + required artifacts
 python tools/stage1_gate.py list --json                         # machine-readable catalog
 python tools/stage1_gate.py check labs/stage1-evidence \
-    --source-world "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test" \
+    --source-world "<read-only source save path>" \
     --report stage1-report.json
 python tools/stage1_gate.py hash-tree "<world dir>"             # deterministic read-only tree hash
 python tools/stage1_gate.py selftest                            # gate logic, no game needed
@@ -55,8 +56,8 @@ python tools/stage1_gate.py selftest                            # gate logic, no
 | `--json` | print the JSON report instead of text |
 | `--verbose` | print every assertion, not only problems |
 | `--source-world PATH` | re-hash this directory read-only and compare it with `run.source_world` |
-| `--skip-source-rehash` | skip the independent hash; records a limitation, never for final acceptance |
-| `--port-range LOW-HIGH` | override the allowed integration port ranges (repeatable) |
+| `--skip-source-rehash` | skip the independent hash; the run is then **blocked**, never a pass |
+| `--port-range LOW-HIGH` | narrow the declared `run.allowed_port_ranges`; ranges outside the declared ones fail |
 
 ## Bundle layout
 
@@ -95,14 +96,19 @@ inside the bundle and may not use `..`.
   "run": {
     "run_id": "rom13-stage1-20260926",
     "issue": "guajun/mc-agent#14",
+    "allowed_port_ranges": ["27240-27249"],
     "tool_category_map": { "terminal": ["bash"], "file": ["write"], "source": ["git"], "mcp": ["mcp"] },
+    "child_runs": [
+      { "run_id": "init-child-1", "instance_id": "exp-1" },
+      { "run_id": "init-child-2", "instance_id": "exp-1" },
+      { "run_id": "init-child-3", "instance_id": "exp-1" }
+    ],
     "source_world": {
       "label": "Minecart ROM test",
-      "path": "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test",
+      "path": "<read-only source save path>",
       "before_tree_sha256": "<64 hex>",
       "after_tree_sha256": "<64 hex>"
     },
-    "allowed_port_ranges": ["27240-27249"],
     "instances": [
       { "instance_id": "src-audit", "role": "source_audit", "dimension": "minecraft:overworld",
         "world_dir": "labs/rom13-src/world", "rcon_port": 27240, "bridge_port": 27241 },
@@ -125,7 +131,9 @@ inside the bundle and may not use `..`.
 ```
 
 `origin` must be `live` for a pass. `scaffold` (and anything else) is blocked no
-matter how complete the rest looks.
+matter how complete the rest looks. `child_runs` declares the independent
+initialization runs; every init sample references one of them instead of being
+forced onto the single parent run id.
 
 ## Checks and evidence schema
 
@@ -141,13 +149,13 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `map.url` | s | immutable/versioned download entry |
-| `map.sha256` | h64 | hash of the map artifact |
+| `map.sha256` | h64 | hash of the map artifact (cross-checked against `version_lock.fixture-map`) |
 | `map.bytes` | i | > 0 |
-| `map.mc_version` | s | e.g. `26.2` |
+| `map.mc_version` | s | e.g. `26.2` (cross-checked against `version_lock.minecraft`) |
 | `map.immutable` | b | true |
 | `map.download_verified` | b | fresh-cache download verified |
 | `map.bad_hash_rejected` | b | a wrong hash is rejected, not accepted |
-| `mods[]` | list | >= 1 entry, each `{name, version, sha256(h64)}` |
+| `mods[]` | list | >= 1 entry, each `{name, version, sha256(h64)}`; a `carpet` entry is cross-checked against `version_lock.carpet` |
 | `world.directory` | s | copy name, never the source save itself |
 | `world.tree_sha256` | h64 | tree hash of the prepared world copy |
 | `world.files` | i | > 0 |
@@ -157,7 +165,8 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `init_id` | s | unique per run |
-| `run_id` | s | |
+| `run_id` | s | must be declared in `run.child_runs` |
+| `instance_id` | s | must equal the instance declared for that child run |
 | `state_hash` | h64 | equal across all initializations |
 | `order_hash` | h16 | equal across all initializations |
 | `entity_count` | i | > 0, equal across runs |
@@ -170,11 +179,12 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 (n), `source` (s, e.g. `carpet`), `facing_target` (b true),
 `server_vantage_uuid` (s, must equal `uuid`).
 
-`command-block-scan.json`: `method` (s), `world_dirs` (non-empty list),
-`command_blocks` (i, must be 0), `scanned` (b true), `placed_by_init` (b false).
+`command-block-scan.json`: `method` (s), `world_dirs` (non-empty list of
+non-empty strings), `command_blocks` (i, must be 0), `scanned` (b true),
+`placed_by_init` (b false).
 
-`cleanup-rebuild.json`: `steps` (non-empty list), `source_world_untouched`
-(b true), `rebuild_reproducible` (b true).
+`cleanup-rebuild.json`: `steps` (non-empty list of non-empty strings),
+`source_world_untouched` (b true), `rebuild_reproducible` (b true).
 
 ### 2. `restore_fidelity` - restore is verified, not just issued (bridge#6)
 
@@ -187,20 +197,27 @@ paths. Types below: `s` string, `h64` 64 lowercase hex, `h40` 40 lowercase hex
 | `failure-cases.jsonl` | one record per injected failure case |
 
 The gate loads both snapshots with `fork_verify`, validates them, and compares
-them itself: `orderHash`, per-type counts, and - for every UUID in order - the
-full `nbt` string, `pos` and `vel` (tolerance `1e-6`). A passing hash with a
-mutated inventory therefore fails.
+them itself: `orderHash`, per-type counts, the full `nbt` string for every UUID
+in order, and the convenience `pos`/`vel` fields when both sides carry them.
+Every entity on both sides must have a **non-empty NBT string** - a null,
+missing or empty NBT fails (`restore_nbt_missing`), so the full-inventory
+comparison can never be vacuous. Missing `vel` on both sides is fine (it is a
+convenience copy of NBT, see `docs/fork-verify.md` rule 11); a field present on
+only one side fails.
 
-`restore-record.json` fields: `endpoint.source`, `endpoint.target` (s),
-`endpoint.target_resolved` (true), `endpoint.wrong_target_rejected` (true),
-`dimension` (s), `chunks_loaded` (true), `tick_controlled` (true),
-`duplicates_pre_existing` (= 0), `commands_issued` (i >= 1),
-`commands_failed` (= 0), `partial_failure` (false), `pause_state_preserved`
-(true), `issued_is_not_success` (true - the record must say issued != restored).
+`restore-record.json`: `endpoint.source` and `endpoint.target` must each resolve
+to a declared `run.instances` entry by `instance_id` or unique `role`; source
+must be the `source_audit` instance and target the `experiment` instance, and
+they must differ. `dimension` must equal the target instance's declared
+dimension. Also required: `endpoint.target_resolved` (true),
+`endpoint.wrong_target_rejected` (true), `chunks_loaded` (true),
+`tick_controlled` (true), `duplicates_pre_existing` (= 0), `commands_issued`
+(i >= 1), `commands_failed` (= 0), `partial_failure` (false),
+`pause_state_preserved` (true), `issued_is_not_success` (true - the record must
+say issued != restored).
 
 `source-unchanged.json`: `before_tree_sha256` (h64), `after_tree_sha256` (h64,
-equal), `unchanged` (true), `hash_tool` (s), `exclusions` (list; the gate's
-re-hash uses its canonical list, see below).
+equal), `unchanged` (true), `hash_tool` (s), `exclusions` (list).
 
 `failure-cases.jsonl` must cover all six cases - `summon_refusal`,
 `duplicate_pre_existing`, `wrong_endpoint`, `inventory_mutation_order_hash`,
@@ -218,17 +235,19 @@ server-vantage path actually used), `accepted` (b). `task_bind`, `hit`,
 `accepted: false` with a non-empty `rejected_reason`.
 
 `entry-contract.json`: `mode` (`external_task` or `manual_external`), `fields`
-(non-empty list), `native_chat_verified` (b - `false` is allowed and recorded),
-`unsupported_entries` (list).
+(non-empty list of non-empty strings), `native_chat_verified` (b - `false` is
+allowed and recorded), `unsupported_entries` (list of non-empty strings).
 
 `version-pins.json`: `interface_mod` and `bridge` objects with `repo`, `commit`
-(h40) and `tested: true`.
+(h40) and `tested: true`; the commits are cross-checked against
+`version_lock.mc-agent-interface-mod` and `version_lock.mc-agent-bridge`.
 
 ### 4. `agent_dev_capability` - build and install into a located instance (#17)
 
-`tool-environment.json`: `harness`, `model` (s), `docs_visible` (non-empty
-list), and `tools` with all of `terminal`, `file`, `filesystem_write`,
-`source_access`, `build`, `install`, `mcp_or_cli`, `lab_manage` set to `true`.
+`tool-environment.json`: `harness`, `model` (s), `docs_visible` (non-empty list
+of non-empty strings), and `tools` with all of `terminal`, `file`,
+`filesystem_write`, `source_access`, `build`, `install`, `mcp_or_cli`,
+`lab_manage` set to `true`.
 
 `jar-update.json`: `case: same_size_different_content`, `old_sha256`,
 `new_sha256` (h64, different), `bytes` (i, same size), `loaded_sha256` (h64,
@@ -243,13 +262,16 @@ must equal `new_sha256`), `runtime_evidence` (s).
 `instance-isolation.jsonl`: >= 2 records with `instance_id`, `role`
 (`source_audit`/`experiment`), `world_dir`, `rcon_port`, `bridge_port`,
 `restarted` (true), `resolves_correct_world` (true), `conflicting_instance`
-(false). Instance ids, world dirs and ports must be unique.
+(false). Every row must match a declared `run.instances` entry on
+id/role/world/dimension-consistent ports; every declared instance must be
+covered; ports must be unique and inside the declared/effective ranges.
 
 ### 5. `independent_test_mod` - auditable machine input and transient output (#18)
 
-`test-mod-manifest.json`: `mod_id`, `version` (s), `sha256` (h64),
-`read_only` (true), `hook_overhead_ms` (n >= 0), `fixture_behavior_unchanged`
-(true), `loaded_in` (contains `source_audit` and `experiment`),
+`test-mod-manifest.json`: `mod_id`, `version` (s), `sha256` (h64,
+cross-checked against `version_lock.test-mod`), `read_only` (true),
+`hook_overhead_ms` (n >= 0), `fixture_behavior_unchanged` (true), `loaded_in`
+(non-empty string list containing `source_audit` and `experiment`),
 `agent_mod_coexists` (true), `no_command_blocks` (true).
 
 `audit-events.jsonl` - the canonical server-side event schema:
@@ -257,54 +279,61 @@ must equal `new_sha256`), `runtime_evidence` (s).
 | Field | Type | Requirement |
 | --- | --- | --- |
 | `event_id` | s | unique across the file; duplicates fail |
-| `run_id` | s | must equal `run.run_id` |
-| `instance_id` | s | must be declared in `run.instances` |
+| `run_id` | s | parent `run.run_id`, or a `run.child_runs` id for `init`/`restore` phases |
+| `instance_id` | s | declared in `run.instances`; for a child run, its declared instance |
 | `dimension` | s | must equal the declared `dimension` of that `instance_id` |
 | `tick` | i | >= 0; `(tick, seq)` strictly increasing per `run_id/instance_id/dimension` |
 | `seq` | i | >= 0; equal/colliding pairs fail, they cannot establish ordering |
 | `event` | s | see below |
-| `phase` | s | `init`, `agent` or `restore` |
-| `actor_uuid`, `cart_uuid` | s | as applicable |
+| `phase` | s | `init`, `agent` or `restore`; `agent` events must belong to the parent run |
+| `actor_uuid` | s | on `input_attempt`/`input_processed` |
+| `cart_uuid` | s | required on `cart_emitted` and `cart_removed` |
 | `pos` | v3 | as applicable |
 | `captured_before_removal` | b | required true on `cart_emitted` |
 | `removal_reason` | s | required on `cart_removed` (e.g. `void`) |
 
-Provenance is enforced before any join: events from another run, another
-instance or another dimension fail the gate even when the evidence index is
-correctly refreshed for the changed bytes. Required events: `input_attempt`,
+Provenance is enforced before any join: events from an undeclared run,
+instance or dimension fail the gate even when the evidence index is correctly
+refreshed for the changed bytes. Required events: `input_attempt`,
 `input_processed`, `cart_emitted`, `cart_removed`. The attempt -> processing ->
 emission -> removal chain is joined on the full
 `run_id/instance_id/dimension` identity (plus `cart_uuid` for the removal), the
 `input_processed` actor must match its `input_attempt`, every `cart_emitted`
-must follow a processed input on that identity, every emitted cart must be
-persisted before removal, and every removal must carry a reason.
-`init`/`restore` events never count as agent operations.
+must follow a processed input on that identity, every emitted cart must have a
+matching `cart_removed`, every emitted cart must be persisted before removal,
+and every removal must carry a reason. `init`/`restore` events never count as
+agent operations.
 
 `negative-cases.jsonl` must cover `no_interaction`, `wrong_position`,
 `marker_only`, `answer_only`, each with `attempted` (b), `processed` (= 0) and
 `evidence_ref` (s). Events explicitly attributed to a negative case must never
 be `input_processed`.
 
-`audit-lifecycle.json`: `states` including `ready`, `init`, `experiment_start`,
-`experiment_end`, `flush`; `missing_log_status` and `overflow_status` both
-`error`; `per_instance_files` (true); `ring_buffer_reliance` (false).
+`audit-lifecycle.json`: `states` (non-empty string list) including `ready`,
+`init`, `experiment_start`, `experiment_end`, `flush`; `missing_log_status` and
+`overflow_status` both `error`; `per_instance_files` (true);
+`ring_buffer_reliance` (false).
 
 ### 6. `trace_persistence` - tools and game events join by run/instance (#19)
 
-`tool-trace.jsonl` - one record per tool call: `call_id` (unique), `run_id`,
-`instance_id`, `tool`, `args` (object), `result` (any, present), `error`
-(string or null, present), `started_at`/`ended_at` (t, ordered). `run_id` must
-equal `run.run_id` and `instance_id` must be declared in `run.instances`, so a
-stale trace from another run cannot be counted. The trace must cover the
-categories `terminal`, `file`, `source` and `mcp` (name patterns can be
-overridden by `run.tool_category_map`).
+`tool-trace.jsonl` - one record per tool call: `call_id` (unique), `run_id`
+(must equal `run.run_id`), `instance_id` (must be declared in `run.instances`),
+`tool`, `args` (object), `result` (any, present), `error` (string or null,
+present), `started_at`/`ended_at` (t, ordered). The trace must cover the
+categories `terminal`, `file`, `source` and `mcp`. `run.tool_category_map` may
+override name patterns per category, but it is merged over the defaults (a
+partial or empty map cannot drop a required category) and blank/empty patterns
+fail.
 
 `trace-join.json`: `joins[]` with `call_id` (must exist in the trace),
 `audit_ref` (`run_id`, `instance_id`, `dimension`, `event_id`, `tick`) and
-`verified: true`, plus `unmatched_tool_calls` and `unmatched_agent_events`
-(must be 0 - every agent-side audit event needs a tool call). Each `audit_ref`
-is resolved against `audit-events.jsonl` and must match that event on the full
-identity and tick; an unknown or ambiguous `event_id` fails.
+`verified: true`. Each `audit_ref` is resolved against `audit-events.jsonl`:
+the event must exist exactly once, match on the full identity and tick, and be
+`phase: agent`. `unmatched_agent_events` must be 0 and equal the computed
+number of agent-phase audit events without a join (every agent-side game event
+needs a tool call); `unmatched_tool_calls` must equal the computed number of
+tool calls without a join (a trace may contain non-game calls such as builds
+and file writes).
 
 `missing-log-detection.jsonl`: cases `trace_missing` and `audit_missing`, each
 `{case, detected: true, exit_nonzero: true, message_ref}`. Missing logs must
@@ -317,17 +346,27 @@ fail loudly, never be silently ignored.
 `{name, command, status: "pass", checks >= 1, log_ref}`.
 
 `fixture-validity.json`: `input_semantics` (s), `stack_positions` (non-empty
-list), `output_boundary` (non-empty object), `void_window_ticks` (i >= 1),
-`end_condition` (s), `timeout_s` (i >= 1), `hook_overhead_ms` (n >= 0),
-`with_mod_without_mod_consistent` (true).
+list of `[x, y, z]`), `output_boundary` (non-empty object),
+`void_window_ticks` (i >= 1), `end_condition` (s), `timeout_s` (i >= 1),
+`hook_overhead_ms` (n >= 0), `with_mod_without_mod_consistent` (true).
 
-`version-lock.json`: `components[]` that must include these names, pinned as:
+`version-lock.json`: `components[]` that must include these names, each with
+its required pin (a `version` string is optional unless it is the pin):
 
-| Component | Pin |
-| --- | --- |
-| `mc-agent`, `mc-agent-interface-mod`, `mc-agent-bridge` | `commit` (h40) |
-| `minecraft`, `fabric-loader`, `jdk` | `version` (s, non-empty) |
-| `carpet`, `test-mod`, `fixture-map` | `sha256` (h64) |
+| Component | Required pin | Cross-checked with |
+| --- | --- | --- |
+| `mc-agent` | `commit` (h40) | - |
+| `mc-agent-interface-mod` | `commit` (h40) | `version-pins.json` |
+| `mc-agent-bridge` | `commit` (h40) | `version-pins.json` |
+| `minecraft` | `version` (s) | `fixture-manifest.map.mc_version` |
+| `fabric-loader` | `version` (s) | - |
+| `jdk` | `version` (s) | - |
+| `carpet` | `sha256` (h64) | `fixture-manifest.mods[carpet]` |
+| `test-mod` | `sha256` (h64) | `test-mod-manifest.sha256` |
+| `fixture-map` | `sha256` (h64) | `fixture-manifest.map.sha256` |
+
+Any disagreement between a pin and the artifact it names fails
+(`version_lock_conflict`).
 
 `evidence-index.json`: `tool` (s) and `entries[]` where each entry is
 `{path, sha256, bytes}` for a file or `{path, tree_sha256, files, bytes}` for a
@@ -338,12 +377,22 @@ be listed too.
 ### 8. `evidence_integrity` - bundle, hashes, ports, source world (computed)
 
 No artifact. The gate itself validates the schema version and kind, `origin`,
-`run.issue`, run instances (unique ids/ports, both roles, a declared `dimension`
-per instance, ports inside the allowed ranges, default `27240-27249`), declared
-evidence kinds and paths, the evidence index against recomputed hashes, the
-audit events' run/instance/dimension provenance, and `run.source_world`
-before/after equality. With `--source-world` (or the path in the manifest) it
-re-hashes the save read-only and compares the result.
+`run.issue`, `run.child_runs`, run instances (unique ids/ports, both roles, a
+declared `dimension` per instance), declared evidence kinds and paths, the
+evidence index against recomputed hashes, the audit events'
+run/instance/dimension provenance, and `run.source_world` before/after
+equality.
+
+Port ranges are explicit configuration, not a hardcoded product requirement:
+`run.allowed_port_ranges` must be declared (a missing list fails), every
+instance and `instance-isolation` port must fall inside it, and `--port-range`
+may only narrow it (a range outside the declared one fails
+`port_range_conflict`).
+
+With `--source-world` (or the path in the manifest) the gate re-hashes the save
+read-only and compares the result. `--skip-source-rehash` skips that
+independent check and therefore makes the whole run **blocked** - there is no
+exit code that reports `pass` without the re-hash.
 
 ## Tree hashing
 
@@ -357,8 +406,9 @@ The same algorithm and exclusion list are used by the gate and by
 
 1. Collect the raw artifacts from #15, bridge#6, #16-#19 into one bundle
    (`scaffold` prints the canonical layout). Keep raw logs; index them too.
-2. Fill `bundle.json`: `origin: live`, run id, source-world path plus before and
-   after tree hashes, instances on ports 27240-27249.
+2. Fill `bundle.json`: `origin: live`, run id, child run ids, source-world path
+   plus before and after tree hashes, declared port ranges, and instances on
+   those ports.
 3. Generate `evidence-index.json` over every file and tree.
 4. Run `check` **with** `--source-world` and `--report`; attach the report to
    issue #14. Any `blocked` or `fail` stops stage two.

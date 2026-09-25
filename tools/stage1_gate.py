@@ -384,6 +384,7 @@ class Bundle:
         self.root = root
         self.parse_problem = parse_problem
         self.manifest: dict[str, Any] = manifest if isinstance(manifest, dict) else {}
+        self.cli_port_ranges: list[str] = []
 
     def _entry(self, check_id: str) -> dict[str, Any]:
         checks = self.manifest.get("checks")
@@ -440,14 +441,29 @@ class Bundle:
         return world if isinstance(world, dict) else {}
 
     @property
-    def allowed_port_ranges(self) -> list[str]:
+    def allowed_port_ranges(self) -> list[Any]:
         run = self.manifest.get("run")
         if not isinstance(run, dict):
             return []
         ranges = run.get("allowed_port_ranges")
         if not isinstance(ranges, list):
             return []
-        return [item for item in ranges if isinstance(item, str)]
+        return list(ranges)
+
+    @property
+    def effective_port_ranges(self) -> list[Any]:
+        """CLI-narrowed ranges when given, else the declared ranges."""
+        return self.cli_port_ranges or self.allowed_port_ranges
+
+    @property
+    def child_runs(self) -> list[dict[str, Any]]:
+        run = self.manifest.get("run")
+        if not isinstance(run, dict):
+            return []
+        children = run.get("child_runs")
+        if not isinstance(children, list):
+            return []
+        return [item for item in children if isinstance(item, dict)]
 
 
 # --------------------------------------------------------------------------- inspection
@@ -632,6 +648,34 @@ class CheckContext:
                 return []
         return value
 
+    def string_list(self, obj: Any, key: str, *, minimum: int = 0, where: str = "") -> list[str] | None:
+        value = self.require(obj, key, "list", minimum=minimum, where=where)
+        if value is None:
+            return None
+        items: list[str] = []
+        for index, item in enumerate(value):
+            if not isinstance(item, str) or not item.strip():
+                self.fail(
+                    "bad_field",
+                    f"{where}{key}[{index}]: expected a non-empty string, got {item!r}",
+                )
+                return None
+            items.append(item)
+        return items
+
+    def vec3_list(self, obj: Any, key: str, *, minimum: int = 0, where: str = "") -> list[Any] | None:
+        value = self.require(obj, key, "list", minimum=minimum, where=where)
+        if value is None:
+            return None
+        for index, item in enumerate(value):
+            if not _is_vec3(item):
+                self.fail(
+                    "bad_field",
+                    f"{where}{key}[{index}]: expected [x, y, z] of finite numbers, got {item!r}",
+                )
+                return None
+        return value
+
     @staticmethod
     def _valid(value: Any, kind: str, *, minimum: int | None, nonempty: bool) -> bool:
         if kind == "string":
@@ -720,6 +764,7 @@ def _check_fixture_map(ctx: CheckContext) -> None:
             "init_runs_short",
             f"init_runs: {len(runs)} run(s), issue #15 requires >= 3 independent initializations",
         )
+    child_runs = _child_run_map(ctx)
     init_ids: list[str] = []
     state_hashes: list[str] = []
     order_hashes: list[str] = []
@@ -728,7 +773,8 @@ def _check_fixture_map(ctx: CheckContext) -> None:
     for index, row in enumerate(runs):
         where = f"init_runs[{index}]."
         init_id = ctx.require(row, "init_id", "string", nonempty=True, where=where)
-        ctx.require(row, "run_id", "string", nonempty=True, where=where)
+        run_id = ctx.require(row, "run_id", "string", nonempty=True, where=where)
+        instance_id = ctx.require(row, "instance_id", "string", nonempty=True, where=where)
         state = ctx.require(row, "state_hash", "hex64", where=where)
         order = ctx.require(row, "order_hash", "hex16", where=where)
         count = ctx.require(row, "entity_count", "int", minimum=1, where=where)
@@ -736,6 +782,19 @@ def _check_fixture_map(ctx: CheckContext) -> None:
         early = ctx.require(row, "early_output", "bool", where=where)
         ready_value = ctx.require(row, "ready", "bool", where=where)
         ctx.require(row, "tick", "int", minimum=0, where=where)
+        if isinstance(run_id, str):
+            expected_instance = child_runs.get(run_id)
+            if expected_instance is None:
+                ctx.fail(
+                    "init_run_unbound",
+                    f"{where}run_id {run_id!r} is not declared in bundle.run.child_runs",
+                )
+            elif isinstance(instance_id, str) and instance_id != expected_instance:
+                ctx.fail(
+                    "init_run_instance",
+                    f"{where}instance_id {instance_id!r} does not match the declared child "
+                    f"run instance {expected_instance!r}",
+                )
         if isinstance(init_id, str):
             init_ids.append(init_id)
         if isinstance(state, str):
@@ -780,7 +839,7 @@ def _check_fixture_map(ctx: CheckContext) -> None:
     scan = ctx.json("command_block_scan")
     if scan is not None:
         ctx.require(scan, "method", "string", nonempty=True)
-        ctx.require(scan, "world_dirs", "list", minimum=1)
+        ctx.string_list(scan, "world_dirs", minimum=1)
         found = ctx.require(scan, "command_blocks", "int", minimum=0)
         ctx.require_true(scan, "scanned")
         ctx.require_false(scan, "placed_by_init")
@@ -789,7 +848,7 @@ def _check_fixture_map(ctx: CheckContext) -> None:
 
     cleanup = ctx.json("cleanup_rebuild")
     if cleanup is not None:
-        ctx.require(cleanup, "steps", "list", minimum=1)
+        ctx.string_list(cleanup, "steps", minimum=1)
         ctx.require_true(cleanup, "source_world_untouched")
         ctx.require_true(cleanup, "rebuild_reproducible")
 
@@ -826,7 +885,21 @@ def _check_restore_fidelity(ctx: CheckContext) -> None:
         ctx.fail("restore_count_mismatch", "restore: per-type entity counts differ after restore")
     ctx.assert_("restore order reproduced", order_before == order_after, order_before)
 
-    # Fixture-relevant full state: same UUID sequence, same NBT, same pos/vel.
+    # The NBT string is the only full-state evidence; an empty/missing/null NBT
+    # would make the "full inventory" comparison vacuous.
+    for side, snapshot in (("before", before), ("after", after)):
+        for entity in snapshot.entities:
+            nbt = entity.record.get("nbt")
+            if not isinstance(nbt, str) or not nbt:
+                ctx.fail(
+                    "restore_nbt_missing",
+                    f"restore: snapshot-{side} entity {entity.uuid or entity.line!r} has no "
+                    f"non-empty NBT string (got {nbt!r})",
+                )
+
+    # Fixture-relevant full state: same UUID sequence, same NBT, and the
+    # convenience pos/vel fields when both sides carry them (docs/fork-verify.md
+    # rule 11: missing vel is not an error).
     if order_before == order_after:
         mismatch = 0
         for left, right in zip(before.entities, after.entities):
@@ -837,29 +910,82 @@ def _check_restore_fidelity(ctx: CheckContext) -> None:
                         "restore_nbt_mismatch",
                         f"restore: {left.uuid} NBT differs (inventory/components not faithful)",
                     )
-            if left.pos is None or right.pos is None or any(
-                abs(a - b) > 1e-6 for a, b in zip(left.pos, right.pos)
-            ):
+            if left.pos is not None and right.pos is not None:
+                if any(abs(a - b) > 1e-6 for a, b in zip(left.pos, right.pos)):
+                    mismatch += 1
+                    if mismatch <= 3:
+                        ctx.fail("restore_pos_mismatch", f"restore: {left.uuid} position differs")
+            elif left.pos is not None or right.pos is not None:
                 mismatch += 1
                 if mismatch <= 3:
-                    ctx.fail("restore_pos_mismatch", f"restore: {left.uuid} position differs")
-            if left.vel is None or right.vel is None or any(
-                abs(a - b) > 1e-6 for a, b in zip(left.vel, right.vel)
-            ):
+                    ctx.fail(
+                        "restore_pos_mismatch",
+                        f"restore: {left.uuid} has pos on only one side of the restore",
+                    )
+            if left.vel is not None and right.vel is not None:
+                if any(abs(a - b) > 1e-6 for a, b in zip(left.vel, right.vel)):
+                    mismatch += 1
+                    if mismatch <= 3:
+                        ctx.fail("restore_vel_mismatch", f"restore: {left.uuid} velocity differs")
+            elif left.vel is not None or right.vel is not None:
                 mismatch += 1
                 if mismatch <= 3:
-                    ctx.fail("restore_vel_mismatch", f"restore: {left.uuid} velocity differs")
+                    ctx.fail(
+                        "restore_vel_mismatch",
+                        f"restore: {left.uuid} has vel on only one side of the restore",
+                    )
         ctx.assert_("restore full state equal", mismatch == 0, f"{mismatch} mismatch(es)")
 
     record = ctx.json("restore_record")
     if record is not None:
         endpoint = ctx.require(record, "endpoint", "object")
         if endpoint is not None:
-            ctx.require(endpoint, "source", "string", nonempty=True)
-            ctx.require(endpoint, "target", "string", nonempty=True)
+            source_value = ctx.require(endpoint, "source", "string", nonempty=True)
+            target_value = ctx.require(endpoint, "target", "string", nonempty=True)
             ctx.require_true(endpoint, "target_resolved")
             ctx.require_true(endpoint, "wrong_target_rejected")
-        ctx.require(record, "dimension", "string", nonempty=True)
+            source_instance = _resolve_instance(ctx.bundle, source_value)
+            target_instance = _resolve_instance(ctx.bundle, target_value)
+            if source_instance is None:
+                ctx.fail(
+                    "restore_endpoint_unknown",
+                    f"restore_record.endpoint.source {source_value!r} is not a declared "
+                    "run instance id or unique role",
+                )
+            elif source_instance.get("role") != "source_audit":
+                ctx.fail(
+                    "restore_endpoint_roles",
+                    "restore_record.endpoint.source must be the source_audit instance",
+                )
+            if target_instance is None:
+                ctx.fail(
+                    "restore_endpoint_unknown",
+                    f"restore_record.endpoint.target {target_value!r} is not a declared "
+                    "run instance id or unique role",
+                )
+            elif target_instance.get("role") != "experiment":
+                ctx.fail(
+                    "restore_endpoint_roles",
+                    "restore_record.endpoint.target must be the experiment instance",
+                )
+            if (
+                isinstance(source_value, str)
+                and isinstance(target_value, str)
+                and source_value == target_value
+            ):
+                ctx.fail("restore_endpoint_same", "restore_record.endpoint source and target are the same")
+        dimension = ctx.require(record, "dimension", "string", nonempty=True)
+        if (
+            target_instance is not None
+            and isinstance(dimension, str)
+            and isinstance(target_instance.get("dimension"), str)
+            and dimension != target_instance.get("dimension")
+        ):
+            ctx.fail(
+                "restore_dimension_mismatch",
+                f"restore_record.dimension {dimension!r} does not match the target instance "
+                f"dimension {target_instance.get('dimension')!r}",
+            )
         ctx.require_true(record, "chunks_loaded")
         ctx.require_true(record, "tick_controlled")
         initial = ctx.require(record, "duplicates_pre_existing", "int", minimum=0)
@@ -948,9 +1074,9 @@ def _check_player_context(ctx: CheckContext) -> None:
     contract = ctx.json("entry_contract")
     if contract is not None:
         ctx.one_of(contract, "mode", ("external_task", "manual_external"))
-        ctx.require(contract, "fields", "list", minimum=1)
+        ctx.string_list(contract, "fields", minimum=1)
         ctx.require(contract, "native_chat_verified", "bool")
-        ctx.require(contract, "unsupported_entries", "list")
+        ctx.string_list(contract, "unsupported_entries")
 
     pins = ctx.json("version_pins")
     if pins is not None:
@@ -969,7 +1095,7 @@ def _check_agent_dev_capability(ctx: CheckContext) -> None:
     if environment is not None:
         ctx.require(environment, "harness", "string", nonempty=True)
         ctx.require(environment, "model", "string", nonempty=True)
-        ctx.require(environment, "docs_visible", "list", minimum=1)
+        ctx.string_list(environment, "docs_visible", minimum=1)
         tools = ctx.require(environment, "tools", "object")
         if tools is not None:
             for name in (
@@ -1018,10 +1144,20 @@ def _check_agent_dev_capability(ctx: CheckContext) -> None:
     rows = ctx.jsonl("instance_isolation")
     if rows is None:
         return
+    declared_by_id = {
+        instance.get("instance_id"): instance for instance in ctx.bundle.instances
+    }
+    effective_ranges = _parse_port_ranges(ctx.bundle.effective_port_ranges)
+    if ctx.bundle.effective_port_ranges and effective_ranges is None:
+        ctx.fail(
+            "port_range",
+            f"allowed_port_ranges: cannot parse {ctx.bundle.effective_port_ranges!r} as LOW-HIGH",
+        )
     instance_ids: list[str] = []
     world_dirs: list[str] = []
     ports: list[int] = []
     roles: set[str] = set()
+    covered: set[str] = set()
     for index, row in enumerate(rows):
         where = f"instance_isolation[{index}]."
         instance = ctx.require(row, "instance_id", "string", nonempty=True, where=where)
@@ -1034,6 +1170,21 @@ def _check_agent_dev_capability(ctx: CheckContext) -> None:
         ctx.require_false(row, "conflicting_instance", where=where)
         if isinstance(instance, str):
             instance_ids.append(instance)
+            declaration = declared_by_id.get(instance)
+            if declaration is None:
+                ctx.fail(
+                    "instance_isolation_mismatch",
+                    f"{where}instance_id {instance!r} is not declared in bundle.run.instances",
+                )
+            else:
+                covered.add(instance)
+                for field, got in (("role", role), ("world_dir", world), ("rcon_port", rcon), ("bridge_port", bridge)):
+                    if got is not None and got != declaration.get(field):
+                        ctx.fail(
+                            "instance_isolation_mismatch",
+                            f"{where}{field}={got!r} does not match the declared instance "
+                            f"{instance!r} value {declaration.get(field)!r}",
+                        )
         if isinstance(world, str):
             world_dirs.append(world)
         if isinstance(role, str):
@@ -1042,6 +1193,14 @@ def _check_agent_dev_capability(ctx: CheckContext) -> None:
             ports.append(rcon)
         if _is_int(bridge):
             ports.append(bridge)
+        for port in (rcon, bridge):
+            if _is_int(port) and effective_ranges is not None and not any(
+                low <= port <= high for low, high in effective_ranges
+            ):
+                ctx.fail(
+                    "instance_port_range",
+                    f"{where}port {port} is outside {ctx.bundle.effective_port_ranges}",
+                )
     if len(rows) < 2:
         ctx.fail("instance_isolation_short", "instance_isolation: at least two instances are required")
     if len(instance_ids) != len(set(instance_ids)):
@@ -1052,6 +1211,12 @@ def _check_agent_dev_capability(ctx: CheckContext) -> None:
         ctx.fail("instance_port_duplicate", "instance_isolation: a port is used by two instances")
     if {"source_audit", "experiment"} - roles:
         ctx.fail("instance_roles", "instance_isolation: source_audit and experiment roles are required")
+    missing = [instance_id for instance_id in declared_by_id if instance_id not in covered]
+    if declared_by_id and missing:
+        ctx.fail(
+            "instance_isolation_missing",
+            f"instance_isolation: declared instance(s) without evidence: {', '.join(sorted(missing))}",
+        )
     ctx.assert_("instances isolated", len(world_dirs) == len(set(world_dirs)) and len(ports) == len(set(ports)))
 
 
@@ -1060,20 +1225,59 @@ def _identity_of(row: dict[str, Any]) -> tuple[Any, Any, Any]:
     return (row.get("run_id"), row.get("instance_id"), row.get("dimension"))
 
 
+def _child_run_map(ctx: CheckContext) -> dict[str, str]:
+    """Validate ``run.child_runs`` and return ``child run_id -> instance_id``."""
+    mapping: dict[str, str] = {}
+    children = ctx.bundle.child_runs
+    if not children:
+        ctx.fail(
+            "child_runs_missing",
+            "bundle.run.child_runs must declare the independent initialization run ids",
+        )
+        return mapping
+    declared_instances = ctx.bundle.instance_dimensions
+    seen: set[str] = set()
+    for index, child in enumerate(children):
+        where = f"run.child_runs[{index}]."
+        child_run = ctx.require(child, "run_id", "string", nonempty=True, where=where)
+        instance_id = ctx.require(child, "instance_id", "string", nonempty=True, where=where)
+        if not isinstance(child_run, str):
+            continue
+        if child_run in seen:
+            ctx.fail("child_run_duplicate", f"{where}run_id {child_run!r} repeats")
+        seen.add(child_run)
+        if child_run == ctx.bundle.run_id:
+            ctx.fail("child_run_parent", f"{where}child run id equals the parent run id")
+        if not isinstance(instance_id, str) or not instance_id:
+            continue
+        if declared_instances and instance_id not in declared_instances:
+            ctx.fail(
+                "child_run_instance",
+                f"{where}instance_id {instance_id!r} is not declared in bundle.run.instances",
+            )
+        mapping[child_run] = instance_id
+    return mapping
+
+
 def _validate_audit_provenance(
     ctx: CheckContext,
     events: Sequence[dict[str, Any]],
     run_id: Any,
     instance_dimensions: dict[str, str],
+    child_runs: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Bind audit events to the declared run/instance/dimension and order them.
 
-    Mixing evidence from another run, instance or dimension is an ordinary
-    stale-evidence failure: the events must not be joined at all.  Event ids
-    must be unique, and ``(tick, seq)`` must be strictly increasing per full
-    identity, so a repeated or colliding sequence cannot silently establish an
-    ordering.  Returns the ``phase == "agent"`` subset for chain checks.
+    Events may belong to the parent run or to an explicitly declared child run
+    (an independent initialization), but the agent phase must belong to the
+    parent run.  Mixing evidence from an undeclared run, instance or dimension
+    is an ordinary stale-evidence failure: the events must not be joined at
+    all.  Event ids must be unique, and ``(tick, seq)`` must be strictly
+    increasing per full identity, so a repeated or colliding sequence cannot
+    silently establish an ordering.  Returns the ``phase == "agent"`` subset
+    for chain checks.
     """
+    child_runs = child_runs or {}
     agent_events: list[dict[str, Any]] = []
     if not isinstance(run_id, str) or not run_id:
         ctx.fail("audit_provenance", "bundle.run.run_id is not declared; audit events cannot be bound")
@@ -1097,12 +1301,31 @@ def _validate_audit_provenance(
         row_run = row.get("run_id")
         instance_id = row.get("instance_id")
         dimension = row.get("dimension")
-        if row_run != run_id:
+        phase = row.get("phase")
+        expected_instance: str | None = None
+        if row_run == run_id:
+            expected_instance = None  # any declared parent instance
+        elif isinstance(row_run, str) and row_run in child_runs:
+            expected_instance = child_runs[row_run]
+            if phase == "agent":
+                ctx.fail(
+                    "audit_provenance",
+                    f"{where}agent-phase event must belong to the parent run {run_id!r}, "
+                    f"not to child run {row_run!r}",
+                )
+        else:
             ctx.fail(
                 "audit_provenance",
-                f"{where}run_id {row_run!r} is not the declared run {run_id!r}",
+                f"{where}run_id {row_run!r} is neither the declared run {run_id!r} nor a "
+                "declared child run",
             )
-        elif not isinstance(instance_id, str) or instance_id not in instance_dimensions:
+        if expected_instance is not None and instance_id != expected_instance:
+            ctx.fail(
+                "audit_provenance",
+                f"{where}instance_id {instance_id!r} does not match child run {row_run!r} "
+                f"instance {expected_instance!r}",
+            )
+        if not isinstance(instance_id, str) or instance_id not in instance_dimensions:
             ctx.fail(
                 "audit_provenance",
                 f"{where}instance_id {instance_id!r} is not declared in bundle.run.instances",
@@ -1131,7 +1354,7 @@ def _validate_audit_provenance(
                     f"{previous[0]}/{previous[1]} for {key[0]}/{key[1]}/{key[2]}",
                 )
             last_order[key] = (tick, seq)
-        if row.get("phase") == "agent":
+        if phase == "agent":
             agent_events.append(row)
     return agent_events
 
@@ -1150,6 +1373,7 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
         loaded = ctx.require(manifest, "loaded_in", "list", minimum=2)
         if loaded is not None and {"source_audit", "experiment"} - set(loaded):
             ctx.fail("test_mod_coverage", "test_mod_manifest: loaded_in must cover source_audit and experiment")
+        ctx.string_list(manifest, "loaded_in", minimum=2)
 
     events = ctx.jsonl("audit_events")
     agent_events: list[dict[str, Any]] = []
@@ -1168,7 +1392,11 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
             if isinstance(event, str):
                 seen_events.add(event)
         agent_events = _validate_audit_provenance(
-            ctx, events, ctx.bundle.run_id, ctx.bundle.instance_dimensions
+            ctx,
+            events,
+            ctx.bundle.run_id,
+            ctx.bundle.instance_dimensions,
+            _child_run_map(ctx),
         )
         required = {"input_attempt", "input_processed", "cart_emitted", "cart_removed"}
         missing = sorted(required - seen_events)
@@ -1184,6 +1412,11 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
         if not emitted:
             ctx.fail("audit_chain", "audit_events: no cart_emitted event captured")
         for row in emitted:
+            if not isinstance(row.get("cart_uuid"), str) or not row.get("cart_uuid"):
+                ctx.fail(
+                    "audit_cart_uuid",
+                    f"audit_events: cart_emitted {row.get('event_id')!r} has no cart_uuid",
+                )
             if row.get("captured_before_removal") is not True:
                 ctx.fail(
                     "audit_transient",
@@ -1192,6 +1425,11 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
         if not removed:
             ctx.fail("audit_chain", "audit_events: no cart_removed event captured")
         for row in removed:
+            if not isinstance(row.get("cart_uuid"), str) or not row.get("cart_uuid"):
+                ctx.fail(
+                    "audit_cart_uuid",
+                    f"audit_events: cart_removed {row.get('event_id')!r} has no cart_uuid",
+                )
             if not isinstance(row.get("removal_reason"), str) or not row.get("removal_reason"):
                 ctx.fail("audit_removal_reason", "audit_events: cart_removed needs a removal_reason")
 
@@ -1251,9 +1489,24 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
                     f"audit_events: cart_removed {row.get('cart_uuid')!r} does not follow a "
                     "cart_emitted on the same run/instance/dimension",
                 )
+        emitted_carts = {
+            _identity_of(row) + (row.get("cart_uuid"),) for row in emitted if row.get("cart_uuid")
+        }
+        removed_carts = {
+            _identity_of(row) + (row.get("cart_uuid"),) for row in removed if row.get("cart_uuid")
+        }
+        for key in sorted(emitted_carts - removed_carts, key=str):
+            ctx.fail(
+                "audit_removal_missing",
+                f"audit_events: cart {key[-1]!r} was emitted but no cart_removed captured it",
+            )
         ctx.assert_(
             "input -> processing -> output chain",
-            matched > 0 and emitted and matched_emitted == len(emitted) and matched_removed == len(removed),
+            matched > 0
+            and emitted
+            and matched_emitted == len(emitted)
+            and matched_removed == len(removed)
+            and not (emitted_carts - removed_carts),
         )
 
     negatives = ctx.jsonl("negative_cases")
@@ -1295,6 +1548,7 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
                 "audit_lifecycle_incomplete",
                 f"audit_lifecycle: missing state(s): {', '.join(sorted(required_states - set(states)))}",
             )
+        ctx.string_list(lifecycle, "states", minimum=1)
         ctx.one_of(lifecycle, "missing_log_status", ("error",))
         ctx.one_of(lifecycle, "overflow_status", ("error",))
         ctx.require_true(lifecycle, "per_instance_files")
@@ -1352,10 +1606,38 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
                     ctx.fail("trace_time", f"{where}ended_at is before started_at")
         if len(call_ids) != len(set(call_ids)):
             ctx.fail("trace_call_duplicate", "tool_trace: call_id values repeat")
-        categories = ctx.bundle.manifest.get("run", {})
-        mapping = categories.get("tool_category_map") if isinstance(categories, dict) else None
-        if not isinstance(mapping, dict):
-            mapping = DEFAULT_TOOL_CATEGORIES
+        run_block = ctx.bundle.manifest.get("run", {})
+        override = run_block.get("tool_category_map") if isinstance(run_block, dict) else None
+        mapping: dict[str, tuple[str, ...]] = {
+            key: tuple(value) for key, value in DEFAULT_TOOL_CATEGORIES.items()
+        }
+        if override is not None:
+            if not isinstance(override, dict):
+                ctx.fail("tool_category_map", "run.tool_category_map must be an object")
+            else:
+                for category, patterns in override.items():
+                    if not isinstance(category, str) or not category.strip():
+                        ctx.fail(
+                            "tool_category_map",
+                            f"run.tool_category_map key {category!r} is not a non-empty string",
+                        )
+                        continue
+                    if not isinstance(patterns, list) or not patterns:
+                        ctx.fail(
+                            "tool_category_map",
+                            f"run.tool_category_map[{category!r}] must be a non-empty list of patterns",
+                        )
+                        continue
+                    valid: list[str] = []
+                    for pattern in patterns:
+                        if not isinstance(pattern, str) or not pattern.strip():
+                            ctx.fail(
+                                "tool_category_map",
+                                f"run.tool_category_map[{category!r}] has a blank pattern {pattern!r}",
+                            )
+                        else:
+                            valid.append(pattern)
+                    mapping[category] = tuple(valid)
         names = " ".join(str(row.get("tool", "")).lower() for row in trace)
         missing = [
             category
@@ -1388,6 +1670,8 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
     if join is not None and call_ids is not None:
         joins = ctx.object_list(join, "joins", minimum=1)
         known = set(call_ids)
+        joined_calls: set[str] = set()
+        joined_events: set[str] = set()
         for index, item in enumerate(joins):
             where = f"joins[{index}]."
             call_id = ctx.require(item, "call_id", "string", nonempty=True, where=where)
@@ -1395,6 +1679,8 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
             ctx.require_true(item, "verified", where=where)
             if isinstance(call_id, str) and call_id not in known:
                 ctx.fail("trace_join_unknown", f"{where}call_id {call_id!r} is not in tool_trace")
+            if isinstance(call_id, str):
+                joined_calls.add(call_id)
             if ref is not None:
                 ctx.require(ref, "run_id", "string", nonempty=True, where=where)
                 ctx.require(ref, "instance_id", "string", nonempty=True, where=where)
@@ -1411,6 +1697,8 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
                         )
                     else:
                         matched = matches[0]
+                        if isinstance(event_id, str):
+                            joined_events.add(event_id)
                         for field in ("run_id", "instance_id", "dimension", "tick"):
                             if matched.get(field) != ref.get(field):
                                 ctx.fail(
@@ -1418,14 +1706,48 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
                                     f"{where}audit_ref.{field}={ref.get(field)!r} but the audit "
                                     f"event has {matched.get(field)!r}",
                                 )
+                        if matched.get("phase") != "agent":
+                            ctx.fail(
+                                "trace_join_phase",
+                                f"{where}event_id {event_id!r} is phase "
+                                f"{matched.get('phase')!r}, not agent",
+                            )
         unmatched_tools = ctx.require(join, "unmatched_tool_calls", "int", minimum=0)
         unmatched_events = ctx.require(join, "unmatched_agent_events", "int", minimum=0)
+        computed_unmatched_tools = len(set(call_ids) - joined_calls)
+        agent_event_ids = (
+            {
+                row.get("event_id")
+                for row in audit_events
+                if row.get("phase") == "agent" and isinstance(row.get("event_id"), str)
+            }
+            if audit_events is not None
+            else set()
+        )
+        computed_unmatched_events = len(agent_event_ids - joined_events)
+        if _is_int(unmatched_tools) and unmatched_tools != computed_unmatched_tools:
+            ctx.fail(
+                "trace_join_unmatched",
+                f"trace_join: unmatched_tool_calls={unmatched_tools} but {computed_unmatched_tools} "
+                "tool call(s) have no join",
+            )
+        if _is_int(unmatched_events) and unmatched_events != computed_unmatched_events:
+            ctx.fail(
+                "trace_join_unmatched",
+                f"trace_join: unmatched_agent_events={unmatched_events} but "
+                f"{computed_unmatched_events} agent-side event(s) have no join",
+            )
         if _is_int(unmatched_events) and unmatched_events != 0:
             ctx.fail(
                 "trace_join_unmatched",
                 f"trace_join: {unmatched_events} agent-side event(s) have no tool call",
             )
-        ctx.assert_("tool trace joins game events", unmatched_events == 0)
+        if audit_events is not None and computed_unmatched_events != 0:
+            ctx.fail(
+                "trace_join_unmatched",
+                f"trace_join: {computed_unmatched_events} agent-side event(s) are not joined",
+            )
+        ctx.assert_("tool trace joins game events", computed_unmatched_events == 0)
 
     missing_log = ctx.jsonl("missing_log_detection")
     if missing_log is not None:
@@ -1444,6 +1766,20 @@ def _check_trace_persistence(ctx: CheckContext) -> None:
                 "missing_log_incomplete",
                 f"missing_log_detection: missing case(s): {', '.join(sorted(required - seen))}",
             )
+
+
+def _load_declared_json(bundle: Bundle, check_id: str, kind: str) -> dict[str, Any] | None:
+    """Read a JSON artifact another check owns, for cross-artifact consistency."""
+    ref = bundle.artifact_ref(check_id, kind)
+    if ref is None:
+        return None
+    path = _resolve_rel(bundle.root, ref)
+    if path is None or not path.is_file():
+        return None
+    obj, error = _read_json(path)
+    if error is not None or not isinstance(obj, dict):
+        return None
+    return obj
 
 
 def _check_smoke_fixture_validity(ctx: CheckContext) -> None:
@@ -1469,7 +1805,7 @@ def _check_smoke_fixture_validity(ctx: CheckContext) -> None:
     validity = ctx.json("fixture_validity")
     if validity is not None:
         ctx.require(validity, "input_semantics", "string", nonempty=True)
-        ctx.require(validity, "stack_positions", "list", minimum=1)
+        ctx.vec3_list(validity, "stack_positions", minimum=1)
         boundary = ctx.require(validity, "output_boundary", "object")
         if boundary is not None and not boundary:
             ctx.fail("bad_field", "fixture_validity.output_boundary: must not be empty")
@@ -1486,7 +1822,6 @@ def _check_smoke_fixture_validity(ctx: CheckContext) -> None:
         for index, component in enumerate(components):
             where = f"components[{index}]."
             name = ctx.require(component, "name", "string", nonempty=True, where=where)
-            ctx.require(component, "version", "string", nonempty=True, where=where)
             if isinstance(name, str):
                 by_name[name] = component
         for name, requirement in VERSION_LOCK_REQUIRED.items():
@@ -1498,7 +1833,52 @@ def _check_smoke_fixture_validity(ctx: CheckContext) -> None:
                 ctx.require(component, "commit", "hex40", where=f"{name}.")
             elif requirement == "sha256":
                 ctx.require(component, "sha256", "hex64", where=f"{name}.")
+            else:
+                ctx.require(component, "version", "string", nonempty=True, where=f"{name}.")
+            if "version" in component:
+                ctx.require(component, "version", "string", nonempty=True, where=f"{name}.")
         ctx.assert_("version lock covers components", not (set(VERSION_LOCK_REQUIRED) - set(by_name)))
+
+        # Pins must agree with the artifacts they name, not only with themselves.
+        def pinned(name: str, field: str) -> Any:
+            component = by_name.get(name)
+            return component.get(field) if component else None
+
+        def conflict(name: str, field: str, other: Any, other_label: str) -> None:
+            value = pinned(name, field)
+            if isinstance(value, str) and isinstance(other, str) and value != other:
+                ctx.fail(
+                    "version_lock_conflict",
+                    f"version_lock: {name}.{field}={value!r} but {other_label}={other!r}",
+                )
+
+        fixture_manifest = _load_declared_json(ctx.bundle, "fixture_map", "fixture_manifest")
+        if fixture_manifest is not None:
+            mapo = fixture_manifest.get("map")
+            if isinstance(mapo, dict):
+                conflict("fixture-map", "sha256", mapo.get("sha256"), "fixture_manifest.map.sha256")
+                conflict("minecraft", "version", mapo.get("mc_version"), "fixture_manifest.map.mc_version")
+            mods = fixture_manifest.get("mods")
+            if isinstance(mods, list):
+                for mod in mods:
+                    if isinstance(mod, dict) and mod.get("name") == "carpet":
+                        conflict("carpet", "sha256", mod.get("sha256"), "fixture_manifest carpet sha256")
+        test_mod_manifest = _load_declared_json(ctx.bundle, "independent_test_mod", "test_mod_manifest")
+        if test_mod_manifest is not None:
+            conflict("test-mod", "sha256", test_mod_manifest.get("sha256"), "test_mod_manifest.sha256")
+        version_pins = _load_declared_json(ctx.bundle, "player_context", "version_pins")
+        if version_pins is not None:
+            interface = version_pins.get("interface_mod")
+            if isinstance(interface, dict):
+                conflict(
+                    "mc-agent-interface-mod",
+                    "commit",
+                    interface.get("commit"),
+                    "version_pins.interface_mod.commit",
+                )
+            bridge = version_pins.get("bridge")
+            if isinstance(bridge, dict):
+                conflict("mc-agent-bridge", "commit", bridge.get("commit"), "version_pins.bridge.commit")
 
     index = ctx.json("evidence_index")
     if index is not None:
@@ -1579,21 +1959,45 @@ def _run_evidence_integrity(
             ctx.fail("instance_ports", "run.instances: a port is used twice")
         if {"source_audit", "experiment"} - roles:
             ctx.fail("instance_roles", "run.instances: source_audit and experiment are required")
-        ranges = port_ranges or bundle.allowed_port_ranges or [DEFAULT_PORT_RANGE]
-        parsed_ranges = _parse_port_ranges(ranges)
-        if parsed_ranges is None:
-            ctx.fail("port_range", f"allowed_port_ranges: cannot parse {ranges!r} as LOW-HIGH")
-        else:
+        declared_ranges = bundle.allowed_port_ranges
+        if not declared_ranges:
+            ctx.fail(
+                "port_range_missing",
+                "run.allowed_port_ranges must explicitly declare the accepted port ranges",
+            )
+        parsed_declared = _parse_port_ranges(declared_ranges) if declared_ranges else None
+        if declared_ranges and parsed_declared is None:
+            ctx.fail("port_range", f"allowed_port_ranges: cannot parse {declared_ranges!r} as LOW-HIGH")
+        effective = parsed_declared or []
+        if port_ranges:
+            parsed_cli = _parse_port_ranges(port_ranges)
+            if parsed_cli is None:
+                ctx.fail("port_range", f"--port-range: cannot parse {port_ranges!r} as LOW-HIGH")
+            else:
+                for low, high in parsed_cli:
+                    if parsed_declared is not None and not any(
+                        declared_low <= low and high <= declared_high
+                        for declared_low, declared_high in parsed_declared
+                    ):
+                        ctx.fail(
+                            "port_range_conflict",
+                            f"--port-range {low}-{high} is not inside the declared "
+                            f"{', '.join(str(item) for item in declared_ranges)}",
+                        )
+                effective = parsed_cli
+        if effective:
+            shown = port_ranges or declared_ranges
             for port in ports:
-                if not any(low <= port <= high for low, high in parsed_ranges):
+                if not any(low <= port <= high for low, high in effective):
                     ctx.fail(
                         "instance_ports",
-                        f"run.instances: port {port} is outside {', '.join(ranges)}",
+                        f"run.instances: port {port} is outside {', '.join(str(item) for item in shown)}",
                     )
         ctx.assert_("integration instances isolated", len(ports) == len(set(ports)))
 
         # Audit events must belong to this run's declared instances/dimensions,
         # even before any tool/game join is checked.
+        child_runs = _child_run_map(ctx)
         audit_ref = bundle.artifact_ref("independent_test_mod", "audit_events")
         audit_path = _resolve_rel(bundle.root, audit_ref) if audit_ref else None
         if audit_path is not None and audit_path.is_file() and isinstance(run_id, str):
@@ -1601,7 +2005,7 @@ def _run_evidence_integrity(
             if audit_errors:
                 ctx.fail("audit_unreadable", "audit_events: " + "; ".join(audit_errors[:3]))
             else:
-                _validate_audit_provenance(ctx, audit_rows, run_id, declared_dimensions)
+                _validate_audit_provenance(ctx, audit_rows, run_id, declared_dimensions, child_runs)
 
     world = ctx.require(manifest.get("run", {}), "source_world", "object") if isinstance(manifest.get("run"), dict) else None
     recorded_after: str | None = None
@@ -1784,14 +2188,21 @@ def _run_evidence_integrity(
                         )
                     ctx.assert_("source world re-hashed read-only", True, f"{files} file(s), {digest}")
     else:
+        ctx.blocked(
+            "source_rehash_skipped",
+            "source world was not independently re-hashed (--skip-source-rehash); "
+            "pass --source-world for acceptance",
+        )
         limitations.append("Source-world bytes were not independently re-hashed (--skip-source-rehash).")
 
     return ctx.result()
 
 
-def _parse_port_ranges(ranges: Sequence[str]) -> list[tuple[int, int]] | None:
+def _parse_port_ranges(ranges: Sequence[Any]) -> list[tuple[int, int]] | None:
     parsed: list[tuple[int, int]] = []
     for item in ranges:
+        if not isinstance(item, str):
+            return None
         match = PORT_RANGE.fullmatch(item)
         if match is None:
             return None
@@ -1800,6 +2211,18 @@ def _parse_port_ranges(ranges: Sequence[str]) -> list[tuple[int, int]] | None:
             return None
         parsed.append((low, high))
     return parsed or None
+
+
+def _resolve_instance(bundle: Bundle, value: Any) -> dict[str, Any] | None:
+    """Find the declared run instance named by an id or by a unique role."""
+    if not isinstance(value, str) or not value:
+        return None
+    matches = [
+        instance
+        for instance in bundle.instances
+        if instance.get("instance_id") == value or instance.get("role") == value
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 # --------------------------------------------------------------------------- check specs
@@ -1973,6 +2396,7 @@ def run_gate(
     root = Path(bundle_dir)
     manifest, parse_problem = _parse_bundle(root)
     bundle = Bundle(root, manifest, parse_problem)
+    bundle.cli_port_ranges = list(port_ranges) if port_ranges else []
     limitations: list[str] = [
         "The gate validates coordinator-provided raw artifacts; it cannot prove they were not fabricated. "
         "Keep the raw logs and spot-check the evidence index.",
@@ -2279,8 +2703,9 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
         root / "artifacts/fixture_map/init-runs.jsonl",
         [
             {
-                "run_id": f"init-run-{index}",
+                "run_id": f"init-child-{index}",
                 "init_id": f"init-{index}",
+                "instance_id": "exp-1",
                 "state_hash": state_hash,
                 "order_hash": order,
                 "entity_count": len(records),
@@ -2584,9 +3009,24 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
                     "call_id": "call-3",
                     "audit_ref": {"run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "dimension": "minecraft:overworld", "tick": 110, "event_id": "e2"},
                     "verified": True,
-                }
+                },
+                {
+                    "call_id": "call-3",
+                    "audit_ref": {"run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "dimension": "minecraft:overworld", "tick": 110, "event_id": "e3"},
+                    "verified": True,
+                },
+                {
+                    "call_id": "call-3",
+                    "audit_ref": {"run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "dimension": "minecraft:overworld", "tick": 113, "event_id": "e4"},
+                    "verified": True,
+                },
+                {
+                    "call_id": "call-3",
+                    "audit_ref": {"run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "dimension": "minecraft:overworld", "tick": 125, "event_id": "e5"},
+                    "verified": True,
+                },
             ],
-            "unmatched_tool_calls": 0,
+            "unmatched_tool_calls": 3,
             "unmatched_agent_events": 0,
         },
     )
@@ -2628,10 +3068,15 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
         root / "artifacts/smoke_fixture_validity/version-lock.json",
         {
             "components": [
-                {"name": name, ("commit" if requirement == "commit" else "sha256" if requirement == "sha256" else "tag"): (
-                    _fake_commit(name) if requirement == "commit" else _fake_sha(name) if requirement == "sha256" else "pinned"
-                ), "version": f"{name}-pinned"}
-                for name, requirement in VERSION_LOCK_REQUIRED.items()
+                {"name": "mc-agent", "commit": _fake_commit("mc-agent"), "version": "mc-agent-pinned"},
+                {"name": "mc-agent-interface-mod", "commit": _fake_commit("interface"), "version": "interface-pinned"},
+                {"name": "mc-agent-bridge", "commit": _fake_commit("bridge"), "version": "bridge-pinned"},
+                {"name": "minecraft", "version": "26.2"},
+                {"name": "fabric-loader", "version": "0.17.2"},
+                {"name": "carpet", "sha256": _fake_sha("carpet"), "version": "carpet-pinned"},
+                {"name": "test-mod", "sha256": _fake_sha("test-mod"), "version": "test-mod-pinned"},
+                {"name": "fixture-map", "sha256": _fake_sha("map"), "version": "fixture-map-pinned"},
+                {"name": "jdk", "version": "25.0.1"},
             ]
         },
     )
@@ -2651,6 +3096,9 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
                 "after_tree_sha256": world_hash,
             },
             "allowed_port_ranges": [DEFAULT_PORT_RANGE],
+            "child_runs": [
+                {"run_id": f"init-child-{index}", "instance_id": "exp-1"} for index in range(1, 4)
+            ],
             "instances": [
                 {"instance_id": "src-audit", "role": "source_audit", "world_dir": "labs/rom13-src/world", "dimension": "minecraft:overworld", "rcon_port": 27240, "bridge_port": 27241},
                 {"instance_id": "exp-1", "role": "experiment", "world_dir": "labs/rom13-exp/world", "dimension": "minecraft:overworld", "rcon_port": 27242, "bridge_port": 27243},
@@ -2677,6 +3125,12 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
                 index_entries.append({"path": artifact.filename, "tree_sha256": digest, "files": files, "bytes": total})
             else:
                 index_entries.append({"path": artifact.filename, "sha256": _sha256_file(path), "bytes": path.stat().st_size})
+    tree_roots = [
+        artifact.filename
+        for spec in CHECK_SPECS
+        for artifact in spec.artifacts.values()
+        if artifact.kind_type == "tree"
+    ]
     for extra in sorted((root / "artifacts").rglob("*")):
         if not extra.is_file():
             continue
@@ -2684,6 +3138,8 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
         if any(entry["path"] == rel for entry in index_entries):
             continue
         if rel.endswith("evidence-index.json"):
+            continue
+        if any(rel == tree or rel.startswith(tree + "/") for tree in tree_roots):
             continue
         index_entries.append({"path": rel, "sha256": _sha256_file(extra), "bytes": extra.stat().st_size})
     _write_json(
@@ -2722,23 +3178,28 @@ def _edit_jsonl(path: Path, edit: Callable[[list[dict[str, Any]]], None]) -> Non
 
 
 def _refresh_index(root: Path, rel: str) -> None:
-    """Re-pin one artifact after a deliberate mutation, so only semantics fail."""
+    """Re-pin one artifact (including files inside a tree) after a mutation."""
     index_path = root / "artifacts/smoke_fixture_validity/evidence-index.json"
     obj = json.loads(index_path.read_text(encoding="utf-8"))
     target = root / rel
+    matched = False
     for entry in obj["entries"]:
-        if entry.get("path") != rel:
+        entry_rel = entry.get("path")
+        if not isinstance(entry_rel, str):
             continue
-        if target.is_dir():
-            digest, files, total = tree_hash(target)
+        if entry_rel != rel and not (target.is_dir() and entry_rel.startswith(rel + "/")):
+            continue
+        matched = True
+        item = root / entry_rel
+        if item.is_dir():
+            digest, files, total = tree_hash(item)
             entry["tree_sha256"] = digest
             entry["files"] = files
             entry["bytes"] = total
         else:
-            entry["sha256"] = _sha256_file(target)
-            entry["bytes"] = target.stat().st_size
-        break
-    else:
+            entry["sha256"] = _sha256_file(item)
+            entry["bytes"] = item.stat().st_size
+    if not matched:
         raise AssertionError(f"evidence index has no entry for {rel}")
     index_path.write_text(json.dumps(obj, indent=2) + "\n", encoding="utf-8")
 
@@ -2825,6 +3286,19 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.equal("command blocks are fail", report.overall, STATUS_FAIL)
         test.check("command block reason", _has_reason(_report_check(report, "fixture_map"), "command_blocks_present"))
 
+        unbound_init = _copy_bundle(base, valid, "init-unbound")
+        _edit_jsonl(
+            unbound_init / "artifacts/fixture_map/init-runs.jsonl",
+            lambda rows: rows[0].update(run_id="undeclared-init-run"),
+        )
+        _refresh_index(unbound_init, "artifacts/fixture_map/init-runs.jsonl")
+        report = run_gate(unbound_init)
+        test.equal("unbound init run is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "unbound init reason",
+            _has_reason(_report_check(report, "fixture_map"), "init_run_unbound"),
+        )
+
         # restore failures ------------------------------------------------------------
         reordered = _copy_bundle(base, valid, "restore-reorder")
         records = [fork_verify.fake_record(f"00000000-0000-0000-0000-00000000000{i}", "minecraft:chest_minecart", [0.5, 70.0, float(i)]) for i in (1, 2, 3)]
@@ -2852,6 +3326,56 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.equal("issued-is-success is fail", report.overall, STATUS_FAIL)
         test.check("issued reason", _has_reason(_report_check(report, "restore_fidelity"), "not_true"))
 
+        null_nbt = _copy_bundle(base, valid, "null-nbt")
+        null_records = [
+            fork_verify.fake_record(
+                f"00000000-0000-0000-0000-00000000000{index}",
+                "minecraft:chest_minecart",
+                [0.5, 70.0, float(index)],
+                nbt=None,
+            )
+            for index in range(1, 4)
+        ]
+        fork_verify.write_snapshot(null_nbt / "artifacts/restore_fidelity/snapshot-before", null_records)
+        fork_verify.write_snapshot(null_nbt / "artifacts/restore_fidelity/snapshot-after", null_records)
+        _refresh_index(null_nbt, "artifacts/restore_fidelity/snapshot-before")
+        _refresh_index(null_nbt, "artifacts/restore_fidelity/snapshot-after")
+        report = run_gate(null_nbt)
+        test.equal("null NBT is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "null NBT reason",
+            _has_reason(_report_check(report, "restore_fidelity"), "restore_nbt_missing"),
+        )
+
+        no_vel = _copy_bundle(base, valid, "missing-vel")
+        for side in ("snapshot-before", "snapshot-after"):
+            entities_path = no_vel / "artifacts/restore_fidelity" / side / "entities.jsonl"
+            entity_rows = [
+                json.loads(line) for line in entities_path.read_text(encoding="utf-8").splitlines() if line.strip()
+            ]
+            for entity_row in entity_rows:
+                entity_row.pop("vel", None)
+            entities_path.write_text(
+                "\n".join(json.dumps(entity_row) for entity_row in entity_rows) + "\n",
+                encoding="utf-8",
+            )
+            _refresh_index(no_vel, f"artifacts/restore_fidelity/{side}")
+        report = run_gate(no_vel)
+        test.equal("missing vel still passes", report.overall, STATUS_PASS)
+
+        ghost_endpoint = _copy_bundle(base, valid, "ghost-endpoint")
+        _edit_json(
+            ghost_endpoint / "artifacts/restore_fidelity/restore-record.json",
+            lambda obj: obj["endpoint"].update(target="ghost-instance"),
+        )
+        _refresh_index(ghost_endpoint, "artifacts/restore_fidelity/restore-record.json")
+        report = run_gate(ghost_endpoint)
+        test.equal("ghost restore endpoint is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "ghost endpoint reason",
+            _has_reason(_report_check(report, "restore_fidelity"), "restore_endpoint_unknown"),
+        )
+
         # player context --------------------------------------------------------------
         crosstalk = _copy_bundle(base, valid, "context-crosstalk")
         _edit_jsonl(crosstalk / "artifacts/player_context/identity-records.jsonl", lambda rows: rows[3].update(viewed_uuid="44444444-4444-4444-4444-444444444444"))
@@ -2871,6 +3395,19 @@ def run_selftest(out: TextIO | None = None) -> int:
         report = run_gate(port_dupe)
         test.equal("duplicate instance port is fail", report.overall, STATUS_FAIL)
         test.check("port dupe reason", _has_reason(_report_check(report, "agent_dev_capability"), "instance_port_duplicate"))
+
+        ghost_isolation = _copy_bundle(base, valid, "ghost-isolation")
+        _edit_jsonl(
+            ghost_isolation / "artifacts/agent_dev_capability/instance-isolation.jsonl",
+            lambda rows: rows[0].update(instance_id="ghost-instance"),
+        )
+        _refresh_index(ghost_isolation, "artifacts/agent_dev_capability/instance-isolation.jsonl")
+        report = run_gate(ghost_isolation)
+        test.equal("ghost isolation instance is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "ghost isolation reason",
+            _has_reason(_report_check(report, "agent_dev_capability"), "instance_isolation_mismatch"),
+        )
 
         # test mod / audit ------------------------------------------------------------
         audit_gap = _copy_bundle(base, valid, "audit-gap")
@@ -2964,6 +3501,33 @@ def run_selftest(out: TextIO | None = None) -> int:
             _has_reason(_report_check(report, "independent_test_mod"), "audit_chain"),
         )
 
+        extra_emission = _copy_bundle(base, valid, "extra-emission")
+        _edit_jsonl(
+            extra_emission / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: rows.append(
+                {
+                    "event_id": "e6",
+                    "run_id": SELFTEST_RUN_ID,
+                    "instance_id": "exp-1",
+                    "phase": "agent",
+                    "dimension": "minecraft:overworld",
+                    "tick": 126,
+                    "seq": 0,
+                    "event": "cart_emitted",
+                    "cart_uuid": "00000000-0000-0000-0000-000000000099",
+                    "pos": [2, 64, 0],
+                    "captured_before_removal": True,
+                }
+            ),
+        )
+        _refresh_index(extra_emission, "artifacts/independent_test_mod/audit-events.jsonl")
+        report = run_gate(extra_emission)
+        test.equal("emitted cart without removal is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "extra emission reason",
+            _has_reason(_report_check(report, "independent_test_mod"), "audit_removal_missing"),
+        )
+
         no_dimension = _copy_bundle(base, valid, "missing-declared-dimension")
         _edit_json(no_dimension / "bundle.json", lambda obj: obj["run"]["instances"][0].pop("dimension"))
         report = run_gate(no_dimension)
@@ -3018,6 +3582,53 @@ def run_selftest(out: TextIO | None = None) -> int:
             _has_reason(_report_check(report, "trace_persistence"), "trace_provenance"),
         )
 
+        unmatched_tools = _copy_bundle(base, valid, "unmatched-tools")
+        _edit_json(
+            unmatched_tools / "artifacts/trace_persistence/trace-join.json",
+            lambda obj: obj.update(unmatched_tool_calls=99),
+        )
+        _refresh_index(unmatched_tools, "artifacts/trace_persistence/trace-join.json")
+        report = run_gate(unmatched_tools)
+        test.equal("wrong unmatched tool count is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "unmatched tool count reason",
+            _has_reason(_report_check(report, "trace_persistence"), "trace_join_unmatched"),
+        )
+
+        partial_map = _copy_bundle(base, valid, "partial-category-map")
+        _edit_json(
+            partial_map / "bundle.json",
+            lambda obj: obj["run"].update(tool_category_map={"terminal": ["bash"]}),
+        )
+        report = run_gate(partial_map)
+        test.equal("partial category map keeps default categories", report.overall, STATUS_PASS)
+
+        blank_map = _copy_bundle(base, valid, "blank-category-map")
+        _edit_json(
+            blank_map / "bundle.json",
+            lambda obj: obj["run"].update(tool_category_map={"terminal": ["   "]}),
+        )
+        report = run_gate(blank_map)
+        test.equal("blank category pattern is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "blank category reason",
+            _has_reason(_report_check(report, "trace_persistence"), "tool_category_map"),
+        )
+
+        empty_map = _copy_bundle(base, valid, "empty-category-map")
+        _edit_json(empty_map / "bundle.json", lambda obj: obj["run"].update(tool_category_map={}))
+        _edit_jsonl(
+            empty_map / "artifacts/trace_persistence/tool-trace.jsonl",
+            lambda rows: [row.update(tool="bash") for row in rows],
+        )
+        _refresh_index(empty_map, "artifacts/trace_persistence/tool-trace.jsonl")
+        report = run_gate(empty_map)
+        test.equal("empty category map cannot drop defaults", report.overall, STATUS_FAIL)
+        test.check(
+            "empty category map reason",
+            _has_reason(_report_check(report, "trace_persistence"), "trace_categories"),
+        )
+
         smoke_fail = _copy_bundle(base, valid, "smoke-fail")
         _edit_json(smoke_fail / "artifacts/smoke_fixture_validity/smoke-report.json", lambda obj: obj["suites"][0].update(status="skip"))
         report = run_gate(smoke_fail)
@@ -3029,6 +3640,45 @@ def run_selftest(out: TextIO | None = None) -> int:
         report = run_gate(lock_gap)
         test.equal("missing locked component is fail", report.overall, STATUS_FAIL)
         test.check("version lock reason", _has_reason(_report_check(report, "smoke_fixture_validity"), "version_lock_component"))
+
+        pin_conflict = _copy_bundle(base, valid, "pin-conflict")
+        _edit_json(
+            pin_conflict / "artifacts/smoke_fixture_validity/version-lock.json",
+            lambda obj: [
+                component.update(sha256=_fake_sha("wrong-map"))
+                for component in obj["components"]
+                if component["name"] == "fixture-map"
+            ],
+        )
+        _refresh_index(pin_conflict, "artifacts/smoke_fixture_validity/version-lock.json")
+        report = run_gate(pin_conflict)
+        test.equal("conflicting version lock is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "pin conflict reason",
+            _has_reason(_report_check(report, "smoke_fixture_validity"), "version_lock_conflict"),
+        )
+
+        commit_pin = _copy_bundle(base, valid, "commit-pin-without-version")
+        _edit_json(
+            commit_pin / "artifacts/smoke_fixture_validity/version-lock.json",
+            lambda obj: [component.pop("version", None) for component in obj["components"] if component["name"] == "mc-agent"],
+        )
+        _refresh_index(commit_pin, "artifacts/smoke_fixture_validity/version-lock.json")
+        report = run_gate(commit_pin)
+        test.equal("commit pin without version passes", report.overall, STATUS_PASS)
+
+        bad_stack = _copy_bundle(base, valid, "bad-stack-position")
+        _edit_json(
+            bad_stack / "artifacts/smoke_fixture_validity/fixture-validity.json",
+            lambda obj: obj.update(stack_positions=["not-a-position"]),
+        )
+        _refresh_index(bad_stack, "artifacts/smoke_fixture_validity/fixture-validity.json")
+        report = run_gate(bad_stack)
+        test.equal("bad stack position is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "bad stack position reason",
+            _has_reason(_report_check(report, "smoke_fixture_validity"), "bad_field"),
+        )
 
         # evidence integrity ----------------------------------------------------------
         tampered = _copy_bundle(base, valid, "tampered")
@@ -3071,6 +3721,23 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.equal("out-of-range run port is fail", report.overall, STATUS_FAIL)
         test.check("port range reason", _has_reason(_report_check(report, "evidence_integrity"), "instance_ports"))
 
+        range_conflict = _copy_bundle(base, valid, "range-conflict")
+        report = run_gate(range_conflict, port_ranges=["30000-30003"])
+        test.equal("cli range outside declared is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "range conflict reason",
+            _has_reason(_report_check(report, "evidence_integrity"), "port_range_conflict"),
+        )
+
+        no_ranges = _copy_bundle(base, valid, "no-ranges")
+        _edit_json(no_ranges / "bundle.json", lambda obj: obj["run"].pop("allowed_port_ranges"))
+        report = run_gate(no_ranges)
+        test.equal("missing declared ranges is fail", report.overall, STATUS_FAIL)
+        test.check(
+            "missing ranges reason",
+            _has_reason(_report_check(report, "evidence_integrity"), "port_range_missing"),
+        )
+
         rehash = base / "case-rehash"
         _build_valid_bundle(rehash, source_world=base / "rehash-source")
         (base / "rehash-source" / "intruder.dat").write_bytes(b"mutated")
@@ -3079,7 +3746,12 @@ def run_selftest(out: TextIO | None = None) -> int:
         test.check("rehash reason", _has_reason(_report_check(report, "evidence_integrity"), "source_world_rehash_mismatch"))
 
         report = run_gate(valid, skip_source_rehash=True)
-        test.equal("skip source rehash still passes", report.overall, STATUS_PASS)
+        test.equal("skip source rehash is blocked", report.overall, STATUS_BLOCKED)
+        test.equal("skip source rehash exit code", _exit_code(report), EXIT_BLOCKED)
+        test.check(
+            "skip source rehash reason",
+            _has_reason(_report_check(report, "evidence_integrity"), "source_rehash_skipped"),
+        )
         test.check(
             "skip source rehash limitation",
             any("re-hashed" in item for item in report.limitations),
