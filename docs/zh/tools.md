@@ -23,7 +23,7 @@ mc-agent-loop/             智能体 loop 与它的后端
 | `mc-bridge watch --events chat,game` | 以 JSON 行流式输出事件 |
 | `mc-bridge mcp` | 以 MCP（stdio）暴露工具，供智能体运行时使用 |
 
-方法：`status`、`capabilities`、`state`、`entities`、`screen`、`command`、`chat`、`mark`、`wait`、`record_start`、`record_stop`、`connect`、`world`、`lan`、`snapshot`、`snapshots`、`fork`、`restore`、`order`、`events`、`stop`。
+方法：`status`、`capabilities`、`state`、`player`、`context`、`entities`、`screen`、`command`、`command_output`、`chat`、`mark`、`wait`、`record_start`、`record_stop`、`connect`、`world`、`lan`、`snapshot`、`snapshots`、`fork`、`restore`、`order`、`save`、`events`、`stop`。
 
 本地 API 是换行分隔的 JSON，所以任何能开 socket 的东西都能用它——见 [bridge README](https://github.com/guajun/mc-agent-bridge)。
 
@@ -35,6 +35,8 @@ mc-agent-loop/             智能体 loop 与它的后端
 | --- | --- |
 | `mc_status`、`mc_capabilities` | 连上了吗、这个实例会什么 |
 | `mc_state` | 玩家在哪、血量、维度、tick |
+| `mc_player` | 某个玩家的服务端上下文——身份、维度、位置、朝向、眼睛与视线目标（按 UUID） |
+| `mc_context` | 聊天事件 `context_id` 背后冻结的上下文包 |
 | `mc_entities` | **摘要版**实体列表：按类型计数 + 最近的 N 个 |
 | `mc_command` | 发一条命令 |
 | `mc_command_output` | 发一条命令**并读回它的回答**——关心回答时用这个 |
@@ -49,9 +51,11 @@ mc-agent-loop/             智能体 loop 与它的后端
 `mc_entities` 刻意返回摘要：真实世界里半径 64 格会回 256 KB 的 JSON，模型没法有效阅读。想看更多就传 `types=` 过滤并调大 `limit`。
 
 !!! info "服务端视角 Toolkit 与它的 Skill"
-    bridge 正在成为接收方中立的服务端视角 Toolkit：`player` 和 `context` 会加进
-    工具面，分别提供每个玩家的上下文和聊天瞬间的上下文包，而 `capabilities` 会
-    如实报告连接的 mod 支持哪些操作。智能体的工作流写在可移植的
+    bridge 就是接收方中立的服务端视角 Toolkit：`player` 和 `context` 已在工具面里，
+    分别提供每个玩家的上下文与聊天瞬间的上下文包；`capabilities` 会如实报告连接的
+    mod 支持哪些操作。接口 mod 0.6.0 已经发出这两个能力；bridge 0.4.1
+    （[PR #8](https://github.com/guajun/mc-agent-bridge/pull/8)）把视线射线保留在
+    `player.view`。智能体的工作流写在可移植的
     [Toolkit Skill](toolkit-skill.md) 里；某个具体连接能做什么，以
     `mc-bridge call capabilities`（或 `mc_capabilities`）为准。想让它由游戏事件
     无人值守地触发，见 [Hermes 无人值守](hermes-unattended.md)。
@@ -74,11 +78,13 @@ mc-agent-loop/             智能体 loop 与它的后端
 | --- | --- |
 | `smoke_offline.py` | 对着假 mod 跑整套链路，可带模型也可不带 |
 | `launch_instance.py` | 直接启动游戏实例，不需要图形启动器；支持 `--world`、`--username`、`--jvm-property mcagent.autoConnect=host:port` |
-| `lab_server.py` | 供给、启动、停止、`exec` 一个无头 Fabric 实验室（RCON 控制台，纯标准库） |
+| `lab_server.py` | 供给、启动、停止、`exec`、`identity`、`verify` 一个无头 Fabric 实验室（RCON 控制台，纯标准库） |
+| `build_mod.py` | 对着实验室自己的服务端/依赖库/API jar 编译 Fabric mod，输出确定性 jar 与构建元数据 |
 | `fork_verify.py` | `inspect` 录制、按顺序 `restore`、`check` 实验室是否复现、`diff` 两次录制逐实体对比 |
 | `fake_player.py` | 生成、驱动、查询 Carpet 假人——不需要第二个客户端就有身体 |
 | `game_cmd.py` | 执行一条游戏命令并打印它产生的反馈 |
 | `mcp_probe.py` | 像智能体一样调用某一个 MCP 工具 |
+| `stage1_gate.py` | issue #14 的失败关闭式阶段一证据门禁：校验前置证据包，重算哈希/顺序/源存档状态，缺证据绝不通过 |
 
 例子：
 
@@ -90,8 +96,13 @@ python tools/fake_player.py status deepseek
 
 python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
 python tools/lab_server.py exec --name lab-01 "tick freeze"
+python tools/lab_server.py identity --name lab-01 --json
+python tools/build_mod.py --source examples/smoke-mod --lab lab-01 --out labs/build/smoke-mod.jar
 
 python tools/fork_verify.py diff "<录制 A>" "<录制 B>"
+
+python tools/stage1_gate.py list
+python tools/stage1_gate.py selftest
 ```
 
 ## 协议

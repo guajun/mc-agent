@@ -25,9 +25,10 @@ The daemon and its client.
 | `mc-bridge watch --events chat,game` | stream events as JSON lines |
 | `mc-bridge mcp` | serve the tools over MCP (stdio) for an agent runtime |
 
-Methods: `status`, `capabilities`, `state`, `entities`, `screen`, `command`,
-`chat`, `mark`, `wait`, `record_start`, `record_stop`, `connect`, `world`, `lan`,
-`snapshot`, `snapshots`, `fork`, `restore`, `order`, `events`, `stop`.
+Methods: `status`, `capabilities`, `state`, `player`, `context`, `entities`,
+`screen`, `command`, `command_output`, `chat`, `mark`, `wait`, `record_start`,
+`record_stop`, `connect`, `world`, `lan`, `snapshot`, `snapshots`, `fork`,
+`restore`, `order`, `save`, `events`, `stop`.
 
 The loopback API is newline-delimited JSON, so anything that speaks a socket can
 use it - see the [bridge README](https://github.com/guajun/mc-agent-bridge).
@@ -40,6 +41,8 @@ What an agent runtime sees when the bridge is registered as an MCP server.
 | --- | --- |
 | `mc_status`, `mc_capabilities` | is it connected, what can this instance do |
 | `mc_state` | where the player is, health, dimension, tick |
+| `mc_player` | one player's server-known context - identity, dimension, position, rotation, eye and view target (by UUID) |
+| `mc_context` | the frozen context bundle behind a chat event's `context_id` |
 | `mc_entities` | **summarised** entity list: counts by type plus the N closest |
 | `mc_command` | send a command |
 | `mc_command_output` | send a command **and read its answer** - use this when the answer matters |
@@ -56,13 +59,15 @@ JSON for a 64-block radius, which is not something a model can read usefully.
 Ask for `types=` filtering and a larger `limit` when you want more.
 
 !!! info "The server-vantage Toolkit and its Skill"
-    The bridge is becoming a Harness-neutral server-vantage Toolkit: `player`
-    and `context` join the surface for per-player and chat-time context, and
+    The bridge is the Harness-neutral server-vantage Toolkit: `player` and
+    `context` are part of the surface for per-player and chat-time context, and
     `capabilities` reports exactly which operations the connected mod supports.
-    Agents learn the workflow from the portable [Toolkit Skill](toolkit-skill.md);
-    `mc-bridge call capabilities` (or `mc_capabilities`) is the authority for
-    what a given connection can do. To run that skill unattended from game
-    events, see [Unattended Hermes](hermes-unattended.md).
+    The interface mod ships both (0.6.0); bridge 0.4.1
+    ([PR #8](https://github.com/guajun/mc-agent-bridge/pull/8)) keeps the view
+    ray with the player. Agents learn the workflow from the portable
+    [Toolkit Skill](toolkit-skill.md); `mc-bridge call capabilities` (or
+    `mc_capabilities`) is the authority for what a given connection can do. To
+    run that skill unattended from game events, see [Unattended Hermes](hermes-unattended.md).
 
 ## mc-agent-loop
 
@@ -86,11 +91,13 @@ primitives above.
 | --- | --- |
 | `smoke_offline.py` | run the whole stack against a fake mod, with or without a model |
 | `launch_instance.py` | start a Minecraft instance directly, without a GUI launcher; `--world`, `--username`, `--jvm-property mcagent.autoConnect=host:port` |
-| `lab_server.py` | provision, start, stop, `exec` against a headless Fabric lab under `labs/` (RCON console, pure stdlib) |
+| `lab_server.py` | provision, start, stop, `exec`, `identity`, `verify` against a headless Fabric lab under `labs/` (RCON console, pure stdlib) |
+| `build_mod.py` | compile a Fabric mod against a lab's own server/libraries/API jars and write a deterministic jar plus build metadata |
 | `fork_verify.py` | `inspect` a recording, `restore` it in order, `check` that a lab reproduced it, `diff` two recordings entity by entity |
 | `fake_player.py` | spawn, drive, and query a Carpet fake player - the agent's body without a second client |
 | `game_cmd.py` | run a game command and print the feedback it produced |
 | `mcp_probe.py` | call one MCP tool against a running bridge, exactly as an agent would |
+| `stage1_gate.py` | fail-closed stage-one evidence gate for issue #14: validate a bundle of prerequisite artifacts, recompute hashes/order/source-world state, never pass on missing evidence |
 
 Examples:
 
@@ -102,8 +109,13 @@ python tools/fake_player.py status deepseek
 
 python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
 python tools/lab_server.py exec --name lab-01 "tick freeze"
+python tools/lab_server.py identity --name lab-01 --json
+python tools/build_mod.py --source examples/smoke-mod --lab lab-01 --out labs/build/smoke-mod.jar
 
 python tools/fork_verify.py diff "<recording A>" "<recording B>"
+
+python tools/stage1_gate.py list
+python tools/stage1_gate.py selftest
 ```
 
 ## Protocols
