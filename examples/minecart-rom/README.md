@@ -1,6 +1,6 @@
 # Minecart ROM fixture
 
-Test-side infrastructure for the [Minecart ROM use case](../../docs/issues/minecart-rom-e2e-use-case.md).
+Test-side infrastructure for the Minecart ROM use case ([issue #13](https://github.com/guajun/mc-agent/issues/13), [stage-one gate #14](https://github.com/guajun/mc-agent/issues/14)).
 It publishes the base map as a versioned, hash-checked artifact and turns a
 fresh copy of it into a deterministic, auditable *ready* state: a real Carpet
 fake player facing the machine, the world frozen, a recorded stack of chest
@@ -70,9 +70,9 @@ python examples/minecart-rom/runner/minecart_rom.py selftest
 
 | Item | Value |
 | --- | --- |
-| artifact | `minecart-rom-base-1.0.0.zip`, 748,718 bytes |
-| SHA-256 | `11d45a85…157bd` (full value in the manifest) |
-| world tree hash | `c766c971…14361` (sorted path + file hash, `session.lock` excluded) |
+| artifact | `minecart-rom-base-1.0.0.zip`, 748,712 bytes |
+| SHA-256 | `46954828…a01387` (full value in the manifest) |
+| world tree hash | `b9d7c2cd…413ae51` (sorted path + file hash, `session.lock` excluded) |
 | Minecraft | 26.2 (DataVersion 4903), flat void overworld |
 | Fabric loader / installer | 0.19.5 / 1.1.2 |
 | Java | 25 |
@@ -81,6 +81,14 @@ python examples/minecart-rom/runner/minecart_rom.py selftest
 The export keeps the datapack switches exactly as the source save had them;
 `minecart_improvements` **must stay disabled**, because the cart stack only
 forms under the classic minecart behaviour.
+
+The artifact is byte-for-byte reproducible: the ZIP entries, gzip streams and
+the `exported_at` stamp inside `level.dat`/`EXPORT.json` are all deterministic
+(`--exported-at` or `SOURCE_DATE_EPOCH` override the fixed default). Exporting
+the same source twice produces the same SHA-256, and `evidence` re-exports the
+imported world twice to prove it rather than asserting it. The manifest's
+`world` block (hash, file count, byte count) is checked against `EXPORT.json`
+and the extracted tree before a world is imported.
 
 `artifact.url` is a versioned URL pinned to commit `15173b6` of this branch.
 The SHA-256 in the manifest is the check that matters: a fresh cache downloads
@@ -143,10 +151,11 @@ scoreboard encodes an order or an answer.
 `validate` re-reads the live world and compares it with the ready snapshot on
 every invariant:
 
-* `READY` — same server process, same user UUID/position/rotation, same cart
-  UUIDs, at rest on the rail, the same **full entity NBT** (inventory and item
-  components included), machine at its base state, world frozen, and the same
-  authoritative tick order plus the same mod full-level order hash;
+* `READY` — same server process, same user UUID/position/rotation, the same
+  hover-seat entity (UUID, position, NBT) with the user still mounted, same
+  cart UUIDs, at rest on the rail, the same **full entity NBT** (inventory and
+  item components included), machine at its base state, world frozen, and the
+  same authoritative tick order plus the same mod full-level order hash;
 * `PREMATURE_OUTPUT` — a cart left the stack, is moving, or disappeared before
   the experiment started;
 * `FIXTURE_INVALID` — machine broken, world unfrozen, cart NBT changed, tick
@@ -201,7 +210,11 @@ The builder verifies instead of asserting:
   (and the lab copies referenced by the records);
 * every `init-runs.jsonl` row carries the interface-mod tick order
   (`order_source: interface-snapshot`) and the normalized 16-hex order hash;
-* `player-identity.json` proves the user's view ray hits the note block.
+* `player-identity.json` proves the user's view ray hits the note block;
+* `map.immutable` is true only when the URL carries a 40-hex commit pin (the
+  pin type is recorded as `url_pin`);
+* `rebuild_reproducible` is true only when two fresh exports of the imported
+  world are byte-identical (the check and both hashes are recorded).
 
 Before the gate check, bind the emitted `run_id`/`instance_id` values to the
 bundle's `run.child_runs` (the coordinator declares them; `--run-map OLD=NEW`
@@ -223,5 +236,12 @@ their artifacts.
 * The public calibration program is three carts; evaluation runs should use a
   sealed `challenge` program, and any new program needs a live calibration of
   its pop order before its answers are trusted.
+* **Stage-two operator note:** the committed `calibration/` tree (records,
+  logs, gate slice) and the `program` block of `fixture-spec.json` contain the
+  calibration program and its observed pop order. Before a cold-start run,
+  initialize with a fresh `--program` challenge that appears nowhere in the
+  committed records, and keep `examples/minecart-rom/calibration/**` out of the
+  agent-visible workspace/context. No logger, solver or research script is
+  shipped here; this is only about the fixture's own oracle material.
 * The calibrator's ready state is intentionally *not* a solution: the pop order
   is observed only when a real run presses the note block.

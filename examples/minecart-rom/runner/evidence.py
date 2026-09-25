@@ -116,21 +116,39 @@ def inventory_total(records: list[dict[str, Any]]) -> int:
     )
 
 
-def early_output(snapshot: dict[str, Any], expected_carts: int) -> bool:
-    carts = snapshot.get("carts") or []
-    if len(carts) != expected_carts:
-        return True
-    rest = None
+def early_output(snapshot: dict[str, Any], spec: dict[str, Any], expected_carts: int) -> bool:
+    """The same classifier as ``validate_ready``: anything off the calibrated
+    ready state counts as the fixture having emitted early."""
     machine = snapshot.get("machine") or {}
     if not machine.get("ok", False):
         return True
+    carts = snapshot.get("carts") or []
+    if len(carts) != expected_carts:
+        return True
+    rest = spec["machine"]["stack"]["rest_pos"]
+    tolerance = float((spec.get("validation") or {}).get("position_tolerance", 0.05))
+    boundary = float(spec["machine"]["output_boundary"]["greater_than"])
     for record in carts:
         pos = record.get("pos")
-        if pos is None:
+        if not pos or not all(abs(a - b) <= tolerance for a, b in zip(pos, rest)):
+            return True
+        if pos[0] > boundary:
             return True
         if record.get("motion") and any(abs(value) > 1e-6 for value in record["motion"]):
             return True
     return False
+
+
+COMMIT_PIN_RE = re.compile(r"/[0-9a-f]{40}/")
+
+
+def url_pin(url: str) -> str:
+    """Classify an artifact URL: a 40-hex commit path is truly immutable."""
+    if COMMIT_PIN_RE.search(url or ""):
+        return "commit"
+    if "/releases/download/" in (url or ""):
+        return "release-tag"
+    return "mutable"
 
 
 def _ray_aabb(origin: list[float], direction: list[float], box: list[list[float]]) -> float | None:
@@ -254,6 +272,7 @@ def fixture_manifest(
     tree_sha256, files, _bytes = _tree_hash(world)
     verified, cold_record = download_verified(records, manifest)
     rejected, reason = bad_hash_rejected(manifest, artifact)
+    pin = url_pin(manifest.data["artifact"]["url"])
     return {
         "format": "mc-agent/fixture-map-evidence@1",
         "map": {
@@ -261,7 +280,8 @@ def fixture_manifest(
             "sha256": manifest.sha256,
             "bytes": manifest.size,
             "mc_version": manifest.data["game"]["minecraft"],
-            "immutable": True,
+            "immutable": pin == "commit",
+            "url_pin": pin,
             "download_verified": verified,
             "bad_hash_rejected": rejected,
             "download_record": (cold_record or {}).get("record"),
@@ -283,6 +303,7 @@ def fixture_manifest(
 
 def init_runs(
     runs: list[dict[str, Any]],
+    spec: dict[str, Any],
     expected_carts: int,
     *,
     run_map: dict[str, str] | None = None,
@@ -311,7 +332,7 @@ def init_runs(
                 "rcon_order": snapshot.get("rcon_order"),
                 "entity_count": len(carts),
                 "inventory_total": inventory_total(carts),
-                "early_output": early_output(snapshot, expected),
+                "early_output": early_output(snapshot, spec, expected),
                 "ready": bool(snapshot.get("tick_frozen")) and (snapshot.get("validation") or {}).get("ok", False),
                 "tick": int(snapshot.get("world_day_tick") or 0),
                 "captured_at": snapshot.get("captured_at"),
@@ -368,9 +389,56 @@ def command_block_scan(world_dirs: list[Path], *, placed_by_init: bool = False) 
     }
 
 
+def rebuild_reproducible(world: Path, exported_at: str = "2026-01-01T00:00:00Z") -> dict[str, Any]:
+    """Export the extracted world twice and compare the bytes.
+
+    The artifact is required to be byte-for-byte reproducible, so the evidence
+    proves it instead of asserting it.
+    """
+    import argparse
+    import contextlib
+    import io
+    import tempfile
+
+    from export_world import export as export_world_run
+
+    hashes: list[str] = []
+    world_hashes: list[str] = []
+    with tempfile.TemporaryDirectory(prefix="minecart-rom-rebuild-") as tmp:
+        for index in range(2):
+            out = Path(tmp) / f"rebuild-{index}.zip"
+            args = argparse.Namespace(
+                source=str(world),
+                out=str(out),
+                version="rebuild-check",
+                build="",
+                keep_build=False,
+                keep_entities=False,
+                allow_command_blocks=False,
+                exported_at=exported_at,
+            )
+            with contextlib.redirect_stdout(io.StringIO()):
+                export_world_run(args)
+            hashes.append(fixture.sha256_file(out))
+            import zipfile
+
+            with zipfile.ZipFile(out) as archive:
+                world_hashes.append(
+                    json.loads(archive.read("EXPORT.json").decode("utf-8"))["world_sha256"]
+                )
+    return {
+        "first_sha256": hashes[0],
+        "second_sha256": hashes[1],
+        "identical": hashes[0] == hashes[1],
+        "world_sha256": world_hashes[0],
+        "exported_at": exported_at,
+    }
+
+
 def cleanup_rebuild(
     source_world: Path | None,
     *,
+    world: Path | None = None,
     lab: str | None = None,
     records: Path | None = None,
 ) -> dict[str, Any]:
@@ -410,10 +478,15 @@ def cleanup_rebuild(
         f"python examples/minecart-rom/runner/minecart_rom.py stop --lab {lab_name}",
         f"rm -rf labs/{lab_name}/world   # discard the copy; the source save is never the world directory",
     ]
+    rebuild = rebuild_reproducible(world) if world is not None else {
+        "identical": False,
+        "note": "no extracted world was provided",
+    }
     return {
         "steps": steps,
         "source_world_untouched": untouched,
-        "rebuild_reproducible": True,
+        "rebuild_reproducible": bool(rebuild.get("identical")),
+        "rebuild_check": rebuild,
         "source_world": source,
         "records": rel_posix(records) if records else None,
         "commands": "README.md#quick-start",
@@ -444,11 +517,16 @@ def build_pack(
         "fixture-manifest.json": fixture_manifest(
             manifest, world, records=downloads, artifact=artifact
         ),
-        "init-runs.jsonl": init_runs(runs, expected, run_map=run_map, instance_id=instance_id),
+        "init-runs.jsonl": init_runs(
+            runs, spec, expected, run_map=run_map, instance_id=instance_id
+        ),
         "player-identity.json": player_identity(spec, runs[-1]["snapshot"]),
         "command-block-scan.json": command_block_scan(world_dirs),
         "cleanup-rebuild.json": cleanup_rebuild(
-            source_world, lab=lab or runs[-1]["snapshot"].get("lab"), records=records_root
+            source_world,
+            world=world,
+            lab=lab or runs[-1]["snapshot"].get("lab"),
+            records=records_root,
         ),
     }
     out = out_dir / "artifacts" / "fixture_map"
@@ -487,6 +565,8 @@ def build_pack(
         "order_sources": sorted({row["order_source"] for row in pack["init-runs.jsonl"]}),
         "download_verified": pack["fixture-manifest.json"]["map"]["download_verified"],
         "bad_hash_rejected": pack["fixture-manifest.json"]["map"]["bad_hash_rejected"],
+        "url_pin": pack["fixture-manifest.json"]["map"]["url_pin"],
+        "rebuild_reproducible": pack["cleanup-rebuild.json"]["rebuild_reproducible"],
         "command_blocks": pack["command-block-scan.json"]["command_blocks"],
         "source_world_untouched": pack["cleanup-rebuild.json"]["source_world_untouched"],
         "player": pack["player-identity.json"]["name"],

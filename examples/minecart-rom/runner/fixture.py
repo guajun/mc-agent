@@ -54,6 +54,7 @@ MAX_ARCHIVE_ENTRIES = 20_000
 RECORD_FORMAT = "mc-agent/minecart-rom-record@1"
 
 CART_MARK = "Minecart with Chest has the following entity data: "
+MARK_ARMOR_STAND = "Armor Stand has the following entity data: "
 
 # The machine as the world ships it. The authoritative copy lives in
 # fixture-spec.json; this fallback keeps older specs working.
@@ -349,14 +350,36 @@ def fetch_artifact(
     raise FixtureError(f"could not fetch the artifact: {last_error}")
 
 
+# Windows reserves these device names with or without an extension, so
+# ``CON.txt`` is as unusable as ``CON`` and must not be extracted.
+RESERVED_WINDOWS_NAMES = {
+    "CON", "PRN", "AUX", "NUL",
+    *(f"COM{index}" for index in range(1, 10)),
+    *(f"LPT{index}" for index in range(1, 10)),
+}
+
+
 def _safe_member(name: str) -> str:
-    """Turn an archive member name into a safe relative path or refuse it."""
+    """Turn an archive member name into a safe relative path or refuse it.
+
+    The project is Windows-centric, so besides traversal the name may not carry
+    an NTFS alternate data stream (``:``), a reserved device name, or a
+    trailing dot/space (Windows silently strips those and could collide).
+    """
     cleaned = name.replace("\\", "/")
     if cleaned.startswith("/") or re.match(r"^[A-Za-z]:", cleaned):
         raise UnsafeArchive(f"archive entry {name!r} is absolute")
+    if ":" in cleaned:
+        raise UnsafeArchive(f"archive entry {name!r} contains a colon (alternate data stream)")
     parts = [part for part in cleaned.split("/") if part not in ("", ".")]
     if any(part == ".." for part in parts):
         raise UnsafeArchive(f"archive entry {name!r} escapes the extraction directory")
+    for part in parts:
+        if part != part.rstrip(" ."):
+            raise UnsafeArchive(f"archive entry {name!r} ends with a dot or space")
+        stem = part.split(".", 1)[0].upper()
+        if stem in RESERVED_WINDOWS_NAMES:
+            raise UnsafeArchive(f"archive entry {name!r} uses a reserved Windows device name")
     return "/".join(parts)
 
 
@@ -414,13 +437,52 @@ def unpack_artifact(manifest: Manifest, zip_path: Path, dest_root: Path) -> dict
         )
     world = candidates[0].parent
     export = world.parent / "EXPORT.json"
-    export_data = read_json(export) if export.is_file() else None
+    if not export.is_file():
+        raise FixtureError(f"{zip_path.name} has no EXPORT.json next to world/")
+    export_data = read_json(export)
+    for key in ("format", "version", "world_sha256", "world_files", "world_uncompressed_bytes", "exported_at"):
+        if key not in export_data:
+            raise FixtureError(f"EXPORT.json is missing {key!r}")
+    if export_data["format"] != "mc-agent/minecart-rom-export@1":
+        raise FixtureError(f"EXPORT.json has an unknown format {export_data['format']!r}")
+
+    archive_sha = sha256_file(zip_path)
+    if archive_sha != manifest.sha256:
+        raise HashMismatch(zip_path, manifest.sha256, archive_sha)
+
     world_hash, files, size = world_tree_hash(world)
-    expected = (export_data or {}).get("world_sha256")
-    if expected and expected != world_hash:
+    if export_data["world_sha256"] != world_hash:
         raise FixtureError(
-            f"extracted world tree hash {world_hash} does not match EXPORT.json {expected}"
+            f"extracted world tree hash {world_hash} does not match EXPORT.json "
+            f"{export_data['world_sha256']}"
         )
+    if int(export_data["world_files"]) != files:
+        raise FixtureError(
+            f"extracted world has {files} files, EXPORT.json says {export_data['world_files']}"
+        )
+    if int(export_data["world_uncompressed_bytes"]) != size:
+        raise FixtureError(
+            f"extracted world is {size} bytes, EXPORT.json says "
+            f"{export_data['world_uncompressed_bytes']}"
+        )
+    # the manifest is the published pin; it must agree with the artifact
+    manifest_world = manifest.data.get("world") or {}
+    for key, actual in (
+        ("sha256", world_hash),
+        ("files", files),
+        ("uncompressed_bytes", size),
+    ):
+        pinned = manifest_world.get(key)
+        if pinned is None:
+            raise FixtureError(f"map-manifest.json world.{key} is missing")
+        if key in ("files", "uncompressed_bytes") and int(pinned) != actual:
+            raise FixtureError(
+                f"map-manifest.json world.{key} is {pinned}, artifact says {actual}"
+            )
+        if key == "sha256" and str(pinned) != actual:
+            raise FixtureError(
+                f"map-manifest.json world.sha256 is {pinned}, artifact tree hash is {actual}"
+            )
     report.update(
         {
             "staging": str(staging),
@@ -429,12 +491,114 @@ def unpack_artifact(manifest: Manifest, zip_path: Path, dest_root: Path) -> dict
             "world_files": files,
             "world_bytes": size,
             "export": export_data,
+            "archive_sha256": archive_sha,
         }
     )
     return report
 
 
 # --------------------------------------------------------------------------- lab control
+
+
+def pinned_mods(manifest: Manifest) -> list[dict[str, Any]]:
+    return [mod for mod in (manifest.data.get("mods") or []) if mod.get("required")]
+
+
+def ensure_pinned_mods(manifest: Manifest, cache_dir: Path | None = None) -> list[Path]:
+    """Fetch and hash-check the pinned mod jars so provisioning cannot drift.
+
+    The manifest pins the exact bytes; a later upstream release must not change
+    the fixture mod stack silently. Jars without a manifest URL (the locally
+    built interface mod) are supplied by the caller instead.
+    """
+    cache = cache_dir or (LABS / "_cache" / "mods")
+    cache.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    for mod in pinned_mods(manifest):
+        url = mod.get("url")
+        filename = mod.get("filename") or mod.get("artifact")
+        if not url or not filename:
+            continue
+        target = cache / filename
+        if target.is_file() and sha256_file(target) == mod["sha256"]:
+            paths.append(target)
+            continue
+        partial = target.with_name(target.name + ".part")
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response, open(partial, "wb") as handle:
+                shutil.copyfileobj(response, handle, 1 << 16)
+        except OSError as error:
+            partial.unlink(missing_ok=True)
+            raise FixtureError(f"cannot download pinned mod {mod['name']} from {url}: {error}") from error
+        actual = sha256_file(partial)
+        if actual != mod["sha256"]:
+            partial.unlink(missing_ok=True)
+            raise HashMismatch(partial, mod["sha256"], actual)
+        partial.replace(target)
+        paths.append(target)
+    return paths
+
+
+def check_mod_pins(lab_name: str, manifest: Manifest) -> dict[str, Any]:
+    """Every required manifest pin must be deployed, byte for byte."""
+    lab = lab_dir(lab_name)
+    state = read_json(lab / "lab.json") or {}
+    deployed = state.get("mods") or []
+    problems = []
+    for mod in pinned_mods(manifest):
+        if not any(record.get("sha256") == mod["sha256"] for record in deployed):
+            problems.append(
+                {
+                    "mod": mod["name"],
+                    "version": mod.get("version"),
+                    "expected_sha256": mod["sha256"],
+                    "deployed": [
+                        {"name": record.get("name"), "sha256": record.get("sha256")}
+                        for record in deployed
+                    ],
+                }
+            )
+    if problems:
+        raise FixtureError(
+            "deployed mods do not match the pinned manifest; provision the pinned jars: "
+            + json.dumps(problems, ensure_ascii=False)
+        )
+    return {
+        "ok": True,
+        "pins": [
+            {"name": mod["name"], "version": mod.get("version"), "sha256": mod["sha256"]}
+            for mod in pinned_mods(manifest)
+        ],
+    }
+
+
+def check_interface_mod(path: Path, manifest: Manifest) -> None:
+    """The caller-supplied interface mod must be the pinned build."""
+    if not path.is_file():
+        raise FixtureError(
+            f"{path} is not a file; build mc-agent-interface from 3b93ceb or pass --interface-mod"
+        )
+    pin = next((mod for mod in pinned_mods(manifest) if mod["name"] == "mc-agent-interface-mod"), None)
+    actual = sha256_file(path)
+    if pin and actual != pin["sha256"]:
+        raise HashMismatch(path, pin["sha256"], actual)
+
+
+def mark_world_provenance(lab: Path, source: Path, manifest: Manifest | None = None) -> None:
+    """A reset copy is an artifact copy, not a newly generated world."""
+    state = read_json(lab / "lab.json") or {}
+    state["world"] = "copied save"
+    state["worldSource"] = str(source)
+    state["worldDir"] = str((lab / "world").resolve())
+    if manifest is not None:
+        state["worldArtifact"] = {
+            "filename": manifest.filename,
+            "sha256": manifest.sha256,
+            "version": manifest.data.get("version"),
+            "world_sha256": (manifest.data.get("world") or {}).get("sha256"),
+        }
+    write_json(lab / "lab.json", state)
 
 
 def run_lab_server(*args: str, timeout: float = 600.0) -> subprocess.CompletedProcess[str]:
@@ -492,12 +656,23 @@ def import_world(
 ) -> dict[str, Any]:
     """Provision (or reset) a lab around a verified world copy."""
     lab = lab_dir(lab_name)
+    if interface_mod is not None and manifest is not None:
+        check_interface_mod(interface_mod, manifest)
+    pinned = ensure_pinned_mods(manifest) if manifest is not None else []
+    mod_args: list[str] = []
+    if pinned:
+        # the manifest's exact bytes replace the floating Modrinth resolution
+        for jar in pinned:
+            mod_args += ["--mod-jar", str(jar)]
+    else:
+        mod_args += ["--fabric-api", "--carpet"]
+    if interface_mod is not None:
+        mod_args += ["--mod-jar", str(interface_mod)]
     provision = [
         "provision",
         "--name",
         lab_name,
-        "--fabric-api",
-        "--carpet",
+        *mod_args,
         *(["--java", java] if java else []),
         *(["--memory", memory] if memory else []),
         # current lab_server pins the ports at provision time; patch_lab_ports
@@ -506,7 +681,6 @@ def import_world(
         *(["--server-port", str(server_port)] if server_port else []),
         *(["--vantage-port", str(vantage_port)] if vantage_port else []),
         *(["--bridge-port", str(bridge_port)] if bridge_port else []),
-        *(["--mod-jar", str(interface_mod)] if interface_mod else []),
     ]
     if reset and lab.exists():
         run_lab_server("stop", "--name", lab_name, "--timeout", "120")
@@ -515,6 +689,7 @@ def import_world(
         if result.returncode != 0:
             raise FixtureError(f"could not re-provision {lab}:\n{result.stdout}\n{result.stderr}")
         shutil.copytree(world, lab / "world", ignore=shutil.ignore_patterns("session.lock"))
+        mark_world_provenance(lab, world, manifest)
     elif not (lab / "lab.json").is_file() or not (lab / "world" / "level.dat").is_file():
         result = run_lab_server(*provision, "--world", str(world))
         if result.returncode != 0:
@@ -530,6 +705,7 @@ def import_world(
         raise FixtureError(
             "the imported lab world does not hash-match the verified artifact; use --reset"
         )
+    pins = check_mod_pins(lab_name, manifest) if manifest is not None else {"ok": None}
     return {
         "lab": lab_name,
         "lab_dir": str(lab),
@@ -537,6 +713,7 @@ def import_world(
         "world_files": files,
         "world_bytes": size,
         "manifest_version": (manifest.data.get("version") if manifest else None),
+        "mod_pins": pins,
     }
 
 
@@ -561,6 +738,7 @@ def lab_status(lab_name: str) -> dict[str, Any]:
     interface = next(
         (mod for mod in mods if str(mod.get("name", "")).startswith("mc-agent-interface")), None
     )
+    world_source = state.get("worldSource")
     return {
         "lab": lab_name,
         "lab_dir": str(lab),
@@ -571,6 +749,7 @@ def lab_status(lab_name: str) -> dict[str, Any]:
         "rcon_port": rcon.get("port"),
         "world": state.get("world"),
         "world_dir": state.get("worldDir"),
+        "world_source": world_source,
         "mods": [mod.get("name") for mod in mods],
         "mod_records": mods,
         "minecraft": state.get("minecraft"),
@@ -742,15 +921,45 @@ def item_key(item: dict[str, Any]) -> tuple:
     return (int(item.get("Slot", 0)), item.get("id"), int(item.get("count", 1)))
 
 
+def tagged_entity_records(console: Console, selector: str, mark: str) -> list[dict[str, Any]]:
+    """Full records for every entity a selector visits, in selector order."""
+    positions = split_records(console.cmd(f"execute as {selector} run data get entity @s Pos"), mark)
+    uuids = split_records(console.cmd(f"execute as {selector} run data get entity @s UUID"), mark)
+    records = []
+    for index, chunk in enumerate(positions):
+        uuid = uuid_from_text(uuids[index]) if index < len(uuids) else ""
+        nbt = after_mark(
+            console.cmd(f"data get entity {uuid}"), " has the following entity data: "
+        ) if uuid else ""
+        records.append(
+            {
+                "uuid": uuid,
+                "pos": parse_vec(chunk),
+                "nbt": nbt,
+                "nbt_sha256": hashlib.sha256(nbt.encode("utf-8")).hexdigest(),
+            }
+        )
+    return records
+
+
+def vehicle_uuid(text: str) -> str:
+    """The mounted vehicle UUID, from a player's ``RootVehicle`` dump."""
+    match = re.search(r"Attach:\s*\[I;\s*([-\d, ]+)\]", text or "")
+    if not match:
+        return ""
+    return uuid_from_text("[I; " + match.group(1) + "]")
+
+
 def player_record(console: Console, name: str) -> dict[str, Any] | None:
     mark = f"{name} has the following entity data: "
     first = console.cmd(f"data get entity {name} UUID")
     if not first.startswith(name):
         return None
     record: dict[str, Any] = {"name": name}
-    for key in ("UUID", "Pos", "Rotation", "playerGameType"):
+    for key in ("UUID", "Pos", "Rotation", "playerGameType", "RootVehicle"):
         text = console.cmd(f"data get entity {name} {key}")
         record[key] = after_mark(text, mark)
+    record["vehicle_uuid"] = vehicle_uuid(record.get("RootVehicle") or "")
     return record
 
 
@@ -788,6 +997,7 @@ def interface_binding(
     interface: "interface_mod.InterfaceClient",
     snapshot_name: str,
     carts: list[dict[str, Any]],
+    seat_uuids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Bind the carts to an actual clean-mod SNAPSHOT (authoritative tick order)."""
     ack = interface.snapshot(snapshot_name)
@@ -837,6 +1047,12 @@ def interface_binding(
         "protocol": meta.get("protocol"),
         "players_skipped": meta.get("playersSkipped"),
         "tick_order": order,
+        "seat_present": all(
+            uuid in index for uuid in (seat_uuids or [])
+        ) if seat_uuids else None,
+        "seat_tick_order": [
+            uuid for uuid in interface_mod.tick_order(entities) if uuid in set(seat_uuids or [])
+        ],
         "cross_check": checks,
         "cross_check_ok": all(
             entry["present"]
@@ -885,6 +1101,16 @@ def take_snapshot(
         "note_block": spec["machine"]["input"]["block"],
     }
     machine.update(machine_state(console, checks))
+    seat_enabled = bool((spec["user"].get("hover_seat") or {}).get("enabled", False))
+    seat = (
+        tagged_entity_records(
+            console,
+            f"@e[type=minecraft:armor_stand,tag={fixture['tag']}]",
+            MARK_ARMOR_STAND,
+        )
+        if seat_enabled
+        else []
+    )
     snapshot: dict[str, Any] = {
         "format": RECORD_FORMAT,
         "captured_at": iso_now(),
@@ -899,13 +1125,16 @@ def take_snapshot(
         "stack": spec["machine"]["stack"],
         "machine": machine,
         "user": player_record(console, canonical_user(spec["user"]["name"])),
+        "seat": seat,
         "rcon_order": [record["uuid"] for record in carts],
         "normalized_hash": normalized_entity_hash(carts),
     }
     if interface is not None:
         name = snapshot_name or f"fixture-{console.lab_name}"
         try:
-            binding = interface_binding(interface, name, carts)
+            binding = interface_binding(
+                interface, name, carts, [record["uuid"] for record in seat]
+            )
             snapshot["interface"] = binding
             snapshot["tick_order"] = binding["tick_order"]
             snapshot["tick_order_hash"] = tick_order_hash(carts, binding["tick_order"])
@@ -1036,6 +1265,7 @@ def initialize(
     interface: "interface_mod.InterfaceClient | None" = None,
     snapshot_name: str | None = None,
     allow_rcon_order: bool = False,
+    manifest: Manifest | None = None,
 ) -> dict[str, Any]:
     """Create the ready fixture and return the ready snapshot plus the log.
 
@@ -1060,6 +1290,8 @@ def initialize(
     def note(step: str, detail: Any = None) -> None:
         steps.append({"at": iso_now(), "step": step, "detail": detail})
 
+    if manifest is not None:
+        check_mod_pins(console.lab_name, manifest)
     if interface is None and not allow_rcon_order:
         raise FixtureError(
             "the interface mod is required for authoritative tick-order evidence: "
@@ -1267,6 +1499,36 @@ def validate_ready(spec: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, 
         problems.append({"check": "world-not-frozen"})
     if not snapshot.get("user"):
         problems.append({"check": "user-missing"})
+    seat_config = spec["user"].get("hover_seat") or {}
+    seat = snapshot.get("seat") or []
+    if seat_config.get("enabled", False):
+        if len(seat) != 1:
+            problems.append({"check": "seat-count", "expected": 1, "actual": len(seat)})
+        else:
+            record = seat[0]
+            expected_pos = seat_config.get("pos")
+            if record.get("pos") and expected_pos and not all(
+                _close(a, b, tolerance) for a, b in zip(record["pos"], expected_pos)
+            ):
+                problems.append(
+                    {"check": "seat-position", "pos": record["pos"], "expected": expected_pos}
+                )
+            user = snapshot.get("user") or {}
+            if user.get("vehicle_uuid") != record.get("uuid"):
+                problems.append(
+                    {
+                        "check": "seat-mount",
+                        "user_vehicle": user.get("vehicle_uuid"),
+                        "seat_uuid": record.get("uuid"),
+                    }
+                )
+        if (snapshot.get("interface") or {}).get("seat_present") is not True:
+            problems.append(
+                {
+                    "check": "seat-in-snapshot",
+                    "note": "the interface snapshot must contain the tagged hover seat",
+                }
+            )
     if validation.get("require_tick_order", True):
         tick_order = snapshot.get("tick_order")
         if not isinstance(tick_order, list) or len(tick_order) != len(carts):
@@ -1371,6 +1633,47 @@ def check_live_state(
                         "now": current_user.get(key),
                     }
                 )
+
+    # the hover seat is real fixture state too: it must survive hand-off intact
+    ready_seat = {record["uuid"]: record for record in (ready.get("seat") or [])}
+    current_seat = current.get("seat") or []
+    if len(current_seat) != len(ready_seat):
+        problems.append(
+            {"check": "seat-count", "at_ready": len(ready_seat), "now": len(current_seat)}
+        )
+    for record in current_seat:
+        previous = ready_seat.get(record["uuid"])
+        if previous is None:
+            problems.append({"check": "seat-unexpected", "uuid": record["uuid"]})
+        elif (
+            previous.get("nbt_sha256") != record.get("nbt_sha256")
+            or previous.get("pos") != record.get("pos")
+        ):
+            problems.append(
+                {
+                    "check": "seat-changed",
+                    "uuid": record["uuid"],
+                    "at_ready": previous.get("nbt_sha256"),
+                    "now": record.get("nbt_sha256"),
+                }
+            )
+    if (ready.get("user") or {}).get("vehicle_uuid") != (current.get("user") or {}).get(
+        "vehicle_uuid"
+    ):
+        problems.append(
+            {
+                "check": "user-vehicle-changed",
+                "at_ready": (ready.get("user") or {}).get("vehicle_uuid"),
+                "now": (current.get("user") or {}).get("vehicle_uuid"),
+            }
+        )
+    if current_seat and (current.get("interface") or {}).get("seat_present") is False:
+        problems.append(
+            {
+                "check": "seat-missing-from-snapshot",
+                "note": "the current interface snapshot does not contain the hover seat",
+            }
+        )
 
     current_uuids = [record["uuid"] for record in current["carts"]]
     missing = [uuid for uuid in (ready.get("spawn_order") or []) if uuid not in current_uuids]

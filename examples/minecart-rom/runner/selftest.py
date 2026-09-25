@@ -88,10 +88,17 @@ def test_nbt_codec(tmp: Path) -> None:
     check_equal(export_world.nbt_get(spawn, "pos").items, [0, -60, 0], "nbt list of ints")
     # sanitising keeps the fake uuid out of the shipped level
     data = export_world.nbt_get(parsed, "Data")
-    changes = export_world.sanitize_level_dat(data, version="9.9.9")
+    changes = export_world.sanitize_level_dat(
+        data, version="9.9.9", exported_at="2026-01-01T00:00:00Z"
+    )
     check("singleplayer_uuid" in changes, "sanitize reports the uuid change")
     check_equal(export_world.nbt_get(data, "singleplayer_uuid"), [0, 0, 0, 0], "uuid zeroed")
     check_equal(export_world.nbt_get(data, "LastPlayed"), 0, "LastPlayed reset")
+    check_equal(
+        export_world.nbt_get(export_world.nbt_get(data, "mc_agent_export"), "exported_at"),
+        "2026-01-01T00:00:00Z",
+        "sanitize stores the deterministic export time",
+    )
 
 
 def test_hashes(tmp: Path) -> None:
@@ -228,6 +235,21 @@ def test_archive_safety(tmp: Path) -> None:
         pass
     check_raises(fixture.FixtureError, lambda: fixture.safe_extract(empty, tmp / "out-empty"), "empty zip rejected")
 
+    colon = tmp / "colon.zip"
+    with zipfile.ZipFile(colon, "w") as archive:
+        archive.writestr("world/file.txt:ads", b"nope")
+    check_raises(fixture.UnsafeArchive, lambda: fixture.safe_extract(colon, tmp / "out-colon"), "ADS colon rejected")
+
+    for member in ("world/CON.txt", "world/aux", "world/Com1.dat", "world/name.", "world/name "):
+        reserved = tmp / "reserved.zip"
+        with zipfile.ZipFile(reserved, "w") as archive:
+            archive.writestr(member, b"nope")
+        check_raises(
+            fixture.UnsafeArchive,
+            lambda: fixture.safe_extract(reserved, tmp / "out-reserved"),
+            f"reserved Windows name rejected: {member}",
+        )
+
     # symlink members are refused as well
     link = tmp / "link.zip"
     with zipfile.ZipFile(link, "w") as archive:
@@ -237,46 +259,88 @@ def test_archive_safety(tmp: Path) -> None:
     check_raises(fixture.UnsafeArchive, lambda: fixture.safe_extract(link, tmp / "out-link"), "symlink rejected")
 
 
-def test_artifact_layout(tmp: Path) -> None:
+def mini_artifact(
+    tmp: Path,
+    *,
+    export_overrides: dict | None = None,
+    manifest_overrides: dict | None = None,
+    world_bytes: bytes = b"level",
+) -> tuple[Path, fixture.Manifest, dict, str]:
+    """A complete, consistent EXPORT.json + world/ ZIP for consistency tests."""
     staging = tmp / "build"
     world = staging / "world"
-    (world / "data").mkdir(parents=True)
-    (world / "level.dat").write_bytes(b"level")
+    (world / "data").mkdir(parents=True, exist_ok=True)
+    (world / "level.dat").write_bytes(world_bytes)
     (world / "data" / "rules.dat").write_bytes(b"")
-    world_hash = fixture.world_tree_hash(world)[0]
-    (staging / "EXPORT.json").write_text(json.dumps({"world_sha256": world_hash}), "utf-8")
-    archive = tmp / "artifact.zip"
+    world_hash, files, size = fixture.world_tree_hash(world)
+    export = {
+        "format": "mc-agent/minecart-rom-export@1",
+        "version": "9.9.9",
+        "world_sha256": world_hash,
+        "world_files": files,
+        "world_uncompressed_bytes": size,
+        "exported_at": "2026-01-01T00:00:00Z",
+    }
+    export.update(export_overrides or {})
+    archive = tmp / f"artifact-{abs(hash(json.dumps(export))) % 10**6}.zip"
     with zipfile.ZipFile(archive, "w") as z:
-        z.writestr("EXPORT.json", (staging / "EXPORT.json").read_text())
-        z.writestr("world/level.dat", b"level")
-        z.writestr("world/data/rules.dat", b"")
+        z.writestr("EXPORT.json", json.dumps(export))
+        for path in sorted(world.rglob("*")):
+            if path.is_file():
+                z.writestr("world/" + path.relative_to(world).as_posix(), path.read_bytes())
     manifest_data = fixture.read_json(EXAMPLES / "map-manifest.json")
     manifest_data["artifact"].update(
-        {"filename": "artifact.zip", "sha256": fixture.sha256_file(archive), "size": archive.stat().st_size}
+        {
+            "filename": archive.name,
+            "sha256": fixture.sha256_file(archive),
+            "size": archive.stat().st_size,
+        }
     )
+    manifest_data["world"] = {"sha256": world_hash, "files": files, "uncompressed_bytes": size}
+    manifest_data.update(manifest_overrides or {})
     manifest = fixture.Manifest(path=tmp / "m.json", data=manifest_data)
+    return archive, manifest, export, world_hash
+
+
+def test_artifact_layout(tmp: Path) -> None:
+    archive, manifest, export, world_hash = mini_artifact(tmp)
     report = fixture.unpack_artifact(manifest, archive, tmp / "unpacked")
     check_equal(report["world_sha256"], world_hash, "unpacked world hash")
     check(report["world"].endswith("world"), "world dir found")
-    # a tampered EXPORT.json hash is refused
-    staging2 = tmp / "build2"
-    world2 = staging2 / "world"
-    world2.mkdir(parents=True)
-    (world2 / "level.dat").write_bytes(b"level")
-    (staging2 / "EXPORT.json").write_text(json.dumps({"world_sha256": "0" * 64}), "utf-8")
-    archive2 = tmp / "artifact2.zip"
-    with zipfile.ZipFile(archive2, "w") as z:
-        z.writestr("EXPORT.json", (staging2 / "EXPORT.json").read_text())
-        z.writestr("world/level.dat", b"level")
-    manifest_data["artifact"].update(
-        {"filename": "artifact2.zip", "sha256": fixture.sha256_file(archive2), "size": archive2.stat().st_size}
+    check_equal(report["archive_sha256"], manifest.sha256, "archive hash recorded")
+
+    # each inconsistency is refused, not silently accepted
+    _, manifest_bad_hash, _, _ = mini_artifact(
+        tmp, manifest_overrides={"artifact": {**manifest.data["artifact"], "sha256": "0" * 64}}
+    )
+    check_raises(
+        fixture.HashMismatch,
+        lambda: fixture.unpack_artifact(manifest_bad_hash, archive, tmp / "unpacked-hash"),
+        "manifest archive hash mismatch rejected",
+    )
+    bad_bytes_export = {**export, "world_uncompressed_bytes": export["world_uncompressed_bytes"] + 1}
+    archive2, manifest2, _, _ = mini_artifact(tmp, export_overrides=bad_bytes_export)
+    check_raises(
+        fixture.FixtureError,
+        lambda: fixture.unpack_artifact(manifest2, archive2, tmp / "unpacked-bytes"),
+        "EXPORT.json byte count mismatch rejected",
+    )
+    _, manifest3, _, _ = mini_artifact(
+        tmp,
+        manifest_overrides={
+            "world": {**manifest.data["world"], "sha256": "0" * 64},
+        },
     )
     check_raises(
         fixture.FixtureError,
-        lambda: fixture.unpack_artifact(
-            fixture.Manifest(path=tmp / "m2.json", data=manifest_data), archive2, tmp / "unpacked2"
-        ),
-        "EXPORT.json hash mismatch rejected",
+        lambda: fixture.unpack_artifact(manifest3, archive, tmp / "unpacked-worldhash"),
+        "manifest world hash mismatch rejected",
+    )
+    archive4, manifest4, _, _ = mini_artifact(tmp, export_overrides={"format": "nope"})
+    check_raises(
+        fixture.FixtureError,
+        lambda: fixture.unpack_artifact(manifest4, archive4, tmp / "unpacked-format"),
+        "EXPORT.json with an unknown format is rejected",
     )
 
 
@@ -304,14 +368,27 @@ def synthetic_snapshot(spec: dict, program: list[dict] | None = None) -> dict:
         )
     spawn_order = [record["uuid"] for record in carts]
     tick_order = list(spawn_order)
+    seat_config = spec["user"].get("hover_seat") or {}
+    seat = []
+    if seat_config.get("enabled", False):
+        seat_nbt = '{"NoGravity":1b,"Invisible":1b,"Marker":1b}'
+        seat = [
+            {
+                "uuid": "11111111-1111-1111-1111-111111111111",
+                "pos": list(seat_config["pos"]),
+                "nbt": seat_nbt,
+                "nbt_sha256": hashlib.sha256(seat_nbt.encode("utf-8")).hexdigest(),
+            }
+        ]
     interface = {
         "name": "synthetic",
         "dir": "/tmp/synthetic",
-        "entities": len(carts),
+        "entities": len(carts) + len(seat),
         "order_hash": "0123456789abcdef",
         "tick": 6000,
         "mod_version": "0.6.0",
         "tick_order": tick_order,
+        "seat_present": True if seat else None,
         "cross_check_ok": True,
         "cross_check": [
             {"uuid": record["uuid"], "present": True, "items_match": True, "pos_match": True, "motion_match": True}
@@ -329,8 +406,15 @@ def synthetic_snapshot(spec: dict, program: list[dict] | None = None) -> dict:
         "interface": interface,
         "carts": carts,
         "cart_count": len(carts),
+        "seat": seat,
         "machine": {"ok": True, "checks": [], "note": 20},
-        "user": {"name": "Romuser", "UUID": "[I; 1, 2, 3, 4]", "Pos": "[0d, 0d, 0d]", "Rotation": "[0f, 0f]"},
+        "user": {
+            "name": "Romuser",
+            "UUID": "[I; 1, 2, 3, 4]",
+            "Pos": "[0d, 0d, 0d]",
+            "Rotation": "[0f, 0f]",
+            "vehicle_uuid": seat[0]["uuid"] if seat else "",
+        },
         "normalized_hash": fixture.normalized_entity_hash(carts),
     }
 
@@ -347,6 +431,27 @@ def test_validate_ready() -> None:
         any(problem["check"] == "tick-order-missing" for problem in report["problems"])
         and any(problem["check"] == "interface-cross-check" for problem in report["problems"]),
         "missing tick order fails the ready contract",
+    )
+    no_seat = copy.deepcopy(good)
+    no_seat["seat"] = []
+    report = fixture.validate_ready(spec, no_seat)
+    check(
+        any(problem["check"] == "seat-count" for problem in report["problems"]),
+        "a missing hover seat fails the ready contract",
+    )
+    not_mounted = copy.deepcopy(good)
+    not_mounted["user"]["vehicle_uuid"] = ""
+    report = fixture.validate_ready(spec, not_mounted)
+    check(
+        any(problem["check"] == "seat-mount" for problem in report["problems"]),
+        "a user not riding the seat fails the ready contract",
+    )
+    seat_missing_from_snapshot = copy.deepcopy(good)
+    seat_missing_from_snapshot["interface"]["seat_present"] = False
+    report = fixture.validate_ready(spec, seat_missing_from_snapshot)
+    check(
+        any(problem["check"] == "seat-in-snapshot" for problem in report["problems"]),
+        "a seat absent from the mod snapshot fails the ready contract",
     )
     custom = synthetic_snapshot(spec, program=spec["program"]["entries"][:2])
     check(fixture.validate_ready(spec, custom)["ok"], "a custom program is validated against itself")
@@ -530,6 +635,22 @@ def test_live_classifier() -> None:
             "classifier: a ready record without tick-order evidence is not ready",
         )
 
+        reset(seat=[])
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            not report["ok"] and any(p["check"] == "seat-count" for p in report["problems"]),
+            "classifier: a missing hover seat is not ready",
+        )
+
+        changed_seat = copy.deepcopy(ready["seat"])
+        changed_seat[0]["nbt_sha256"] = "0" * 64
+        reset(seat=changed_seat)
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            any(p["check"] == "seat-changed" for p in report["problems"]),
+            "classifier: a changed hover seat is not ready",
+        )
+
         reset(carts=list(ready["carts"][:2]), normalized_hash=fixture.normalized_entity_hash(ready["carts"][:2]))
         report = fixture.check_live_state(console, spec, ready)
         check(report["verdict"] == "PREMATURE_OUTPUT", "classifier: missing cart is premature output")
@@ -546,7 +667,7 @@ def test_evidence_helpers() -> None:
     records = EXAMPLES / "calibration" / "records"
     runs = evidence.find_ready_snapshots(records)
     check(len(runs) >= 3, "at least three ready records committed")
-    rows = evidence.init_runs(runs, len(spec["program"]["entries"]))
+    rows = evidence.init_runs(runs, spec, len(spec["program"]["entries"]))
     check(len({row["state_hash"] for row in rows}) == 1, "state hash equal across committed runs")
     check(len({row["order_hash"] for row in rows}) == 1, "order hash equal across committed runs")
     check(all(row["order_source"] == "interface-snapshot" for row in rows), "committed runs carry the tick-order evidence")
@@ -561,11 +682,131 @@ def test_evidence_helpers() -> None:
     check(identity["server_vantage_uuid"] == identity["uuid"], "server vantage uuid equals task uuid")
     check(len(identity["uuid"]) == 36, "uuid is canonically formatted")
     check(evidence.inventory_total(snapshot["carts"]) == 6, "inventory total helper")
-    check(evidence.early_output(snapshot, 3) is False, "early-output helper")
-    check(evidence.early_output({**snapshot, "carts": snapshot["carts"][:2]}, 3) is True, "short stack is early output")
+    check(evidence.early_output(snapshot, spec, 3) is False, "early-output helper")
+    check(
+        evidence.early_output({**snapshot, "carts": snapshot["carts"][:2]}, spec, 3) is True,
+        "short stack is early output",
+    )
+    off_stack = copy.deepcopy(snapshot)
+    off_stack["carts"][0]["pos"] = [v for v in off_stack["carts"][0]["pos"]]
+    off_stack["carts"][0]["pos"][0] += 0.5
+    check(
+        evidence.early_output(off_stack, spec, 3) is True,
+        "a cart nudged off the rest position is early output",
+    )
+    check_equal(evidence.url_pin("https://raw.githubusercontent.com/o/r/" + "a" * 40 + "/x.zip"), "commit", "commit URL pin")
+    check_equal(evidence.url_pin("https://example.invalid/map.zip"), "mutable", "mutable URL pin")
     # fail closed when the source save was not provided
     rebuild = evidence.cleanup_rebuild(None)
     check(rebuild["source_world_untouched"] is False, "no source world means untouched=false")
+
+
+def test_export_reproducible(tmp: Path) -> None:
+    """Two exports of an unchanged source must be byte-identical."""
+    import argparse
+    import contextlib
+    import io
+
+    source = tmp / "synthetic-save"
+    source.mkdir()
+    payload = {
+        "Data": (
+            10,
+            {
+                "LevelName": (8, "synthetic"),
+                "LastPlayed": (4, 1),
+                "singleplayer_uuid": (11, [1, 2, 3, 4]),
+            },
+        )
+    }
+    export_world.write_nbt(source / "level.dat", "", payload)
+
+    def run(out: Path, exported_at: str = "") -> Path:
+        with contextlib.redirect_stdout(io.StringIO()):
+            export_world.export(
+                argparse.Namespace(
+                    source=str(source),
+                    out=str(out),
+                    version="test",
+                    build="",
+                    keep_build=False,
+                    keep_entities=False,
+                    allow_command_blocks=False,
+                    exported_at=exported_at,
+                )
+            )
+        return out
+
+    first = run(tmp / "first.zip")
+    second = run(tmp / "second.zip")
+    check_equal(
+        fixture.sha256_file(first), fixture.sha256_file(second), "two exports are byte-identical"
+    )
+    with zipfile.ZipFile(first) as archive:
+        export = json.loads(archive.read("EXPORT.json"))
+    check_equal(export["exported_at"], export_world.DEFAULT_EXPORTED_AT, "deterministic export time")
+    with zipfile.ZipFile(first) as archive:
+        archive.extractall(tmp / "first-extracted")
+    _, level = export_world.read_nbt(tmp / "first-extracted" / "world" / "level.dat")
+    stamp = export_world.nbt_get(
+        export_world.nbt_get(export_world.nbt_get(level, "Data"), "mc_agent_export"), "exported_at"
+    )
+    check_equal(stamp, export_world.DEFAULT_EXPORTED_AT, "level.dat carries the deterministic time")
+    other = run(tmp / "other.zip", exported_at="2027-02-02T00:00:00Z")
+    check(
+        fixture.sha256_file(other) != fixture.sha256_file(first),
+        "an explicit exported-at changes the artifact",
+    )
+
+
+def test_mod_pins(tmp: Path) -> None:
+    manifest_data = fixture.read_json(EXAMPLES / "map-manifest.json")
+    carpet = next(mod for mod in manifest_data["mods"] if mod["name"] == "carpet")
+    pinned = copy.deepcopy(manifest_data)
+    pinned["mods"] = [carpet]
+    manifest = fixture.Manifest(path=tmp / "m.json", data=pinned)
+    lab = tmp / "pins-lab"
+    lab.mkdir()
+    (lab / "lab.json").write_text(
+        json.dumps({"mods": [{"name": "fabric-carpet.jar", "sha256": carpet["sha256"]}]}),
+        "utf-8",
+    )
+    original_labs = fixture.LABS
+    fixture.LABS = tmp
+    try:
+        check(fixture.check_mod_pins("pins-lab", manifest)["ok"], "matching mod pins pass")
+        (lab / "lab.json").write_text(json.dumps({"mods": []}), "utf-8")
+        check_raises(
+            fixture.FixtureError,
+            lambda: fixture.check_mod_pins("pins-lab", manifest),
+            "missing pinned mods fail closed",
+        )
+    finally:
+        fixture.LABS = original_labs
+
+    # the pin downloader verifies bytes (a local file:// URL keeps it offline)
+    jar = tmp / "pinned-carpet.jar"
+    jar.write_bytes(b"jar-bytes")
+    pinned = copy.deepcopy(manifest_data)
+    pinned["mods"] = [
+        {
+            "name": "carpet",
+            "version": "x",
+            "sha256": fixture.sha256_file(jar),
+            "url": jar.as_uri(),
+            "filename": "pinned-carpet.jar",
+            "required": True,
+        }
+    ]
+    paths = fixture.ensure_pinned_mods(fixture.Manifest(path=tmp / "p.json", data=pinned), tmp / "cache")
+    check_equal(paths, [tmp / "cache" / "pinned-carpet.jar"], "pinned mod cached")
+    bad = copy.deepcopy(pinned)
+    bad["mods"][0]["sha256"] = "0" * 64
+    check_raises(
+        fixture.HashMismatch,
+        lambda: fixture.ensure_pinned_mods(fixture.Manifest(path=tmp / "b.json", data=bad), tmp / "cache"),
+        "wrong pinned mod hash rejected",
+    )
 
 
 def test_challenge_generator(tmp: Path) -> None:
@@ -628,6 +869,8 @@ def run(keep: bool = False, verbose: bool = False) -> int:
         ("live classifier", test_live_classifier),
         ("evidence helpers", test_evidence_helpers),
         ("challenge", lambda: test_challenge_generator(tmp)),
+        ("export reproducible", lambda: test_export_reproducible(tmp)),
+        ("mod pins", lambda: test_mod_pins(tmp)),
         ("lab helpers", lambda: test_import_helpers(tmp)),
     ]
     failures = 0

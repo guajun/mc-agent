@@ -141,6 +141,7 @@ def cmd_up(args: argparse.Namespace) -> int:
 
 def cmd_init(args: argparse.Namespace) -> int:
     spec = fixture.load_spec(Path(args.spec) if args.spec else None)
+    manifest = fixture.load_manifest(Path(args.manifest) if args.manifest else None)
     program = fixture.load_program(Path(args.program)) if args.program else None
     records = record_dir(args)
     status = fixture.lab_status(args.lab)
@@ -155,6 +156,7 @@ def cmd_init(args: argparse.Namespace) -> int:
             interface=interface,
             snapshot_name=args.snapshot_name or f"ready-{args.lab}",
             allow_rcon_order=args.allow_rcon_order,
+            manifest=manifest,
         )
     finally:
         if interface is not None:

@@ -47,6 +47,12 @@ ZIP_DATE = (2026, 1, 1, 0, 0, 0)
 EXPORT_FORMAT = "mc-agent/minecart-rom-export@1"
 LEVEL_NAME = "Minecart ROM base"
 
+# The artifact must be byte-for-byte reproducible, so nothing inside it may
+# carry a wall-clock time. The export time is fixed (or provided explicitly /
+# through SOURCE_DATE_EPOCH); the wall-clock moment belongs in map-manifest.json
+# outside the hashed artifact.
+DEFAULT_EXPORTED_AT = "2026-01-01T00:00:00Z"
+
 # The fixture must not contain command blocks; the export proves it by scanning
 # every chunk palette instead of trusting the source save.
 COMMAND_BLOCKS = {
@@ -59,6 +65,18 @@ COMMAND_BLOCKS = {
 def die(message: str, code: int = 2) -> NoReturn:
     print(f"error: {message}", file=sys.stderr)
     raise SystemExit(code)
+
+
+def resolve_exported_at(value: str) -> str:
+    """A deterministic ISO-8601 UTC timestamp for the artifact."""
+    if value:
+        if not __import__("re").fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+            die(f"--exported-at must look like 2026-01-01T00:00:00Z, got {value!r}")
+        return value
+    epoch = os.environ.get("SOURCE_DATE_EPOCH")
+    if epoch:
+        return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(int(epoch)))
+    return DEFAULT_EXPORTED_AT
 
 
 def sha256_file(path: Path) -> str:
@@ -352,7 +370,7 @@ def copy_world_tree(source: Path, target: Path) -> dict[str, Any]:
 # --------------------------------------------------------------------------- export
 
 
-def sanitize_level_dat(data: dict[str, Any], *, version: str) -> list[str]:
+def sanitize_level_dat(data: dict[str, Any], *, version: str, exported_at: str) -> list[str]:
     """Strip the owner's identity, keep the map's gameplay state."""
     changed: list[str] = []
     if "singleplayer_uuid" in data:
@@ -373,7 +391,7 @@ def sanitize_level_dat(data: dict[str, Any], *, version: str) -> list[str]:
         {
             "format": (8, EXPORT_FORMAT),
             "version": (8, version),
-            "exported_at": (8, time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())),
+            "exported_at": (8, exported_at),
         },
     )
     return changed
@@ -416,11 +434,12 @@ def export(args: argparse.Namespace) -> int:
     world.mkdir(parents=True)
     entities = [] if args.keep_entities else find_entities(source)
     copy = copy_world_tree(source, world)
+    exported_at = resolve_exported_at(args.exported_at)
     name, root = read_nbt(world / "level.dat")
     data = nbt_get(root, "Data")
     if not isinstance(data, dict):
         die("level.dat has no Data compound")
-    changes = sanitize_level_dat(data, version=args.version)
+    changes = sanitize_level_dat(data, version=args.version, exported_at=exported_at)
     write_nbt(world / "level.dat", name, root)
     (world / "level.dat_old").unlink(missing_ok=True)
     (world / "session.lock").unlink(missing_ok=True)
@@ -444,7 +463,7 @@ def export(args: argparse.Namespace) -> int:
         "removed_entities": entities,
         "command_blocks": command_blocks,
         "tool": "examples/minecart-rom/runner/export_world.py",
-        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "exported_at": exported_at,
     }
     (build / "EXPORT.json").write_text(
         json.dumps(export_record, indent=2, ensure_ascii=False) + "\n", "utf-8"
@@ -474,6 +493,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--source", required=True, help="the source save directory (read only)")
     parser.add_argument("--out", required=True, help="the .zip to write")
     parser.add_argument("--version", default="1.0.0")
+    parser.add_argument(
+        "--exported-at",
+        default="",
+        help=f"deterministic artifact timestamp (default {DEFAULT_EXPORTED_AT} or $SOURCE_DATE_EPOCH)",
+    )
     parser.add_argument("--build", default="", help="staging directory (default: next to --out)")
     parser.add_argument("--keep-build", action="store_true")
     parser.add_argument("--keep-entities", action="store_true", help="do not strip saved entities")
