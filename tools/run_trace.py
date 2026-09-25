@@ -318,7 +318,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     cs.append_jsonl(
         trajectory_path(run_dir),
         {
+            "schema": cs.SCHEMA_TRAJECTORY,
             "record": "phase",
+            "run_id": run_id,
             "phase": "prepare",
             "actor": "operator",
             "at": cs.utc_now(),
