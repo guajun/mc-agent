@@ -1,0 +1,29 @@
+{
+  "what": "two exports of the unchanged source save with the deterministic exporter",
+  "source": "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test",
+  "source_tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+  "source_files": 40,
+  "source_bytes": 11556310,
+  "command": "python examples/minecart-rom/runner/export_world.py --source <source> --out <out> --version 1.0.0",
+  "exports": [
+    {
+      "out": "export-a.zip",
+      "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+      "size": 748712,
+      "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
+      "world_uncompressed_bytes": 11530852
+    },
+    {
+      "out": "export-b.zip",
+      "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+      "size": 748712,
+      "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
+      "world_uncompressed_bytes": 11530852
+    }
+  ],
+  "exported_at": "2026-01-01T00:00:00Z",
+  "byte_identical": true,
+  "artifact_sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+  "artifact_matches_exports": true,
+  "checked_at": "2026-09-26"
+}

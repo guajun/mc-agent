@@ -1,0 +1,23 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "checked_at": "2026-09-26T02:18:37+0800",
+  "verdict": "FIXTURE_INVALID",
+  "ok": false,
+  "problems": [
+    {
+      "check": "normalized-state-changed",
+      "at_ready": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+      "now": "fc2bb78d2158a11851e09f1371a2fe9dc566a1d180138cea5abbac894b7aff6c"
+    },
+    {
+      "check": "cart-nbt-changed",
+      "uuid": "0846025f-5649-490e-8582-c3138af310fc",
+      "at_ready": "2cd674d37758039b597a649829748da5344da4d8f1f42ae4966ca3254c2cf304",
+      "now": "d7145ac922a3c6dba1887640f7264753ea3df3f1d94047e10745cc1a4ee501d2",
+      "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Sl",
+      "now_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Sl"
+    }
+  ],
+  "ready_snapshot": "examples\\minecart-rom\\calibration\\negative\\nbt-tampered\\ready-snapshot.json",
+  "records_dir": "examples\\minecart-rom\\calibration\\negative\\nbt-tampered"
+}

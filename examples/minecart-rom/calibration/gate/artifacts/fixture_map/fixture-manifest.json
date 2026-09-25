@@ -1,0 +1,49 @@
+{
+  "format": "mc-agent/fixture-map-evidence@1",
+  "map": {
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/f7d8e43c1316e4f9d37f1ef3a59a779c33921cd6/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+    "bytes": 748712,
+    "mc_version": "26.2",
+    "immutable": true,
+    "url_pin": "commit",
+    "download_verified": true,
+    "bad_hash_rejected": true,
+    "download_record": "examples/minecart-rom/calibration/records/cold-download/download.json",
+    "bad_hash_check": "sha256 mismatch for minecart-rom-base-1.0.0.zip: manifest says 0000000000000000000000000000000000000000000000000000000000000000, file is 46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387"
+  },
+  "mods": [
+    {
+      "name": "fabric-api",
+      "version": "0.161.0+26.2",
+      "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a"
+    },
+    {
+      "name": "carpet",
+      "version": "26.2+v260616",
+      "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c"
+    },
+    {
+      "name": "wavecarpet",
+      "version": "0.6.1+26.2",
+      "sha256": "ddfcd05db0c96cc628e08992edd76b5521230a5f09037030efae6136c2d89bcd"
+    },
+    {
+      "name": "carpet-tis-addition",
+      "version": "1.81.0",
+      "sha256": "d1a245cb4e5670b9908e2fed80c2ba024f611f7d26eb505448e01b9ce93dfbb3"
+    },
+    {
+      "name": "mc-agent-interface-mod",
+      "version": "0.6.0",
+      "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f"
+    }
+  ],
+  "world": {
+    "directory": "labs/_cache/maps/unpacked/minecart-rom-base-1.0.0/world",
+    "tree_sha256": "a9b6c381721ac8c95cced15fc227cfdd4035ea27d64538e37da84e680b8ba79a",
+    "files": 31,
+    "hash_tool": "tools/stage1_gate.py hash-tree",
+    "source_export_file_hash": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51"
+  }
+}

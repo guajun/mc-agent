@@ -1,0 +1,17 @@
+{
+  "checks": {
+    "fixture_map": {
+      "evidence": {
+        "fixture_manifest": "artifacts/fixture_map/fixture-manifest.json",
+        "init_runs": "artifacts/fixture_map/init-runs.jsonl",
+        "player_identity": "artifacts/fixture_map/player-identity.json",
+        "command_block_scan": "artifacts/fixture_map/command-block-scan.json",
+        "cleanup_rebuild": "artifacts/fixture_map/cleanup-rebuild.json"
+      }
+    }
+  },
+  "notes": [
+    "init-runs.jsonl rows must be bound to bundle.run.child_runs before the gate check",
+    "command-block-scan.world_dirs must cover every declared run.instances[].world_dir"
+  ]
+}

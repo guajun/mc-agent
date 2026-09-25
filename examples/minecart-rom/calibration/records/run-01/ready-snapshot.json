@@ -1,0 +1,692 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "captured_at": "2026-09-26T02:09:38+0800",
+  "tick_frozen": true,
+  "world_day_tick": 6000,
+  "lab": "rom15d",
+  "server": {
+    "lab": "rom15d",
+    "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15d",
+    "running": true,
+    "pid": 30964,
+    "startedAt": 1790359726.0352638,
+    "rcon_host": "127.0.0.1",
+    "rcon_port": 27156,
+    "world": "copied save",
+    "world_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15d\\world",
+    "world_source": "labs\\_scratch\\mapcache\\unpacked\\minecart-rom-base-1.0.0\\world",
+    "mods": [
+      "fabric-api-0.161.0+26.2.jar",
+      "fabric-carpet-26.2+v260616.jar",
+      "mc-agent-interface-0.6.0.jar"
+    ],
+    "mod_records": [
+      {
+        "name": "fabric-api-0.161.0+26.2.jar",
+        "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "size": 2566123,
+        "origin": "local",
+        "version": "0.161.0+26.2",
+        "required": false,
+        "deployedAt": 1790357680.9821825
+      },
+      {
+        "name": "fabric-carpet-26.2+v260616.jar",
+        "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c",
+        "size": 1536362,
+        "origin": "local",
+        "version": "26.2",
+        "required": false,
+        "deployedAt": 1790357680.9841075
+      },
+      {
+        "name": "mc-agent-interface-0.6.0.jar",
+        "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+        "size": 66517,
+        "origin": "local",
+        "version": "",
+        "required": false,
+        "deployedAt": 1790357680.9846869
+      }
+    ],
+    "minecraft": "26.2",
+    "loader": "0.19.5",
+    "server_vantage_port": 27158,
+    "server_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15d\\mc-agent-server",
+    "bridge_api_port": 27159,
+    "interface_mod": {
+      "name": "mc-agent-interface-0.6.0.jar",
+      "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+      "size": 66517,
+      "origin": "local",
+      "version": "",
+      "required": false,
+      "deployedAt": 1790357680.9846869
+    }
+  },
+  "program": [
+    {
+      "index": 0,
+      "items": [
+        {
+          "slot": 0,
+          "id": "minecraft:stone",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "items": [
+        {
+          "slot": 1,
+          "id": "minecraft:dirt",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "items": [
+        {
+          "slot": 2,
+          "id": "minecraft:gold_ingot",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "spawn_order": [
+    "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+    "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+    "2ab07a06-b015-4121-b814-60cb5e982f5f"
+  ],
+  "carts": [
+    {
+      "uuid": "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+      "pos": [
+        14.5,
+        -51.9375,
+        -21.5
+      ],
+      "motion": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "items": [
+        {
+          "count": 1,
+          "Slot": 0,
+          "id": "minecraft:stone"
+        }
+      ],
+      "items_raw": "[{count: 1, Slot: 0b, id: \"minecraft:stone\"}]",
+      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Slot: 0b, id: \"minecraft:stone\"}], UUID: [I; 805216556, 1944210660, -1420344448, 1290535090], FlippedRotation: 0b, HasTicked: 0b}",
+      "nbt_sha256": "c85ea35583c25ec300cde748ac2321827a5b4013872013d91c380c36c5703164",
+      "spawn_index": 0
+    },
+    {
+      "uuid": "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+      "pos": [
+        14.5,
+        -51.9375,
+        -21.5
+      ],
+      "motion": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "items": [
+        {
+          "count": 2,
+          "Slot": 1,
+          "id": "minecraft:dirt"
+        }
+      ],
+      "items_raw": "[{count: 2, Slot: 1b, id: \"minecraft:dirt\"}]",
+      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 2, Slot: 1b, id: \"minecraft:dirt\"}], UUID: [I; -1236219438, 1897613587, -1383222778, -1469454166], FlippedRotation: 0b, HasTicked: 0b}",
+      "nbt_sha256": "9ea58da79d91a3d7240294879e81bb220e14b9d43c9ce1f74f2ceb6d8d2d2ea0",
+      "spawn_index": 1
+    },
+    {
+      "uuid": "2ab07a06-b015-4121-b814-60cb5e982f5f",
+      "pos": [
+        14.5,
+        -51.9375,
+        -21.5
+      ],
+      "motion": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "items": [
+        {
+          "count": 3,
+          "Slot": 2,
+          "id": "minecraft:gold_ingot"
+        }
+      ],
+      "items_raw": "[{count: 3, Slot: 2b, id: \"minecraft:gold_ingot\"}]",
+      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 3, Slot: 2b, id: \"minecraft:gold_ingot\"}], UUID: [I; 716208646, -1340784351, -1206624053, 1587031903], FlippedRotation: 0b, HasTicked: 0b}",
+      "nbt_sha256": "4cb561745e10f2f608f1b6c373c5148cbe354bbc3581cb57de18b4a7f48074f5",
+      "spawn_index": 2
+    }
+  ],
+  "cart_count": 3,
+  "stack": {
+    "rail_block": [
+      14,
+      -52,
+      -22
+    ],
+    "spawn": [
+      14.5,
+      -52.0,
+      -21.5
+    ],
+    "rest_pos": [
+      14.5,
+      -51.9375,
+      -21.5
+    ],
+    "stack_axis": "y",
+    "notes": "Every cart is summoned at `spawn`; overlapping carts stack in summon order. The order is recorded, never assumed to equal the pop order."
+  },
+  "machine": {
+    "ok": true,
+    "checks": [
+      {
+        "pos": [
+          11,
+          -54,
+          -23
+        ],
+        "block": "minecraft:note_block[instrument=harp,powered=false]",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -54,
+          -22
+        ],
+        "block": "minecraft:sticky_piston[extended=false,facing=up]",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          12,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          13,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          14,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -52,
+          -22
+        ],
+        "block": "minecraft:redstone_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          14,
+          -52,
+          -22
+        ],
+        "block": "minecraft:powered_rail[powered=false,shape=north_south]",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -51,
+          -22
+        ],
+        "block": "minecraft:sand",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -50,
+          -22
+        ],
+        "block": "minecraft:sand",
+        "ok": true
+      },
+      {
+        "pos": [
+          13,
+          -49,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -48,
+          -22
+        ],
+        "block": "minecraft:sticky_piston[extended=false,facing=east]",
+        "ok": true
+      },
+      {
+        "pos": [
+          12,
+          -48,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          13,
+          -48,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          12,
+          -47,
+          -22
+        ],
+        "block": "minecraft:redstone_block",
+        "ok": true
+      }
+    ],
+    "note": 20,
+    "note_block": [
+      11,
+      -54,
+      -23
+    ]
+  },
+  "user": {
+    "name": "Romuser",
+    "UUID": "[I; 1052844757, -64534506, -1102594165, -388504211]",
+    "Pos": "[11.5d, -53.6d, -24.5d]",
+    "Rotation": "[0.0f, 50.5055f]",
+    "playerGameType": "1",
+    "RootVehicle": "{Entity: {NoGravity: 1b, Brain: {memories: {}}, Invulnerable: 0b, FallFlying: 0b, ShowArms: 0b, PortalCooldown: 0, AbsorptionAmount: 0.0f, DisabledSlots: 0, DeathTime: 0s, Pose: {}, id: \"minecraft:armor_stand\", Invisible: 1b, UUID: [I; 774012271, 1045056735, -1253247935, -1594555413], Tags: [\"minecart-rom-fixture\"], Motion: [0.0d, 0.0d, 0.0d], Small: 0b, Health: 20.0f, fall_distance: 0.0d, Air: 300s, OnGround: 1b, Marker: 1b, Rotation: [0.0f, 0.0f], current_impulse_context_reset_grace_time: 0, Pos: [11.5d, -53.0d, -24.5d], Fire: 0s, NoBasePlate: 0b, attributes: [{id: \"minecraft:movement_speed\", base: 0.7d}], HurtTime: 0s}, Attach: [I; 774012271, 1045056735, -1253247935, -1594555413]}",
+    "vehicle_uuid": "2e227d6f-3e4a-4cdf-b54c-f441a0f503eb"
+  },
+  "seat": [
+    {
+      "uuid": "2e227d6f-3e4a-4cdf-b54c-f441a0f503eb",
+      "pos": [
+        11.5,
+        -53.0,
+        -24.5
+      ],
+      "nbt": "{NoGravity: 1b, Brain: {memories: {}}, Invulnerable: 0b, FallFlying: 0b, ShowArms: 0b, PortalCooldown: 0, AbsorptionAmount: 0.0f, DisabledSlots: 0, DeathTime: 0s, Pose: {}, Invisible: 1b, UUID: [I; 774012271, 1045056735, -1253247935, -1594555413], Tags: [\"minecart-rom-fixture\"], Motion: [0.0d, 0.0d, 0.0d], Small: 0b, Health: 20.0f, fall_distance: 0.0d, Air: 300s, OnGround: 1b, Marker: 1b, Rotation: [0.0f, 0.0f], current_impulse_context_reset_grace_time: 0, Pos: [11.5d, -53.0d, -24.5d], Fire: 0s, NoBasePlate: 0b, attributes: [{id: \"minecraft:movement_speed\", base: 0.7d}], HurtTime: 0s}",
+      "nbt_sha256": "dc5da03b7cd43ced768cd5602c6cf2a718a942729604b69b77af42eb8df3c32c"
+    }
+  ],
+  "rcon_order": [
+    "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+    "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+    "2ab07a06-b015-4121-b814-60cb5e982f5f"
+  ],
+  "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+  "interface": {
+    "name": "ready-rom15d",
+    "dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15d\\mc-agent-server\\snapshots\\ready-rom15d",
+    "entities": 4,
+    "order_hash": "44fdd5654183186f",
+    "tick": 839,
+    "dimension": "minecraft:overworld",
+    "bytes": 2627,
+    "mod": "mc-agent-interface",
+    "mod_version": "0.6.0",
+    "protocol": 1,
+    "players_skipped": 1,
+    "tick_order": [
+      "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+      "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+      "2ab07a06-b015-4121-b814-60cb5e982f5f"
+    ],
+    "seat_present": true,
+    "seat_tick_order": [
+      "2e227d6f-3e4a-4cdf-b54c-f441a0f503eb"
+    ],
+    "cross_check": [
+      {
+        "uuid": "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+        "present": true,
+        "items_match": true,
+        "items": {
+          "match": true,
+          "mod_items": "[{count:1,Slot:0b,id:\"minecraft:stone\"}]",
+          "rcon_items": "[{count:1,Slot:0b,id:\"minecraft:stone\"}]"
+        },
+        "pos_match": true,
+        "motion_match": true,
+        "nbt_sha256": "fcab7bc811ed23d09c240a060a39a8c2ea083bcc8e40adf16854c5c9cb741813"
+      },
+      {
+        "uuid": "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+        "present": true,
+        "items_match": true,
+        "items": {
+          "match": true,
+          "mod_items": "[{count:2,Slot:1b,id:\"minecraft:dirt\"}]",
+          "rcon_items": "[{count:2,Slot:1b,id:\"minecraft:dirt\"}]"
+        },
+        "pos_match": true,
+        "motion_match": true,
+        "nbt_sha256": "e27b6e006eb380ff173156711f14fa5f4cf159c69212daafff51908c4e5ab20f"
+      },
+      {
+        "uuid": "2ab07a06-b015-4121-b814-60cb5e982f5f",
+        "present": true,
+        "items_match": true,
+        "items": {
+          "match": true,
+          "mod_items": "[{count:3,Slot:2b,id:\"minecraft:gold_ingot\"}]",
+          "rcon_items": "[{count:3,Slot:2b,id:\"minecraft:gold_ingot\"}]"
+        },
+        "pos_match": true,
+        "motion_match": true,
+        "nbt_sha256": "0d30feb425cb1c0d8951142d0f39b775ada43dbcc108a5ed86b7233a487ce3b8"
+      }
+    ],
+    "cross_check_ok": true
+  },
+  "tick_order": [
+    "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+    "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+    "2ab07a06-b015-4121-b814-60cb5e982f5f"
+  ],
+  "tick_order_hash": "a3ba375742d0de28",
+  "initialization": {
+    "started_at": "2026-09-26T02:09:41+0800",
+    "seconds": 40.724,
+    "steps": [
+      {
+        "at": "2026-09-26T02:09:00+0800",
+        "step": "interface",
+        "detail": {
+          "port": 27158,
+          "protocol": "SNAPSHOT",
+          "snapshot_name": "ready-rom15d"
+        }
+      },
+      {
+        "at": "2026-09-26T02:09:05+0800",
+        "step": "machine-base",
+        "detail": {
+          "forceload": "0 -3 2 -1",
+          "machine": {
+            "ok": true,
+            "checks": [
+              {
+                "pos": [
+                  11,
+                  -54,
+                  -23
+                ],
+                "block": "minecraft:note_block[instrument=harp,powered=false]",
+                "ok": true
+              },
+              {
+                "pos": [
+                  11,
+                  -54,
+                  -22
+                ],
+                "block": "minecraft:sticky_piston[extended=false,facing=up]",
+                "ok": true
+              },
+              {
+                "pos": [
+                  11,
+                  -53,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  12,
+                  -53,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  13,
+                  -53,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  14,
+                  -53,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  11,
+                  -52,
+                  -22
+                ],
+                "block": "minecraft:redstone_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  14,
+                  -52,
+                  -22
+                ],
+                "block": "minecraft:powered_rail[powered=false,shape=north_south]",
+                "ok": true
+              },
+              {
+                "pos": [
+                  11,
+                  -51,
+                  -22
+                ],
+                "block": "minecraft:sand",
+                "ok": true
+              },
+              {
+                "pos": [
+                  11,
+                  -50,
+                  -22
+                ],
+                "block": "minecraft:sand",
+                "ok": true
+              },
+              {
+                "pos": [
+                  13,
+                  -49,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  11,
+                  -48,
+                  -22
+                ],
+                "block": "minecraft:sticky_piston[extended=false,facing=east]",
+                "ok": true
+              },
+              {
+                "pos": [
+                  12,
+                  -48,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  13,
+                  -48,
+                  -22
+                ],
+                "block": "minecraft:slime_block",
+                "ok": true
+              },
+              {
+                "pos": [
+                  12,
+                  -47,
+                  -22
+                ],
+                "block": "minecraft:redstone_block",
+                "ok": true
+              }
+            ]
+          }
+        }
+      },
+      {
+        "at": "2026-09-26T02:09:16+0800",
+        "step": "user",
+        "detail": {
+          "name": "Romuser",
+          "aim": {
+            "requested": [
+              -0.0,
+              50.5055
+            ],
+            "actual": [
+              0.0,
+              50.5055
+            ]
+          },
+          "seat": {
+            "enabled": true,
+            "pos": [
+              11.5,
+              -53.0,
+              -24.5
+            ],
+            "nbt": "{NoGravity:1b,Invisible:1b,Marker:1b,Tags:[\"minecart-rom-fixture\"]}",
+            "notes": "The machine floats over the void and the fake player has no flight toggle; an invisible NoGravity marker armor stand keeps the creative user at the operating position. It has no collision, no AI, and is not part of the machine."
+          }
+        }
+      },
+      {
+        "at": "2026-09-26T02:09:16+0800",
+        "step": "note-block-reset",
+        "detail": 20
+      },
+      {
+        "at": "2026-09-26T02:09:20+0800",
+        "step": "cart",
+        "detail": {
+          "index": 0,
+          "uuid": "2ffea12c-73e2-4ce4-ab57-43804cec00b2",
+          "items": [
+            {
+              "slot": 0,
+              "id": "minecraft:stone",
+              "count": 1
+            }
+          ]
+        }
+      },
+      {
+        "at": "2026-09-26T02:09:24+0800",
+        "step": "cart",
+        "detail": {
+          "index": 1,
+          "uuid": "b650c9d2-711b-4913-ad8d-b206a869e8aa",
+          "items": [
+            {
+              "slot": 1,
+              "id": "minecraft:dirt",
+              "count": 2
+            }
+          ]
+        }
+      },
+      {
+        "at": "2026-09-26T02:09:28+0800",
+        "step": "cart",
+        "detail": {
+          "index": 2,
+          "uuid": "2ab07a06-b015-4121-b814-60cb5e982f5f",
+          "items": [
+            {
+              "slot": 2,
+              "id": "minecraft:gold_ingot",
+              "count": 3
+            }
+          ]
+        }
+      }
+    ],
+    "program_entries": 3,
+    "program_name": "calibration-default-v1",
+    "user": "romuser",
+    "spec_version": "1.0.0",
+    "order_source": "interface-snapshot"
+  },
+  "validation": {
+    "ok": true,
+    "problems": [],
+    "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+    "tick_order_hash": "a3ba375742d0de28",
+    "cart_count": 3
+  }
+}

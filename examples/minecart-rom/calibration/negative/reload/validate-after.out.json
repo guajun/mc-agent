@@ -1,0 +1,36 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "checked_at": "2026-09-26T02:22:29+0800",
+  "verdict": "FIXTURE_INVALID:RELOAD",
+  "ok": false,
+  "problems": [
+    {
+      "check": "server-restarted",
+      "pid_at_ready": 94632,
+      "pid_now": 29404
+    },
+    {
+      "check": "world-not-frozen",
+      "tick_frozen": false
+    },
+    {
+      "check": "user-missing"
+    },
+    {
+      "check": "seat-count",
+      "at_ready": 1,
+      "now": 0
+    },
+    {
+      "check": "user-vehicle-changed",
+      "at_ready": "b2f459d9-3de0-477e-9a59-57932b8bf777",
+      "now": null
+    },
+    {
+      "check": "tick-order-unavailable",
+      "note": "no current interface snapshot; cannot prove the tick order"
+    }
+  ],
+  "ready_snapshot": "examples\\minecart-rom\\calibration\\negative\\reload\\ready-snapshot.json",
+  "records_dir": "examples\\minecart-rom\\calibration\\negative\\reload"
+}
