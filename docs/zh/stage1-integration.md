@@ -101,7 +101,7 @@ python tools/stage1_integration.py run --bundle-only   # 从 normalize-inputs.js
 | `fixture_map` | blocked | #15 地图 manifest/初始化尚未被接受 |
 | `restore_fidelity` | blocked | 本 run 没有同 run 的快照/恢复产物 |
 | `player_context` | **pass** | 真实 #16 身份，五个 case 与版本固定齐全 |
-| `agent_dev_capability` | blocked | 冷启动 harness 的 `tool_environment` 与 fixture 相关 `smoke_mod` 属阶段二证据 |
+| `agent_dev_capability` | blocked | harness `tool_environment` 记录（来自 `harness_preflight.py`，无模型调用）与通用 `smoke_mod` 记录未在本 bundle 声明 |
 | `independent_test_mod` | blocked | 仍需 test-mod manifest、负例与审计生命周期声明 |
 | `trace_persistence` | blocked | 尚无经证明的 agent 阶段 join 与缺日志检测产物 |
 | `smoke_fixture_validity` | blocked | smoke 套件（offline/player/restore）、校准与 fixture 版本锁依赖 #15/#19 |
@@ -111,17 +111,17 @@ python tools/stage1_integration.py run --bundle-only   # 从 normalize-inputs.js
 
 ## 精确剩余依赖
 
-1. **#15 fixture**：带不可变 URL/sha256 的地图 manifest、三条带 child-run 来源的初始化、fixture 假人身份、覆盖 fixture 与两个 lab 世界的无命令方块扫描、清理/重建记录。PR #27 候选（`f2a636f`）仍在评审且有未决 P1，**本页不视为已接受**。
+1. **#15 fixture**：带不可变 URL/sha256 的地图 manifest、三条带 child-run 来源的初始化、fixture 假人身份、覆盖 fixture 与两个 lab 世界的无命令方块扫描、清理/重建记录。PR #27 仍在评审（撰写时 head `4741be6`），**本页不视为已接受**。
 2. **同 run 恢复（bridge#6）**：针对门禁 run 实例的 snapshot-before/after、绑定 restore record、`source-unchanged.json` 与六个失败场景。已合并的 bridge6 证据另行收集（见上），不能重新标为本次 run 的证据。
 3. **#18/#19 测试 mod 完整性**：`test-mod-manifest.json`、`negative-cases.jsonl`（无操作、错误位置、仅 marker、仅答案）与 `audit-lifecycle.json` 声明；`missing-log-detection.jsonl`。
-4. **冷启动（#19/#20）**：harness `tool-environment.json`、五个 smoke 套件、fixture 校准、`version-lock.json`，以及 Agent 自己带显式证明的工具—游戏 join。
+4. **阶段一 harness 能力（#17/#19）**：harness `tool-environment.json`（来自 `harness_preflight.py`）、五个 smoke 套件、fixture 校准与 `version-lock.json` 都是阶段一产物。唯一属于阶段二的是 Agent 自己带显式证明的工具—游戏 join，它归 #20 审计，而非本门禁。
 5. 这些产物就绪后重跑 `stage1_integration.py run`（或补齐输入后用 `--bundle-only`），由门禁裁决。只有完整 `pass` 才放行阶段二。
 
 ## 限制
 
 * 场景是通用接线验证，不操作 ROM 机器，不构成 #14 验收。
-* 驱动的 RCON—事件归因刻意保持未验证（候选而非证明）；阶段二必须 join Agent 自己的调用。
-* #18 适配针对已提交的 PR #26 head `502f561`；该 PR 若在合并前变化，需按新版本重新验证。
+* 驱动的 RCON—事件归因刻意保持未验证（候选而非证明）。门禁仍需要测试端带显式证明的 smoke join；阶段二审计另行 join Agent 自己的调用。
+* #18 适配跟踪 PR #26 分支（本次 run 针对 `502f561`）；若该 head 在合并前变化，下次门禁运行前需按接受版本重新验证映射。
 * 快照 `meta.json` 无法证明来自哪个实机实例，因此恢复校验通过 restore record 与审计/轨迹来源绑定端点身份（见[门禁限制](stage1-gate.md)）。
 
-另见：[阶段一集成门禁](stage1-gate.md)、[冷启动协议](coldstart-protocol.md)、[构建 mod](mod-building.md)、[实验室服务器](lab-server.md)。
+另见：[阶段一集成门禁](stage1-gate.md)、[冷启动协议](coldstart-protocol.md)、[构建 mod](mod-building.md)、[实验室服务器](lab-server.md)、[Minecart ROM 验收 runbook](minecart-rom-runbook.md)。

@@ -267,6 +267,9 @@ stage1-evidence/
 
 ## 集成运行手册（前置项合并之后）
 
+父级当前状态、阶段一/阶段二交接命令与循环依赖防护见
+[Minecart ROM 验收 runbook](minecart-rom-runbook.md)。
+
 1. 从 #15、bridge#6、#16-#19 收集原始证据到一个包里（`scaffold` 会打印规范结构）。保留原始日志，并一并列入索引。
 2. 填写 `bundle.json`：`origin: live`、run id、child run id、源存档路径与前后 tree 哈希、声明的端口区间，以及落在这些端口上的实例。
 3. 对所有文件与目录树生成 `evidence-index.json`。
