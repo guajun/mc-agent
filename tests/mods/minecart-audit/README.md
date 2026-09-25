@@ -36,6 +36,8 @@ src/main/java/dev/mcagent/audit/
     mixin/MinecartContainerMixin.java  inventory capture before the void drops it
 src/main/resources/          fabric.mod.json, mcaudit.mixins.json
 live_smoke.py                ports 27180-27189, positives + negatives + control
+bridge_restore_smoke.py      bridge guarded restore + audit coverage + smoke-mod coexistence
+stage1_evidence.py           canonical stage1-gate artifacts + partial gate check
 dist/                        built jar (git-ignored)
 ```
 

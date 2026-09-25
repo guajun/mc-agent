@@ -199,8 +199,8 @@ The script builds the mod, raises disposable void labs on the issue's ports
 
 * a positive run across a server restart (two sessions, one agent operation,
   one cart captured before the void);
-* `no operation`, `wrong position`, `marker only` and `redstone only`
-  negative runs - all must fail the verifier;
+* `no interaction`, `wrong position`, `marker only`, `answer only` and
+  `redstone only` negative runs - all must fail the verifier;
 * a lab with the mod but no config - must report "not configured";
 * a control lab without the mod running the same script, compared on the
   observable results (the note cycles, the cart is gone) to show the hooks do
@@ -210,22 +210,84 @@ The script builds the mod, raises disposable void labs on the issue's ports
 
 Evidence lands in `labs/rom18-evidence/` (`summary.json`, the raw logs, the
 verifier reports and the console logs); the directory is git-ignored, so it is
-a local artifact, not repository content.
+a local artifact, not repository content. Prior attempts are kept as
+`<evidence>.attempt-<timestamp>/` instead of being deleted.
+
+## Combined bridge / interface-mod verification
+
+```powershell
+python tests/mods/minecart-audit/bridge_restore_smoke.py
+```
+
+This is the merged-stack run: a clean bridge source (default the
+`codex/rom13-bridge6` worktree whose head is pinned in the script, i.e. the
+guarded restore plus `player.view`), the clean interface mod 0.6.0
+(SHA-256 `45f12e16...404f`), and the audit mod installed as a **required**
+test mod (`--test-mod`, so a missing audit mod refuses to start) in both a
+source-audit lab and an experiment lab.
+
+The stages, all live on dedicated 26.2 servers:
+
+1. a generic three-cart stacked chest-minecart fixture (distinct items) is
+   forked under the bridge's guarded `fork` (frozen, snapshot, world copy);
+2. the experiment lab loads the fork world and the bridge runs the guarded
+   `restore` with `expect_world_dir` + `replace_existing`, then `verify`
+   compares full state (order hash, counts, dimension, positions, velocities,
+   NBT/items) - `ok: true` is required before the audit stage continues;
+3. the audit log's `cart_tracked` inventories for the restored carts are
+   cross-checked item-by-item against the bridge's post-restore snapshot
+   (same UUIDs, same ordered items);
+4. `player`/`player.view` is called on the restored destination and must
+   return `found`, dimension and a normalised eye/direction;
+5. a generic note-block machine in the experiment lab produces the canonical
+   input -> processing -> cart-output chain while the restored copy is still
+   tracked;
+* the #17 smoke mod (`examples/smoke-mod`, built with
+   `tools/build_mod.py` against the lab) is deployed alongside the audit and
+   interface mods; `mcagent-smoke status`/`sample` and
+   `lab_server.py verify --require-vantage` must all succeed. That smoke mod
+   proves deployment capability and coexistence; it is **not** the agent's
+   logger and is never treated as one.
+
+Evidence lands in `labs/rom18-b6-evidence/` (`summary.json`, per-stage JSON
+including the recorded bridge calls, the restored-audit crosscheck, the
+coexistence output, raw audit logs and console logs).
+
+## Stage-one gate adapter
+
+`tools/stage1_gate.py` from #22 consumes a
+canonical bundle, not the raw JSONL. `tools/minecart_audit.py export` maps the
+live evidence into its `independent_test_mod` artifacts:
+`test-mod-manifest.json`, `audit-events.jsonl`, `negative-cases.jsonl` and
+`audit-lifecycle.json`. The mapping keeps the raw event type, server tick and
+sequence in each row's `detail`; the canonical `(tick, seq)` is a per-identity
+monotonic counter because a server restart resets the game tick while the audit
+sequence keeps going.
+
+```powershell
+python tests/mods/minecart-audit/stage1_evidence.py
+```
+
+reads the two live evidence sets, exports the artifacts, assembles a partial
+live bundle with the real run/instance/port/source-world fields, and runs the
+gate on it. The latest run reports `independent_test_mod: pass` with the
+assertions *input -> processing -> output chain* and *negative cases rejected*
+while the overall bundle stays `blocked` on the other prerequisites' missing
+artifacts. That is deliberately not a gate pass: #15's fixture and the other
+checks are owned by their own work.
 
 ## Limitations
 
 * This is instrumentation, not an adversarial sandbox. It does not promise to
   resist same-privilege malicious code; it records evidence for review.
-* Full fixture integration (the actual ROM map, deterministic cart
-  initialization and faithful snapshot restore) depends on
-  [#15](https://github.com/guajun/mc-agent/issues/15),
-  [bridge #6](https://github.com/guajun/mc-agent-bridge/issues/6) and
-  [#17](https://github.com/guajun/mc-agent/issues/17). The config carries the
-  `provenance` fields needed to join those runs.
+* The actual ROM map and deterministic fixture initialization are still
+  [#15](https://github.com/guajun/mc-agent/issues/15)'s work; every run here
+  uses generic void-lab fixtures. The combined bridge/restore run does prove
+  the restored-copy audit coverage, but it is not fixture integration.
 * Joining tool calls to `input_*` events is
   [#19](https://github.com/guajun/mc-agent/issues/19)'s audit harness: the
   mod records operator UUID, tick and sequence precisely so the join is
   possible, but it does not read the tool trajectory itself.
 * Same-tick multi-output ordering is enforced and unit-tested in the verifier;
-  the live smoke fixture produced a single cart per run, so it is covered
-  synthetically rather than by a live same-tick pair.
+  the live fixtures produced one cart per run, so it is covered synthetically
+  rather than by a live same-tick pair.

@@ -138,17 +138,46 @@ python tests/mods/minecart-audit/live_smoke.py
 脚本会构建 mod，在 issue 指定端口（27180-27189）拉起一次性虚空实验室，并运行：
 
 * 一次跨服务端重启的正向运行（两个会话、一次智能体操作、一辆矿车在被虚空移除前被捕获）；
-* `无操作`、`错误位置`、`仅 marker`、`仅红石` 四个负向运行——都必须被 verifier 判失败；
+* `无交互`、`错误位置`、`仅 marker`、`仅答案`、`仅红石` 五个负向运行——都必须被 verifier 判失败；
 * 装了 mod 但没有配置的实验室——必须报告"not configured"；
 * 一个不装 mod 的对照实验室跑同一脚本，对比可观察结果（音符被调、矿车消失），证明 hook 不改变 fixture 行为；
 * 源存档的只读副本在装了 mod 的情况下正常加载；
 * 实例间日志隔离。
 
-证据写进 `labs/rom18-evidence/`（`summary.json`、原始日志、verifier 报告、控制台日志）；该目录被 git 忽略，是本地产物而非仓库内容。
+证据写进 `labs/rom18-evidence/`（`summary.json`、原始日志、verifier 报告、控制台日志）；该目录被 git 忽略，是本地产物而非仓库内容。旧尝试会保留为 `<evidence>.attempt-<时间戳>/`，不会被删掉。
+
+## bridge / interface-mod 组合验证
+
+```powershell
+python tests/mods/minecart-audit/bridge_restore_smoke.py
+```
+
+这是合并后的组合运行：干净的 bridge 源码（默认为 `codex/rom13-bridge6` worktree，head 在脚本里固定，即带守卫恢复 + `player.view` 的版本）、干净的 interface mod 0.6.0（SHA-256 `45f12e16...404f`），并在 source-audit 实验室与 experiment 实验室里把审计 mod 作为**必需**测试 mod 安装（`--test-mod`，缺了会拒绝启动）。
+
+所有阶段都跑在真实的 26.2 专用服务器上：
+
+1. 用 bridge 的守卫 `fork`（冻结、快照、复制世界）分叉一个通用的三辆叠加箱子矿车 fixture（物品各不相同）；
+2. experiment 实验室加载 fork 世界，bridge 用 `expect_world_dir` + `replace_existing` 执行守卫 `restore`，随后 `verify` 对比完整状态（顺序哈希、数量、维度、位置、速度、NBT/物品）——必须 `ok: true` 才继续审计阶段；
+3. 审计日志中恢复矿车的 `cart_tracked` 有序库存与 bridge 恢复后快照逐项交叉核对（相同 UUID、相同有序物品）；
+4. 在恢复后的目标上调用 `player`/`player.view`，必须返回 `found`、维度及归一化的 eye/direction；
+5. experiment 实验室里的通用音符盒机器产生规范的 输入 -> 处理 -> 矿车输出 链，同时恢复副本仍在被追踪；
+6. #17 的 smoke mod（`examples/smoke-mod`，用 `tools/build_mod.py` 针对该实验室构建）与审计、interface mod 共存部署；`mcagent-smoke status`/`sample` 和 `lab_server.py verify --require-vantage` 必须全部成功。该 smoke mod 只证明部署能力与共存，**不是**智能体的 logger，也绝不当作 logger。
+
+证据写进 `labs/rom18-b6-evidence/`（`summary.json`、含 bridge 调用记录的逐阶段 JSON、恢复审计交叉核对、共存输出、原始审计日志与控制台日志）。
+
+## 阶段一门禁适配器
+
+#22 的 `tools/stage1_gate.py` 消费的是规范 bundle，而不是原始 JSONL。`tools/minecart_audit.py export` 把 live 证据映射成它的 `independent_test_mod` 产物：`test-mod-manifest.json`、`audit-events.jsonl`、`negative-cases.jsonl`、`audit-lifecycle.json`。映射在每行 `detail` 中保留原始事件类型、服务端 tick 与序号；规范 `(tick, seq)` 使用按身份单调的计数器，因为服务端重启会重置游戏 tick 而审计序号仍在增长。
+
+```powershell
+python tests/mods/minecart-audit/stage1_evidence.py
+```
+
+读取两份 live 证据、导出产物、用真实 run/instance/端口/源世界字段组装部分 live bundle，并对它运行门禁。最近一次结果为 `independent_test_mod: pass`（断言 *input -> processing -> output chain*、*negative cases rejected*），而整体 bundle 因其他前置缺失仍是 `blocked`。这刻意不是门禁通过：#15 的 fixture 与其他检查各自负责。
 
 ## 限制
 
 * 这是插桩，不是对抗性沙箱。它不承诺抵抗同权限恶意代码；它为人工审查记录证据。
-* 完整 fixture 集成（真实 ROM 地图、确定性矿车初始化、忠实的快照恢复）依赖 [#15](https://github.com/guajun/mc-agent/issues/15)、[bridge #6](https://github.com/guajun/mc-agent-bridge/issues/6) 和 [#17](https://github.com/guajun/mc-agent/issues/17)。配置中的 `provenance` 字段已为这些运行的关联做好准备。
+* 真实 ROM 地图与确定性 fixture 初始化仍属于 [#15](https://github.com/guajun/mc-agent/issues/15) 的工作；这里所有运行都用通用虚空实验室 fixture。组合 bridge/restore 运行确实证明了恢复副本的审计覆盖，但这不是 fixture 集成。
 * 把工具调用关联到 `input_*` 事件属于 [#19](https://github.com/guajun/mc-agent/issues/19) 的审计 harness：mod 精确记录操作者 UUID、tick 和序号，使关联成为可能，但它自己不读取工具轨迹。
-* 同 tick 多输出的顺序在 verifier 中有强制校验与单测；live smoke 的 fixture 每次只产生一辆矿车，因此该点由合成用例覆盖而非真实同 tick 双输出。
+* 同 tick 多输出的顺序在 verifier 中有强制校验与单测；live fixture 每次只产生一辆矿车，因此该点由合成用例覆盖而非真实同 tick 双输出。

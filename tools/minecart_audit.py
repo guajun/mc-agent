@@ -16,8 +16,10 @@ Exit codes: 0 pass, 1 fail, 2 incomplete/unreadable.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -695,6 +697,228 @@ def cmd_selftest(_args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+# --------------------------------------------------------------------------- stage1 export
+
+# The stage-one gate uses these case names (tools/stage1_gate.py NEGATIVE_CASES).
+GATE_NEGATIVE_ALIASES = {
+    "no_operation": "no_interaction",
+    "no_interaction": "no_interaction",
+    "wrong_position": "wrong_position",
+    "marker_only": "marker_only",
+    "answer_only": "answer_only",
+}
+
+
+def _parse_event_specs(specs: list[str]) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    for spec in specs:
+        parts = [part.strip() for part in spec.split(",")]
+        if len(parts) != 4 or not all(parts):
+            raise SystemExit(
+                "--events wants path,run_id,instance_id,dimension: " + repr(spec)
+            )
+        entries.append(
+            {"path": parts[0], "run_id": parts[1], "instance_id": parts[2], "dimension": parts[3]}
+        )
+    return entries
+
+
+def canonical_audit_rows(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
+    """Normalize raw audit logs into the stage-one gate's audit schema.
+
+    The raw stream is the primary evidence; this mapping is an adapter. The
+    canonical ``(tick, seq)`` is a per-identity monotonic counter because a
+    dedicated-server restart resets the game tick while the audit sequence
+    keeps going; the real server tick and raw sequence stay in ``detail``.
+    """
+    rows: list[dict[str, Any]] = []
+    counters: dict[tuple[str, str, str], int] = {}
+    for entry in entries:
+        events, errors = read_events(Path(entry["path"]))
+        if errors:
+            raise SystemExit(f"cannot export {entry['path']}: {'; '.join(errors[:3])}")
+        for event in events:
+            kind = event.get("type")
+            raw_phase = event.get("phase")
+            phase = "init" if raw_phase == "init" else "restore" if raw_phase == "restore" else "agent"
+            operator = event.get("operator") if isinstance(event.get("operator"), dict) else {}
+            if kind == "input_attempt":
+                canonical: dict[str, Any] = {"event": "input_attempt", "actor_uuid": operator.get("uuid")}
+            elif kind == "input_processed":
+                if not event.get("targetInput"):
+                    continue  # processing somewhere else is not a machine input
+                canonical = {"event": "input_processed", "actor_uuid": operator.get("uuid")}
+            elif kind == "cart_exit":
+                inventory = event.get("inventory")
+                canonical = {
+                    "event": "cart_emitted",
+                    "cart_uuid": event.get("uuid"),
+                    "captured_before_removal": isinstance(inventory, list),
+                }
+            elif kind == "cart_remove":
+                canonical = {
+                    "event": "cart_removed",
+                    "cart_uuid": event.get("uuid"),
+                    "removal_reason": event.get("reason"),
+                }
+            else:
+                continue
+            identity = (entry["run_id"], entry["instance_id"], entry["dimension"])
+            counters[identity] = counters.get(identity, 0) + 1
+            index = counters[identity]
+            canonical.update(
+                {
+                    "event_id": f"{entry['run_id']}-{entry['instance_id']}-{index:06d}",
+                    "run_id": entry["run_id"],
+                    "instance_id": entry["instance_id"],
+                    "dimension": event.get("dim") or event.get("level") or entry["dimension"],
+                    "phase": phase,
+                    "tick": index,
+                    "seq": index,
+                    "detail": {
+                        "source_event": kind,
+                        "server_tick": event.get("tick"),
+                        "raw_seq": event.get("seq"),
+                        "raw_phase": raw_phase,
+                        "session": event.get("session"),
+                        "attempt_seq": event.get("attemptSeq"),
+                        "request_seq": event.get("requestSeq"),
+                        "region": event.get("region"),
+                    },
+                }
+            )
+            rows.append(canonical)
+    return rows
+
+
+def hook_overhead_ms(events: list[dict[str, Any]]) -> float:
+    for event in events:
+        if event.get("type") == "audit_end":
+            hooks = event.get("hooks") or {}
+            total = sum(float(entry.get("totalNanos") or 0) for entry in hooks.values())
+            return round(total / 1_000_000.0, 3)
+    return 0.0
+
+
+def _negative_row(case: str, log: str) -> dict[str, Any]:
+    events, errors = read_events(Path(log))
+    if errors:
+        raise SystemExit(f"negative log {log} is unreadable: {'; '.join(errors[:2])}")
+    report = evaluate(events)
+    if report["verdict"] == "pass":
+        raise SystemExit(f"negative case {case} ({log}) passed the verifier; refusing to export it as a negative")
+    attempted = any(event.get("type") == "input_attempt" for event in events)
+    processed = sum(
+        1
+        for event in events
+        if event.get("type") == "input_processed"
+        and event.get("targetInput")
+        and event.get("agentOp")
+        and event.get("phase") in OPERATION_PHASES
+    )
+    return {
+        "case": case,
+        "attempted": attempted,
+        "processed": processed,
+        "evidence_ref": log,
+        "verifier_verdict": report["verdict"],
+        "checks": {
+            name: check["pass"]
+            for name, check in report["checks"].items()
+            if not check["pass"]
+        },
+    }
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    entries = _parse_event_specs(args.events)
+    output = Path(args.out)
+    output.mkdir(parents=True, exist_ok=True)
+
+    parent_entries = [entry for entry in entries if entry["run_id"] == args.parent_run]
+    if not parent_entries:
+        raise SystemExit(f"--parent-run {args.parent_run!r} matches no --events entry")
+    parent_events, parent_errors = read_events(Path(parent_entries[0]["path"]))
+    parent_report = evaluate(parent_events, parent_errors)
+    if parent_report["verdict"] != "pass":
+        raise SystemExit(
+            f"parent run {args.parent_run} does not pass the verifier ({parent_report['verdict']}); "
+            "refusing to export"
+        )
+
+    rows = canonical_audit_rows(entries)
+    (output / "audit-events.jsonl").write_text(
+        "\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n", encoding="utf-8"
+    )
+
+    negatives = []
+    for spec in args.negative:
+        if "=" not in spec:
+            raise SystemExit(f"--negative wants case=log: {spec!r}")
+        case, log = spec.split("=", 1)
+        case = GATE_NEGATIVE_ALIASES.get(case.strip(), case.strip())
+        negatives.append(_negative_row(case, log.strip()))
+    (output / "negative-cases.jsonl").write_text(
+        "\n".join(json.dumps(row, sort_keys=True) for row in negatives) + "\n", encoding="utf-8"
+    )
+
+    jar = Path(args.jar)
+    if not jar.is_file():
+        raise SystemExit(f"--jar not found: {jar}")
+    jar_sha = hashlib.sha256(jar.read_bytes()).hexdigest()
+    manifest = {
+        "mod_id": "mc-agent-minecart-audit",
+        "version": args.version,
+        "sha256": jar_sha,
+        "read_only": True,
+        "hook_overhead_ms": hook_overhead_ms(parent_events),
+        "fixture_behavior_unchanged": bool(args.fixture_behavior_unchanged),
+        "agent_mod_coexists": bool(args.agent_mod_coexists),
+        "no_command_blocks": True,
+        "loaded_in": [item for item in args.loaded_in.split(",") if item],
+        "hooks": (next((event.get("hooks") for event in parent_events if event.get("type") == "audit_end"), {})),
+        "evidence": {
+            "parent_log": parent_entries[0]["path"],
+            "parent_verdict": parent_report["verdict"],
+            "negative_logs": [row["evidence_ref"] for row in negatives],
+        },
+        "notes": dict(part.split("=", 1) for part in args.note if "=" in part),
+    }
+    (output / "test-mod-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+    lifecycle = {
+        "states": ["ready", "init", "restore", "experiment_start", "experiment_end", "flush", "end"],
+        "missing_log_status": "error",
+        "overflow_status": "error",
+        "per_instance_files": True,
+        "ring_buffer_reliance": False,
+        "evidence": {
+            "missing_log": "verifier selftest missing_end -> incomplete; status-unconfigured.json on a bad config",
+            "overflow": "verifier selftest truncated -> incomplete; maxBytes sets audit_end.truncated",
+            "flush": "AuditLog flushes every event; /mcaudit flush writes the status snapshot",
+            "sessions": [session["id"] for session in parent_report["sessions"]],
+        },
+    }
+    (output / "audit-lifecycle.json").write_text(json.dumps(lifecycle, indent=2) + "\n", encoding="utf-8")
+
+    provenance = {
+        "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "parent_run": args.parent_run,
+        "events": entries,
+        "jar": str(jar),
+        "jar_sha256": jar_sha,
+        "interface_sha256": args.interface_sha,
+        "bridge_commit": args.bridge_commit,
+        "mod_version": args.version,
+    }
+    (output / "export-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
+    print(f"exported {len(rows)} canonical audit events to {output}")
+    for row in negatives:
+        print(f"  negative {row['case']}: attempted={row['attempted']} processed={row['processed']} "
+              f"({row['verifier_verdict']})")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     commands = parser.add_subparsers(dest="command", required=True)
@@ -711,6 +935,33 @@ def build_parser() -> argparse.ArgumentParser:
     summary.set_defaults(handler=cmd_summary)
     selftest = commands.add_parser("selftest", help="run the synthetic check cases")
     selftest.set_defaults(handler=cmd_selftest)
+    export = commands.add_parser("export", help="normalize raw audit logs into the stage-one gate schema")
+    export.add_argument("--out", required=True, help="artifact directory to write")
+    export.add_argument(
+        "--events",
+        action="append",
+        default=[],
+        required=True,
+        metavar="PATH,RUN,INSTANCE,DIMENSION",
+        help="raw audit log plus its canonical identity (repeatable)",
+    )
+    export.add_argument("--parent-run", required=True, help="run id of the agent-phase experiment instance")
+    export.add_argument("--jar", required=True, help="audit mod jar the run used")
+    export.add_argument("--version", default="0.1.0")
+    export.add_argument(
+        "--negative",
+        action="append",
+        default=[],
+        metavar="CASE=LOG",
+        help="negative-case raw log (repeatable); the verifier must fail it",
+    )
+    export.add_argument("--loaded-in", default="source_audit,experiment")
+    export.add_argument("--fixture-behavior-unchanged", action="store_true")
+    export.add_argument("--agent-mod-coexists", action="store_true")
+    export.add_argument("--interface-sha", default="")
+    export.add_argument("--bridge-commit", default="")
+    export.add_argument("--note", action="append", default=[], metavar="KEY=VALUE")
+    export.set_defaults(handler=cmd_export)
     return parser
 
 

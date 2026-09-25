@@ -56,19 +56,51 @@ def default_mc_dir() -> str:
     return str(candidates[0])
 
 
-def default_java() -> str:
-    """$MC_AGENT_JAVA, then the JDK recorded by an existing lab, then PATH."""
+def java_major(java: Path) -> int:
+    try:
+        result = subprocess.run(
+            [str(java), "-version"], capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    import re as _re
+
+    match = _re.search(r'version "(\d+)', (result.stderr or "") + (result.stdout or ""))
+    return int(match.group(1)) if match else 0
+
+
+def _java_candidates() -> list[Path]:
+    candidates: list[Path] = []
     configured = os.environ.get("MC_AGENT_JAVA")
-    if configured and Path(configured).is_file():
-        return configured
+    if configured:
+        candidates.append(Path(configured))
     for lab_json in sorted((ROOT / "labs").glob("*/lab.json")):
         try:
             recorded = json.loads(lab_json.read_text(encoding="utf-8")).get("java") or ""
         except (OSError, ValueError):
             continue
-        if recorded and Path(recorded).is_file():
-            return recorded
-    return shutil.which("java") or ""
+        if recorded:
+            candidates.append(Path(recorded))
+    home = os.environ.get("JAVA_HOME")
+    if home:
+        candidates.append(Path(home) / "bin" / ("java.exe" if os.name == "nt" else "java"))
+    found = shutil.which("java")
+    if found:
+        candidates.append(Path(found))
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        for pattern in ("*/*/bin/java.exe", "*/*/bin/java"):
+            candidates.extend(sorted((Path(appdata) / ".hmcl" / "java").glob(pattern)))
+    return candidates
+
+
+def default_java() -> str:
+    """A Java 25+ runtime: $MC_AGENT_JAVA, lab metadata, JAVA_HOME, PATH, HMCL."""
+    for candidate in _java_candidates():
+        if candidate.is_file() and java_major(candidate) >= 25:
+            return str(candidate)
+    return ""
 
 # Ports 27180-27189 are reserved for this issue's labs.
 LABS_CONFIG = {
@@ -85,7 +117,7 @@ STACK_1 = {"name": "stack", "from": [2, -60, -1], "to": [3, -59, 1]}
 OUTPUT_1 = {"name": "output", "from": [4, -140, -8], "to": [8, -60, 8]}
 
 
-def run(argv: list[object], check: bool = True, timeout: float = 300) -> subprocess.CompletedProcess:
+def run(argv: list[object], check: bool = True, timeout: float = 900) -> subprocess.CompletedProcess:
     result = subprocess.run(
         [str(item) for item in argv],
         capture_output=True,
@@ -108,6 +140,13 @@ def lab(*args: object) -> str:
 
 def rcon(name: str, command: str) -> str:
     return lab("exec", "--name", name, command)
+
+
+def rotate_evidence(path: Path) -> None:
+    """Keep every prior attempt: rename the old evidence dir instead of deleting."""
+    if path.exists() and any(path.iterdir()):
+        archived = path.with_name(path.name + ".attempt-" + time.strftime("%Y%m%d-%H%M%S"))
+        path.rename(archived)
 
 
 def prepare_lab(name: str, with_mod: bool, mc_dir: Path, java: Path, source_world: Path | None = None) -> Path:
@@ -316,6 +355,29 @@ def scenario_marker_only(name: str, run_id: str, instance: str) -> dict:
     return {"marker_written": True}
 
 
+def scenario_answer_only(name: str, run_id: str, instance: str) -> dict:
+    """The correct answer without any operation: still not an auditable run."""
+    write_config(name, run_id, instance, [NOTE_1], STACK_1, OUTPUT_1)
+    fresh_world(name)
+    lab("start", "--name", name, "--wait", "300")
+    rcon(name, "mcaudit phase init")
+    reset_machine(name)
+    summon_cart(name, 3.5, 0.5, "apple", 3)
+    assert_dir = LABS / name / "mc-audit"
+    assert_dir.mkdir(parents=True, exist_ok=True)
+    answer = assert_dir / "answer.json"
+    answer.write_text(
+        json.dumps({"answer": [{"item": "minecraft:apple", "count": 3}], "submitted_by": "test-side"}),
+        encoding="utf-8",
+    )
+    rcon(name, "mcaudit phase experiment_start")
+    rcon(name, "mcaudit phase experiment_end")
+    rcon(name, "mcaudit end")
+    observable = {"answer_submitted": answer.exists(), "answer_file": str(answer)}
+    lab("stop", "--name", name, "--timeout", "120")
+    return observable
+
+
 def scenario_environment_only(name: str, run_id: str, instance: str) -> dict:
     write_config(name, run_id, instance, [NOTE_1], STACK_1, OUTPUT_1)
     fresh_world(name)
@@ -445,7 +507,7 @@ def main() -> int:
     java = Path(args.java)
     stamp = time.strftime("%Y%m%d-%H%M%S")
 
-    shutil.rmtree(EVIDENCE, ignore_errors=True)
+    rotate_evidence(EVIDENCE)
     if not args.skip_build:
         run([sys.executable, BUILDER, "--minecraft-dir", str(mc_dir), "--jdk", str(java.parent.parent)])
     if not MOD_JAR.is_file():
@@ -478,6 +540,10 @@ def main() -> int:
     run_marker = f"meta18-marker-{stamp}"
     summary["scenarios"]["marker_only"] = scenario_marker_only("rom18-b", run_marker, "lab-rom18-b")
     summary["scenarios"]["marker_only"]["verdict"] = verify("rom18-b", run_marker, ["fail"])
+
+    run_answer = f"meta18-answer-{stamp}"
+    summary["scenarios"]["answer_only"] = scenario_answer_only("rom18-b", run_answer, "lab-rom18-b")
+    summary["scenarios"]["answer_only"]["verdict"] = verify("rom18-b", run_answer, ["fail"])
 
     run_env = f"meta18-env-{stamp}"
     summary["scenarios"]["environment_only"] = scenario_environment_only("rom18-b", run_env, "lab-rom18-b")
@@ -518,7 +584,7 @@ def main() -> int:
     summary["checks"]["positive_pass"] = positive["verdict"]["verdict"] == "pass"
     summary["checks"]["negative_cases_fail"] = all(
         summary["scenarios"][key]["verdict"]["verdict"] == "fail"
-        for key in ("no_operation", "wrong_position", "marker_only", "environment_only")
+        for key in ("no_operation", "wrong_position", "marker_only", "answer_only", "environment_only")
     )
     summary["checks"]["unconfigured_detected"] = (
         summary["scenarios"]["unconfigured"]["command_reports_unconfigured"]
