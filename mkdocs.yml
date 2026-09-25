@@ -45,6 +45,7 @@ nav:
       - Building a mod for a lab: mod-building.md
       - Checking a fork: fork-verify.md
       - Stage-one integration gate: stage1-gate.md
+      - Stage-one integration run: stage1-integration.md
   - Reference:
       - Tools: tools.md
       - Troubleshooting: troubleshooting.md
@@ -85,6 +86,7 @@ plugins:
             Building a mod for a lab: 为实验室构建 mod
             Checking a fork: 校验一次分叉
             Stage-one integration gate: 阶段一集成门禁
+            Stage-one integration run: 阶段一集成运行
             Reference: 参考
             Tools: 工具
             Troubleshooting: 疑难排查
