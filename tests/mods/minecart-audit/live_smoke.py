@@ -253,6 +253,10 @@ def ensure_bot(name: str, x: float, timeout: float = 20.0) -> None:
     else:
         raise SystemExit(f"fake player Bot never came online in {name}")
     rcon(name, f"tp Bot {x} -59.0 2.5 180 29")
+    # Carpet fake players are not guaranteed to be survival; creative punches
+    # destroy the note block and would fire the observer through the block
+    # change, which is a different mechanism than the calibrated note trigger.
+    rcon(name, "gamemode survival Bot")
     time.sleep(0.5)
 
 
@@ -386,6 +390,45 @@ def scenario_answer_only(name: str, run_id: str, instance: str) -> dict:
     rcon(name, "mcaudit end")
     observable = {"answer_submitted": answer.exists(), "answer_file": str(answer)}
     lab("stop", "--name", name, "--timeout", "120")
+    return observable
+
+
+def scenario_attack_only(name: str, run_id: str, instance: str) -> dict:
+    """A left-click punch calls playNote but never changes the note state.
+
+    It must stay a recorded attempt without being counted as a machine
+    operation, and the observer/piston machine must not run.
+    """
+    write_config(name, run_id, instance, [NOTE_1], STACK_1, OUTPUT_1)
+    fresh_world(name)
+    lab("start", "--name", name, "--wait", "300")
+    rcon(name, "mcaudit phase init")
+    reset_machine(name)
+    summon_cart(name, 3.5, 0.5, "apple", 3)
+    ensure_bot(name, 0.5)
+    rcon(name, "gamemode survival Bot")
+    rcon(name, "mcaudit phase experiment_start")
+    rcon(name, "player Bot attack once")
+    time.sleep(1)
+    observable = {
+        "note_unchanged": test_passed(rcon(name, "execute if block 0 -59 0 minecraft:note_block[note=0]")),
+        "block_present": test_passed(rcon(name, "execute if block 0 -59 0 minecraft:note_block")),
+        "cart_present_after_punch": test_passed(
+            rcon(name, "execute if entity @e[type=minecraft:chest_minecart,x=3,y=-60,z=-1,dx=2,dy=2,dz=2]")),
+    }
+    rcon(name, "tick sprint 200")
+    time.sleep(2)
+    observable["cart_present_after_sprint"] = test_passed(
+        rcon(name, "execute if entity @e[type=minecraft:chest_minecart,x=3,y=-60,z=-1,dx=2,dy=2,dz=2]"))
+    rcon(name, "mcaudit phase experiment_end")
+    rcon(name, "mcaudit end")
+    lab("stop", "--name", name, "--timeout", "120")
+    log_path = LABS / name / "mc-audit" / f"audit-{run_id}.jsonl"
+    observable["attack_attempt_logged"] = any(
+        json.loads(line).get("type") == "input_attempt" and json.loads(line).get("path") == "attack"
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if "input_attempt" in line
+    )
     return observable
 
 
@@ -576,6 +619,10 @@ def main() -> int:
     summary["scenarios"]["answer_only"] = scenario_answer_only("rom18-b", run_answer, "lab-rom18-b")
     summary["scenarios"]["answer_only"]["verdict"] = verify("rom18-b", run_answer, ["fail"])
 
+    run_attack = f"meta18-attack-{stamp}"
+    summary["scenarios"]["attack_only"] = scenario_attack_only("rom18-b", run_attack, "lab-rom18-b")
+    summary["scenarios"]["attack_only"]["verdict"] = verify("rom18-b", run_attack, ["fail"])
+
     run_env = f"meta18-env-{stamp}"
     summary["scenarios"]["environment_only"] = scenario_environment_only("rom18-b", run_env, "lab-rom18-b")
     summary["scenarios"]["environment_only"]["verdict"] = verify("rom18-b", run_env, ["fail"])
@@ -650,6 +697,15 @@ def main() -> int:
         )
     summary["checks"]["crash_marks_incomplete"] = (
         summary["scenarios"]["crash_abandoned_session"]["verdict"]["verdict"] == "incomplete"
+    )
+    attack = summary["scenarios"]["attack_only"]
+    summary["checks"]["attack_only_rejected"] = (
+        attack["verdict"]["verdict"] == "fail"
+        and attack.get("note_unchanged")
+        and attack.get("block_present")
+        and attack.get("cart_present_after_punch")
+        and attack.get("cart_present_after_sprint")
+        and attack.get("attack_attempt_logged")
     )
     summary["all_passed"] = all(
         value for key, value in summary["checks"].items() if key != "source_world_reason"

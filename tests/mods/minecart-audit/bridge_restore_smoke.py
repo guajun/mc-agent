@@ -619,15 +619,11 @@ async def run_stages(args: argparse.Namespace) -> int:
     )
     write_json(EVIDENCE / "stage-coexistence.json", coexistence)
 
-    # -- bookkeeping ---------------------------------------------------------
-    for name in ("rom18-b6-src", "rom18-b6-dst"):
-        target = EVIDENCE / name
-        shutil.rmtree(target, ignore_errors=True)
-        if (LABS / name / "mc-audit").exists():
-            shutil.copytree(LABS / name / "mc-audit", target)
-        console = LABS / name / "logs" / "console.log"
-        if console.exists():
-            shutil.copy2(console, EVIDENCE / f"console-{name}.log")
+    # -- finalize and bookkeep ----------------------------------------------
+    # Close both audit sessions before copying, so the retained source-child
+    # log is complete (the adapter refuses an open child session).
+    rcon("rom18-b6-dst", "mcaudit end")
+    rcon("rom18-b6-src", "mcaudit end")
     run([sys.executable, LAB_SERVER, "stop", "--name", "rom18-b6-dst", "--timeout", "120"], check=False)
     run([sys.executable, LAB_SERVER, "stop", "--name", "rom18-b6-src", "--timeout", "120"], check=False)
     for process in (src_bridge, dst_bridge):
@@ -637,6 +633,14 @@ async def run_stages(args: argparse.Namespace) -> int:
                 process.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 process.kill()
+    for name in ("rom18-b6-src", "rom18-b6-dst"):
+        target = EVIDENCE / name
+        shutil.rmtree(target, ignore_errors=True)
+        if (LABS / name / "mc-audit").exists():
+            shutil.copytree(LABS / name / "mc-audit", target)
+        console = LABS / name / "logs" / "console.log"
+        if console.exists():
+            shutil.copy2(console, EVIDENCE / f"console-{name}.log")
     if not args.keep_labs:
         # Evidence is copied; dropping the labs frees the ports for the next run.
         for name in ("rom18-b6-src", "rom18-b6-dst"):

@@ -43,6 +43,7 @@ NEGATIVE_KEYS = {
     "wrong_position": "wrong_position",
     "marker_only": "marker_only",
     "answer_only": "answer_only",
+    "attack_only": "attack_only",
 }
 
 
@@ -87,6 +88,22 @@ def main() -> int:
             "before exporting, or pass the jar the run actually used"
         )
 
+    # The attestation flags must come from the verified live summaries, never
+    # from constants: a regression that broke parity or coexistence must not
+    # be exported as passed.
+    fixture_behavior_unchanged = bool(live_summary.get("checks", {}).get("fixture_behavior_unchanged"))
+    agent_mod_coexists = bool(bridge_summary.get("checks", {}).get("smoke_mod_coexists"))
+    if not fixture_behavior_unchanged or not agent_mod_coexists:
+        raise SystemExit(
+            "refusing to export the manifest: live summaries report "
+            f"fixture_behavior_unchanged={fixture_behavior_unchanged}, "
+            f"smoke_mod_coexists={agent_mod_coexists}"
+        )
+
+    summary_flags = {
+        "fixture_behavior_unchanged": fixture_behavior_unchanged,
+        "smoke_mod_coexists": agent_mod_coexists,
+    }
     src_run = bridge_summary["checks"]["source_run_id"]
     dst_run = bridge_summary["checks"]["experiment_run_id"]
     src_log = bridge_evidence / "rom18-b6-src" / f"audit-{src_run}.jsonl"
@@ -94,11 +111,28 @@ def main() -> int:
     for path in (src_log, dst_log):
         if not path.is_file():
             raise SystemExit(f"missing raw audit log: {path}")
+    # The child run must be finalized too; the exporter refuses open sessions,
+    # but fail here with a specific message first.
+    src_check = run(
+        [sys.executable, VERIFIER, "check", "--log", str(src_log), "--allow-no-operation", "--json"],
+        check=False,
+    )
+    try:
+        src_report = json.loads(src_check.stdout)
+    except ValueError:
+        raise SystemExit(f"source child run {src_run} is unreadable: {src_check.stdout}")
+    if src_report.get("verdict") == "incomplete":
+        raise SystemExit(f"source child run {src_run} is incomplete; close it with /mcaudit end")
+    summary_flags["source_child_verdict"] = src_report.get("verdict")
 
     negative_specs = []
     negative_refs = {}
     for key, case in NEGATIVE_KEYS.items():
-        scenario = live_summary["scenarios"][key]
+        scenario = live_summary.get("scenarios", {}).get(key)
+        if scenario is None:
+            raise SystemExit(
+                f"live summary has no {key!r} scenario; re-run live_smoke.py before exporting"
+            )
         report = scenario.get("verdict")
         if not isinstance(report, dict) or report.get("verdict") != "fail":
             raise SystemExit(f"live negative {key} is not a recorded failure: {scenario}")
@@ -120,8 +154,8 @@ def main() -> int:
         "--parent-run", dst_run,
         "--jar", args.audit_jar,
         "--version", args.version,
-        "--fixture-behavior-unchanged",
-        "--agent-mod-coexists",
+        *(["--fixture-behavior-unchanged"] if fixture_behavior_unchanged else []),
+        *(["--agent-mod-coexists"] if agent_mod_coexists else []),
         "--interface-sha", bridge_summary["interface"]["sha256"],
         "--bridge-commit", bridge_summary["bridge"]["head"],
         "--note", f"bridge_commit={bridge_summary['bridge']['head']}",
@@ -132,6 +166,7 @@ def main() -> int:
     ]
     exported = run(export_command)
     print(exported.stdout.strip())
+    print(json.dumps({"attestations": summary_flags}, indent=2))
 
     # -- partial gate bundle for schema validation --------------------------
     bundle_dir = out / "gate-bundle"
@@ -182,6 +217,7 @@ def main() -> int:
     status = independent.get("status") if independent else "missing"
     summary = {
         "auditJar": {"path": str(audit_jar), "sha256": current_jar_sha},
+        "attestations": summary_flags,
         "overall": report.get("overall"),
         "independent_test_mod": status,
         "reasons": [reason["message"] for reason in (independent or {}).get("reasons", [])],

@@ -82,7 +82,8 @@ public final class AuditEngine {
             int z,
             String operatorUuid,
             String operatorName,
-            String trigger) {
+            String trigger,
+            long requestSeq) {
     }
 
     /** Load config, open the evidence file and announce readiness. */
@@ -164,7 +165,7 @@ public final class AuditEngine {
                 return;
             }
             Region region = config.inputRegionFor(pos.getX(), pos.getY(), pos.getZ());
-            InputRecord request = latest(requests, pos, serverTick, false);
+            InputRecord request = newest(requests, pos, serverTick);
             JsonObject event = log.event("input_attempt");
             event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
             event.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
@@ -192,7 +193,8 @@ public final class AuditEngine {
                         pos.getZ(),
                         player instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
                         player instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
-                        "player"));
+                        "player",
+                        request == null ? -1L : request.seq()));
             }
         } catch (Throwable error) {
             hookError("note_use", error);
@@ -212,7 +214,7 @@ public final class AuditEngine {
                 return;
             }
             Region region = config.inputRegionFor(pos.getX(), pos.getY(), pos.getZ());
-            InputRecord request = latest(requests, pos, serverTick, false);
+            InputRecord request = newest(requests, pos, serverTick);
             JsonObject event = log.event("input_attempt");
             event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
             event.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
@@ -236,7 +238,8 @@ public final class AuditEngine {
                         pos.getZ(),
                         player instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
                         player instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
-                        "player"));
+                        "player",
+                        request == null ? -1L : request.seq()));
             }
         } catch (Throwable error) {
             hookError("note_attack", error);
@@ -282,7 +285,8 @@ public final class AuditEngine {
                         pos.getZ(),
                         entity instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
                         entity instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
-                        trigger));
+                        trigger,
+                        -1L));
             }
         } catch (Throwable error) {
             hookError("play_note", error);
@@ -307,8 +311,12 @@ public final class AuditEngine {
             // One request/attempt may be credited to exactly one processing
             // event: consuming the match stops a later trigger in the same
             // window from inheriting the same player.
-            InputRecord request = latest(requests, pos, serverTick, target);
-            InputRecord attempt = target ? latest(attempts, pos, serverTick, true) : null;
+            InputRecord request = oldest(requests, pos, serverTick, target);
+            // Proof-carrying association: consume the attempt that observed
+            // this exact request. No match means no attributed attempt.
+            InputRecord attempt = target && request != null
+                    ? consumeAttempt(pos, request.seq())
+                    : null;
             String operatorUuid = request != null ? request.operatorUuid() : null;
             JsonObject event = log.event("input_processed");
             event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
@@ -833,10 +841,11 @@ public final class AuditEngine {
     }
 
     /**
-     * The most recent record at {@code pos} inside the correlation window.
-     * Order is insertion order (actual occurrence), never a sorted query.
+     * The oldest unconsumed record at {@code pos} inside the window. Block
+     * events are processed FIFO, so the first request queued is the first
+     * processing event; consuming from the front keeps that association.
      */
-    private InputRecord latest(
+    private InputRecord oldest(
             Map<Long, ArrayDeque<InputRecord>> map, BlockPos pos, int tick, boolean consume) {
         long key = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
         ArrayDeque<InputRecord> queue = map.get(key);
@@ -846,14 +855,61 @@ public final class AuditEngine {
         while (!queue.isEmpty() && tick - queue.peekFirst().tick() > config.correlationWindowTicks) {
             queue.pollFirst();
         }
-        InputRecord record = queue.peekLast();
+        InputRecord record = queue.peekFirst();
         if (record != null && consume) {
-            queue.pollLast();
+            queue.pollFirst();
         }
         if (queue.isEmpty()) {
             map.remove(key);
         }
         return record;
+    }
+
+    /** The newest record at {@code pos}: used to link an attempt to its own request. */
+    private InputRecord newest(Map<Long, ArrayDeque<InputRecord>> map, BlockPos pos, int tick) {
+        long key = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
+        ArrayDeque<InputRecord> queue = map.get(key);
+        if (queue == null) {
+            return null;
+        }
+        while (!queue.isEmpty() && tick - queue.peekFirst().tick() > config.correlationWindowTicks) {
+            queue.pollFirst();
+        }
+        if (queue.isEmpty()) {
+            map.remove(key);
+            return null;
+        }
+        return queue.peekLast();
+    }
+
+    /**
+     * Proof-carrying attempt match: the attempt that observed this request is
+     * the one whose recorded requestSeq equals it, not merely the neighbour
+     * in the window. No match means no attributed attempt (fail closed).
+     */
+    private InputRecord consumeAttempt(BlockPos pos, long requestSeq) {
+        long key = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
+        ArrayDeque<InputRecord> queue = attempts.get(key);
+        if (queue == null) {
+            return null;
+        }
+        while (!queue.isEmpty()
+                && serverTick - queue.peekFirst().tick() > Math.max(config.correlationWindowTicks * 4, 16)) {
+            queue.pollFirst();
+        }
+        InputRecord matched = null;
+        for (java.util.Iterator<InputRecord> iterator = queue.iterator(); iterator.hasNext(); ) {
+            InputRecord record = iterator.next();
+            if (record.requestSeq() == requestSeq) {
+                matched = record;
+                iterator.remove();
+                break;
+            }
+        }
+        if (queue.isEmpty()) {
+            attempts.remove(key);
+        }
+        return matched;
     }
 
     /** Age out correlation entries that no processing event consumed. */

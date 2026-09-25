@@ -157,12 +157,24 @@ the triggering entity (`playNote`) and the processing (`triggerEvent`);
 right-clicks, sounds and command feedback are never treated as machine
 operation.
 
-A request or attempt is credited to exactly one processing event: the engine
-consumes the matched record, only configured input positions feed the
-correlation maps, and stale entries are pruned each tick. The verifier fails a
-run when one `requestSeq`/`attemptSeq` is referenced by more than one
-target `input_processed`, or when the attempt/request/processing operator
-UUIDs disagree.
+Only `useItemOn`/`useWithoutItem` count as a calibrated machine operation.
+26.2's `attack` punch calls `playNote` but never changes the note state, so it
+cannot trigger the observer/piston machine through the calibrated path; it is
+still recorded as an attempt (`path: "attack"`) so the chain stays intact, but
+`machine_operated` ignores it. The live smoke has an attack-only negative that
+forces the fake player to survival, punches the note block, and shows the
+block still present, the cart unmoved and the verifier `fail`.
+
+A request or attempt is credited to exactly one processing event, in the same
+order the server processes block events: requests are consumed FIFO, and the
+attempt is the one whose recorded `requestSeq` equals the processing request
+(not merely a neighbour in the time window). No matching attempt is a
+fail-closed gap. The verifier fails a run when one
+`requestSeq`/`attemptSeq` is referenced by more than one target
+`input_processed`, when an attempt carries a different `requestSeq` than the
+processing it is credited to, or when the attempt/request/processing operator
+UUIDs disagree. Only configured input positions feed the correlation maps, and
+stale entries are pruned each tick.
 
 All hooks use `@Inject` only: no redirects, no overwrites, no mutation, no
 cancellation. Per-hook call counts, total nanoseconds and max nanoseconds are
@@ -212,8 +224,11 @@ The script builds the mod, raises disposable void labs on the issue's ports
 
 * a positive run across a server restart (two sessions, one agent operation,
   one cart captured before the void);
-* `no interaction`, `wrong position`, `marker only`, `answer only` and
-  `redstone only` negative runs - all must fail the verifier;
+* `no interaction`, `wrong position`, `marker only`, `answer only`,
+  `attack only` and `redstone only` negative runs - all must fail the
+  verifier; the attack run forces the fake player to survival so the punch is
+  recorded without destroying the note block, and shows the block and cart
+  unmoved;
 * a killed-server run (`stop --force`, restart, close the second session) -
   the verifier must report `incomplete` for the abandoned session;
 * a lab with the mod but no config - must report "not configured";
@@ -259,12 +274,15 @@ The stages, all live on dedicated 26.2 servers:
 5. a generic note-block machine in the experiment lab produces the canonical
    input -> processing -> cart-output chain while the restored copy is still
    tracked;
-* the #17 smoke mod (`examples/smoke-mod`, built with
+6. the #17 smoke mod (`examples/smoke-mod`, built with
    `tools/build_mod.py` against the lab) is deployed alongside the audit and
    interface mods; `mcagent-smoke status`/`sample` and
    `lab_server.py verify --require-vantage` must all succeed. That smoke mod
    proves deployment capability and coexistence; it is **not** the agent's
-   logger and is never treated as one.
+   logger and is never treated as one;
+7. both audit sessions are closed with `/mcaudit end` and the labs are stopped
+   before the raw logs are copied, so the retained source-child log is complete
+   instead of an open session.
 
 Evidence lands in `labs/rom18-b6-evidence/` (`summary.json`, per-stage JSON
 including the recorded bridge calls, the restored-audit crosscheck, the
@@ -272,14 +290,26 @@ coexistence output, raw audit logs and console logs).
 
 ## Stage-one gate adapter
 
-`tools/stage1_gate.py` from #22 consumes a
-canonical bundle, not the raw JSONL. `tools/minecart_audit.py export` maps the
-live evidence into its `independent_test_mod` artifacts:
-`test-mod-manifest.json`, `audit-events.jsonl`, `negative-cases.jsonl` and
-`audit-lifecycle.json`. The mapping keeps the raw event type, server tick and
-sequence in each row's `detail`; the canonical `(tick, seq)` is a per-identity
-monotonic counter because a server restart resets the game tick while the audit
-sequence keeps going.
+`tools/stage1_gate.py` from #22 consumes a canonical bundle, not the raw
+JSONL. The shared lossless adapter `tools/stage1_evidence.py` (from #28)
+projects the raw formats for the full bundle; the module-level
+`tools/minecart_audit.py export` maps the live evidence into the gate's
+`independent_test_mod` artifacts: `test-mod-manifest.json`,
+`audit-events.jsonl`, `negative-cases.jsonl` and `audit-lifecycle.json`. The
+mapping keeps the raw event type, server tick and sequence in each row's
+`detail`; the canonical `(tick, seq)` is a per-identity monotonic counter
+because a server restart resets the game tick while the audit sequence keeps
+going.
+
+The export binds evidence instead of relabelling it: an event whose own
+`run`/`inst`/dimension does not match the declared identity is refused, and a
+log with an open session or without `audit_end` is refused. Negative cases
+must have verifier verdict exactly `fail` (an `incomplete`/crashed log is not a
+rejected negative), the gate asserts each row's `verifier_verdict == "fail"`,
+and environment-triggered processing rows carry an `actor_provenance` instead
+of a bare null actor. The manifest's `fixture_behavior_unchanged` and
+`agent_mod_coexists` claims are derived from the live summaries and the
+adapter refuses to export when either is false.
 
 ```powershell
 python tests/mods/minecart-audit/stage1_evidence.py

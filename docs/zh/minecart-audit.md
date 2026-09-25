@@ -107,7 +107,9 @@ mc-audit/
 
 矿车 hook 刻意注入在 `Entity.remove` 与 `AbstractMinecartContainer.remove` 的 HEAD，早于内容销毁——因为 vanilla 快速路径会先掉落内容，仅靠 tick 末采样会漏掉快速下坠。音符盒 hook 区分玩家尝试（`useItemOn`/`useWithoutItem`，以及 26.2 的 `attack` 左键，记为 `path: "attack"`，避免左键污染证据链）、携带触发实体的请求（`playNote`）与服务端处理（`triggerEvent`）；任意右键、发声和命令反馈都不会被当成机器操作。
 
-一个请求或尝试只会记到一次处理事件：引擎消费已匹配记录，只有配置的输入位置进入关联表，过期条目每 tick 清理。verifier 在一个 `requestSeq`/`attemptSeq` 被多个目标 `input_processed` 引用，或尝试/请求/处理的 operator UUID 不一致时判失败。
+只有 `useItemOn`/`useWithoutItem` 会被算作已校准的机器操作。26.2 的 `attack` 左键会调用 `playNote` 但不会改变音符状态，因此不能通过校准路径触发观察者/活塞机器；它仍会作为尝试记录（`path: "attack"`）以保持证据链完整，但 `machine_operated` 会忽略它。live smoke 有专门的 attack-only 负例：把假玩家设为生存模式后左键，证明音符盒仍在、矿车未移动、verifier 判 `fail`。
+
+一个请求或尝试只会记到一次处理事件，并且顺序与服务端处理方块事件的顺序一致：请求按 FIFO 消费，尝试通过与处理事件相同的 `requestSeq` 匹配（而不是时间窗口里的邻居）；匹配不到就是 fail-closed 缺口。verifier 在一个 `requestSeq`/`attemptSeq` 被多个目标 `input_processed` 引用、尝试携带的 `requestSeq` 与处理事件不一致，或尝试/请求/处理的 operator UUID 不一致时判失败。只有配置的输入位置进入关联表，过期条目每 tick 清理。
 
 所有 hook 只用 `@Inject`：没有 redirect、没有 overwrite、不修改状态、不取消回调。每个 hook 的调用次数、总纳秒与最大纳秒都写进状态文件和 `audit_end`，观测开销可度量。
 
@@ -140,7 +142,7 @@ python tests/mods/minecart-audit/live_smoke.py
 脚本会构建 mod，在 issue 指定端口（27180-27189）拉起一次性虚空实验室，并运行：
 
 * 一次跨服务端重启的正向运行（两个会话、一次智能体操作、一辆矿车在被虚空移除前被捕获）；
-* `无交互`、`错误位置`、`仅 marker`、`仅答案`、`仅红石` 五个负向运行——都必须被 verifier 判失败；
+* `无交互`、`错误位置`、`仅 marker`、`仅答案`、`仅左键`、`仅红石` 六个负向运行——都必须被 verifier 判失败；左键负例把假玩家设为生存模式，记录左键但不破坏音符盒，证明方块与矿车都没有变化；
 * kill/restart 负例（`stop --force` 后重启、只关闭第二个会话）——verifier 必须对未关闭会话报 `incomplete`；
 * 装了 mod 但没有配置的实验室——必须报告"not configured"；
 * 一个不装 mod 的对照实验室跑同一脚本，对比可观察结果（音符被调、矿车消失），证明 hook 不改变 fixture 行为；
@@ -177,6 +179,8 @@ python tests/mods/minecart-audit/stage1_evidence.py
 ```
 
 读取两份 live 证据、导出产物、用真实 run/instance/端口/源世界字段组装部分 live bundle，并对它运行门禁。最近一次结果为 `independent_test_mod: pass`（断言 *input -> processing -> output chain*、*negative cases rejected*），而整体 bundle 因其他前置缺失仍是 `blocked`。这刻意不是门禁通过：#15 的 fixture 与其他检查各自负责。
+
+导出会**绑定**证据而不是改写身份：事件自身的 `run`/`inst`/维度与声明不符会被拒绝，存在未关闭会话或缺少 `audit_end` 的日志同样被拒绝。负例必须 verifier 判定恰为 `fail`（不完整/崩溃日志不算"已拒绝的负例"），门禁会断言每行 `verifier_verdict == "fail"`；环境触发的处理行会带 `actor_provenance` 而不是裸 null。manifest 的 `fixture_behavior_unchanged` 与 `agent_mod_coexists` 来自 live summary，任一为假时适配器拒绝导出。仓库另有 #28 提供的完整 bundle 无损适配器 `tools/stage1_evidence.py`；bridge 组合脚本在复制证据前会用 `/mcaudit end` 收尾源会话。
 
 ## 限制
 

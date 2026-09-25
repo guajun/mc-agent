@@ -309,6 +309,12 @@ def evaluate(
         operator = event.get("operator")
         return operator.get("uuid") if isinstance(operator, dict) else None
 
+    # Only interactions that can actually drive the machine count as operation.
+    # In 26.2 a punch calls playNote but never changes the note state, so it
+    # cannot trigger the observer/piston; it stays recorded as an attempt.
+    calibrated_paths = {"useItemOn", "useWithoutItem"}
+    uncalibrated_ops = 0
+
     for event in target_processed:
         request_seq = event.get("requestSeq")
         request = by_seq.get(request_seq)
@@ -355,6 +361,17 @@ def evaluate(
                     f"actor {attempt_actor}"
                 )
                 continue
+            # Proof-carrying association: the attempt must be the one that
+            # observed this request, not merely a neighbour in the window.
+            if attempt.get("requestSeq") is not None and attempt.get("requestSeq") != request_seq:
+                chain_errors.append(
+                    f"seq {event.get('seq')}: attempt {attempt_seq} carries requestSeq "
+                    f"{attempt.get('requestSeq')} but this processing credits {request_seq}"
+                )
+                continue
+            if attempt.get("path") not in calibrated_paths:
+                uncalibrated_ops += 1
+                continue
             agent_ops.append(event)
         elif event.get("operator") is not None:
             chain_errors.append(
@@ -381,7 +398,8 @@ def evaluate(
     checks.add(
         "machine_operated",
         machine_operated or not require_machine,
-        f"{len(agent_ops)} correlated agent operation(s); {environment_ops} environment trigger(s)",
+        f"{len(agent_ops)} calibrated agent operation(s); {uncalibrated_ops} uncalibrated "
+        f"player trigger(s); {environment_ops} environment trigger(s)",
     )
 
     # ----- cart capture -----------------------------------------------------
@@ -670,6 +688,12 @@ def _selftest_cases() -> list[tuple[str, list[dict[str, Any]], str]]:
 
     add("positive", _base_stream(), "pass")
 
+    attack_only = [dict(event) for event in _base_stream()]
+    for event in attack_only:
+        if event["type"] == "input_attempt":
+            event["path"] = "attack"
+    add("attack_only", attack_only, "fail")
+
     open_history = [
         _event(1, "session_start", phase="bootstrap"),
         _event(2, "audit_ready", phase="ready", config={"correlationWindowTicks": 2}),
@@ -773,6 +797,51 @@ def cmd_selftest(_args: argparse.Namespace) -> int:
         if not ok:
             failures += 1
             print_report(report, as_json=False)
+
+    # Exporters must refuse evidence that cannot be bound to a declared run.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as directory:
+        root = Path(directory)
+        foreign = root / "foreign.jsonl"
+        foreign.write_text(
+            "\n".join(
+                json.dumps(_event(seq, event["type"], run="actual-run", inst="actual-inst", **{
+                    key: value for key, value in event.items()
+                    if key not in ("seq", "tick", "wall", "run", "inst", "type")
+                }))
+                for seq, event in enumerate(_base_stream(), start=1)
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        try:
+            canonical_audit_rows([{
+                "path": str(foreign), "run_id": "declared-run",
+                "instance_id": "declared-inst", "dimension": "minecraft:overworld",
+            }])
+            print("[FAIL] foreign_identity: exporter accepted relabelled events")
+            failures += 1
+        except SystemExit:
+            print("[ok] foreign_identity: exporter refused relabelled events")
+
+        incomplete = root / "incomplete.jsonl"
+        incomplete.write_text(
+            "\n".join(
+                json.dumps(event)
+                for event in _base_stream()
+                if event["type"] != "audit_end"
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        try:
+            _negative_row("no_interaction", str(incomplete))
+            print("[FAIL] incomplete_negative: exporter accepted an incomplete negative")
+            failures += 1
+        except SystemExit:
+            print("[ok] incomplete_negative: exporter refused an incomplete negative")
+
     print(f"selftest: {'all cases passed' if failures == 0 else str(failures) + ' case(s) failed'}")
     return 1 if failures else 0
 
@@ -817,6 +886,44 @@ def canonical_audit_rows(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
         events, errors = read_events(Path(entry["path"]))
         if errors:
             raise SystemExit(f"cannot export {entry['path']}: {'; '.join(errors[:3])}")
+
+        # Bind the raw evidence to the declared identity instead of stamping
+        # the CLI values over it: a foreign or relabelled event is refused.
+        started = {str(event.get("session")) for event in events if event.get("type") == "session_start"}
+        ended = {str(event.get("session")) for event in events if event.get("type") == "audit_end"}
+        open_sessions = sorted(started - ended)
+        if open_sessions:
+            raise SystemExit(
+                f"{entry['path']}: session(s) {open_sessions} have no audit_end; refusing to export "
+                "a crashed/abandoned log"
+            )
+        if not events:
+            raise SystemExit(f"{entry['path']}: no events; refusing to export")
+        if not ended:
+            raise SystemExit(
+                f"{entry['path']}: no audit_end; refusing to export an incomplete log"
+            )
+        for event in events:
+            run_id = event.get("run")
+            instance_id = event.get("inst")
+            if run_id is None or instance_id is None:
+                raise SystemExit(
+                    f"{entry['path']}: event seq {event.get('seq')} has no run/inst; "
+                    "refusing to stamp identity from the CLI"
+                )
+            if str(run_id) != entry["run_id"] or str(instance_id) != entry["instance_id"]:
+                raise SystemExit(
+                    f"{entry['path']}: foreign event seq {event.get('seq')} carries "
+                    f"run={run_id!r} inst={instance_id!r}, not the declared "
+                    f"{entry['run_id']!r}/{entry['instance_id']!r}"
+                )
+            raw_dimension = event.get("dim") or event.get("level")
+            if raw_dimension is not None and str(raw_dimension) != entry["dimension"]:
+                raise SystemExit(
+                    f"{entry['path']}: event seq {event.get('seq')} carries dimension "
+                    f"{raw_dimension!r}, not the declared {entry['dimension']!r}"
+                )
+
         for event in events:
             kind = event.get("type")
             raw_phase = event.get("phase")
@@ -824,10 +931,15 @@ def canonical_audit_rows(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
             operator = event.get("operator") if isinstance(event.get("operator"), dict) else {}
             if kind == "input_attempt":
                 canonical: dict[str, Any] = {"event": "input_attempt", "actor_uuid": operator.get("uuid")}
+                if not operator.get("uuid"):
+                    canonical["actor_provenance"] = f"player attempt without uuid (path={event.get('path')})"
             elif kind == "input_processed":
                 if not event.get("targetInput"):
                     continue  # processing somewhere else is not a machine input
                 canonical = {"event": "input_processed", "actor_uuid": operator.get("uuid")}
+                if not operator.get("uuid"):
+                    provenance = event.get("requestTrigger") or event.get("trigger") or "environment"
+                    canonical["actor_provenance"] = f"no player operator ({provenance})"
             elif kind == "cart_exit":
                 inventory = event.get("inventory")
                 canonical = {
@@ -885,17 +997,15 @@ def _negative_row(case: str, log: str) -> dict[str, Any]:
     if errors:
         raise SystemExit(f"negative log {log} is unreadable: {'; '.join(errors[:2])}")
     report = evaluate(events)
-    if report["verdict"] == "pass":
-        raise SystemExit(f"negative case {case} ({log}) passed the verifier; refusing to export it as a negative")
+    if report["verdict"] != "fail":
+        raise SystemExit(
+            f"negative case {case} ({log}) is {report['verdict']}, not a functional failure; "
+            "refusing to export it as a rejected negative"
+        )
     attempted = any(event.get("type") == "input_attempt" for event in events)
-    processed = sum(
-        1
-        for event in events
-        if event.get("type") == "input_processed"
-        and event.get("targetInput")
-        and event.get("agentOp")
-        and event.get("phase") in OPERATION_PHASES
-    )
+    # "processed" is the verifier's count of calibrated machine operations, so
+    # an uncalibrated attack is recorded as attempted with processed=0.
+    processed = len(report["agentOperations"])
     return {
         "case": case,
         "attempted": attempted,
