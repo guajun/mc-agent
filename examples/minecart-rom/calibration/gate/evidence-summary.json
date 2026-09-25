@@ -1,0 +1,16 @@
+{
+  "out": "labs\\stage1-fixture-evidence",
+  "init_runs": 4,
+  "state_hashes": [
+    "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be"
+  ],
+  "order_hashes": [
+    "a3ba375742d0de28"
+  ],
+  "download_verified": true,
+  "bad_hash_rejected": true,
+  "command_blocks": 0,
+  "source_world_untouched": true,
+  "player": "Romuser",
+  "facing_target": true
+}

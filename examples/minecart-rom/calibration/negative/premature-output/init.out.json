@@ -2,15 +2,15 @@
   "records": "examples\\minecart-rom\\calibration\\negative\\premature-output",
   "cart_count": 3,
   "spawn_order": [
-    "d72960a3-2ef2-4bd0-8581-28c69b23ec81",
-    "4f8266b6-bc5f-4fdb-b9b2-37ee7b9f5d46",
-    "684aec25-64ac-4659-a301-6b7057bd7d97"
+    "593ceeab-4fed-4961-84ab-d4d360975112",
+    "aa4c3c15-a74c-4f41-8de1-22d82fe13df9",
+    "ed8f9acb-c549-427d-bbaf-151bbbfffc71"
   ],
   "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
   "entity_order": [
-    "d72960a3-2ef2-4bd0-8581-28c69b23ec81",
-    "4f8266b6-bc5f-4fdb-b9b2-37ee7b9f5d46",
-    "684aec25-64ac-4659-a301-6b7057bd7d97"
+    "593ceeab-4fed-4961-84ab-d4d360975112",
+    "aa4c3c15-a74c-4f41-8de1-22d82fe13df9",
+    "ed8f9acb-c549-427d-bbaf-151bbbfffc71"
   ],
   "machine": {
     "ok": true,

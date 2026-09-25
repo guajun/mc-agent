@@ -1,0 +1,35 @@
+stage-one gate (rom13-stage1): BLOCKED  bundle=labs\stage1-fixture-bundle
+  [PASS] fixture_map  (Map fixture pinned and initialized deterministically)
+  [BLOCKED] restore_fidelity  (Snapshot restore is faithful, not just issued)
+      - [blocked/evidence_missing] snapshot_before: artifacts/restore_fidelity/snapshot-before does not exist
+      - [blocked/evidence_missing] snapshot_after: artifacts/restore_fidelity/snapshot-after does not exist
+  [BLOCKED] player_context  (Fake-player identity and server-vantage context on the real server)
+      - [blocked/evidence_missing] identity_records: artifacts/player_context/identity-records.jsonl does not exist
+      - [blocked/evidence_missing] entry_contract: artifacts/player_context/entry-contract.json does not exist
+      - [blocked/evidence_missing] version_pins: artifacts/player_context/version-pins.json does not exist
+  [BLOCKED] agent_dev_capability  (Agent can write, build and install a mod into a located experiment instance)
+      - [blocked/evidence_missing] tool_environment: artifacts/agent_dev_capability/tool-environment.json does not exist
+      - [blocked/evidence_missing] jar_update: artifacts/agent_dev_capability/jar-update.json does not exist
+      - [blocked/evidence_missing] smoke_mod: artifacts/agent_dev_capability/smoke-mod.json does not exist
+      - [blocked/evidence_missing] instance_isolation: artifacts/agent_dev_capability/instance-isolation.jsonl does not exist
+  [BLOCKED] independent_test_mod  (Independent test mod audits inputs and transient cart outputs)
+      - [blocked/evidence_missing] test_mod_manifest: artifacts/independent_test_mod/test-mod-manifest.json does not exist
+      - [blocked/evidence_missing] audit_events: artifacts/independent_test_mod/audit-events.jsonl does not exist
+      - [blocked/evidence_missing] negative_cases: artifacts/independent_test_mod/negative-cases.jsonl does not exist
+      - [blocked/evidence_missing] audit_lifecycle: artifacts/independent_test_mod/audit-lifecycle.json does not exist
+  [BLOCKED] trace_persistence  (Tool calls and game events persist and join by run/instance)
+      - [blocked/evidence_missing] tool_trace: artifacts/trace_persistence/tool-trace.jsonl does not exist
+      - [blocked/trace_audit_missing] audit_events: artifacts/independent_test_mod/audit-events.jsonl is not available
+      - [blocked/evidence_missing] trace_join: artifacts/trace_persistence/trace-join.json does not exist
+      - [blocked/evidence_missing] missing_log_detection: artifacts/trace_persistence/missing-log-detection.jsonl does not exist
+  [BLOCKED] smoke_fixture_validity  (Generic smoke tests pass and the run is pinned/evidenced)
+      - [blocked/evidence_missing] smoke_report: artifacts/smoke_fixture_validity/smoke-report.json does not exist
+      - [blocked/evidence_missing] fixture_validity: artifacts/smoke_fixture_validity/fixture-validity.json does not exist
+      - [blocked/evidence_missing] version_lock: artifacts/smoke_fixture_validity/version-lock.json does not exist
+      - [blocked/evidence_missing] evidence_index: artifacts/smoke_fixture_validity/evidence-index.json does not exist
+  [PASS] evidence_integrity  (Bundle structure, artifact hashes, ports and source world)
+  8 check(s): 2 pass, 0 fail, 6 blocked
+  limitations:
+    - The gate validates coordinator-provided raw artifacts; it cannot prove they were not fabricated. Keep the raw logs and spot-check the evidence index.
+    - Boolean facts such as hook read-only behavior are cross-checked against the canonical event log, not re-measured live by this tool.
+    - A pass authorizes the stage-two cold start only after the coordinator reviews this report and the artifact hashes.

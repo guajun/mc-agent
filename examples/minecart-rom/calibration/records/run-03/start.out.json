@@ -2,14 +2,30 @@
   "lab": "rom15b",
   "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15b",
   "running": true,
-  "pid": 16872,
-  "startedAt": 1790355831.792221,
+  "pid": 87020,
+  "startedAt": 1790356561.1870208,
   "rcon_host": "127.0.0.1",
   "rcon_port": 27152,
   "world": "new world",
   "mods": [
-    "fabric-api-0.161.0+26.2.jar",
-    "fabric-carpet-26.2+v260616.jar"
+    {
+      "name": "fabric-api-0.161.0+26.2.jar",
+      "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "size": 2566123,
+      "origin": "modrinth",
+      "version": "0.161.0+26.2",
+      "required": false,
+      "deployedAt": 1790356384.1938279
+    },
+    {
+      "name": "fabric-carpet-26.2+v260616.jar",
+      "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c",
+      "size": 1536362,
+      "origin": "modrinth",
+      "version": "26.2",
+      "required": false,
+      "deployedAt": 1790356384.1960077
+    }
   ],
   "minecraft": "26.2",
   "loader": "0.19.5"

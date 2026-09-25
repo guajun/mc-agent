@@ -39,12 +39,14 @@
       "required": true
     },
     {
-      "name": "fabric-carpet",
+      "name": "carpet",
       "version": "26.2+v260616",
       "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c",
       "source": "https://api.modrinth.com/v2/project/carpet/version",
       "required": true,
-      "notes": "Carpet provides the real fake player (`/player <name> spawn`, `use`, `look`, `turn`, `tick`)."
+      "notes": "Carpet provides the real fake player (`/player <name> spawn`, `use`, `look`, `turn`, `tick`).",
+      "artifact": "fabric-carpet-26.2+v260616.jar",
+      "modrinth_slug": "fabric-carpet"
     },
     {
       "name": "wavecarpet",

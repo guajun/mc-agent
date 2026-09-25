@@ -494,6 +494,10 @@ def import_world(
         "--carpet",
         *(["--java", java] if java else []),
         *(["--memory", memory] if memory else []),
+        # current lab_server pins the ports at provision time; patch_lab_ports
+        # below still fixes labs provisioned by an older tool
+        *(["--rcon-port", str(rcon_port)] if rcon_port else []),
+        *(["--server-port", str(server_port)] if server_port else []),
     ]
     if reset and lab.exists():
         run_lab_server("stop", "--name", lab_name, "--timeout", "120")
@@ -741,6 +745,12 @@ def machine_state(console: Console, checks: list[dict[str, Any]]) -> dict[str, A
     return {"ok": ok, "checks": entries}
 
 
+def world_day_ticks(console: Console) -> int | None:
+    """The 26.2 ``time query day`` tick count, when the server reports it."""
+    match = re.search(r"at\s+(-?\d+)\s+tick", console.cmd("time query day", idle=0.2))
+    return int(match.group(1)) if match else None
+
+
 def note_value(console: Console, pos: list[int], values: range = range(0, 25)) -> int | None:
     x, y, z = pos
     for note in values:
@@ -783,6 +793,7 @@ def take_snapshot(
         "format": RECORD_FORMAT,
         "captured_at": iso_now(),
         "tick_frozen": "game is frozen" in console.cmd("tick query").lower(),
+        "world_day_tick": world_day_ticks(console),
         "lab": console.lab_name,
         "server": server,
         "spawn_order": spawn_order,

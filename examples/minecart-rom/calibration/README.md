@@ -90,6 +90,35 @@ lab_server.py exec --name rom15b "execute as @e[type=minecraft:chest_minecart] r
 lab_server.py exec --name rom15b "execute if block 14 -52 -22 minecraft:powered_rail run seed"
 ```
 
+## Stage-one gate slice
+
+The records above were turned into the gate's `fixture_map` evidence with:
+
+```powershell
+python examples/minecart-rom/runner/minecart_rom.py evidence `
+    --records examples/minecart-rom/calibration/records `
+    --out labs/stage1-evidence `
+    --source-world "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test"
+```
+
+Result on 2026-09-26 against `tools/stage1_gate.py` (the merged #14 gate), with
+the four initialization runs bound to declared child runs:
+
+```text
+[PASS] fixture_map  (Map fixture pinned and initialized deterministically)
+[PASS] evidence_integrity  (Bundle structure, artifact hashes, ports and source world)
+```
+
+The full bundle still reports the other six checks as `blocked` because their
+prerequisites (bridge#6, #16, #17, #18, #19) have not contributed their own
+artifacts yet; that is the integration gate's job, not this fixture's. The
+generated slice is committed under `gate/` and can be rebuilt from the records
+at any time.
+
+The source save re-hashed to the gate's own read-only baseline
+`8cd54c86…5324a` (40 files, 11,556,310 bytes) both before and after the export,
+which is what backs `source_world_untouched: true`.
+
 ## Limitations
 
 * The machine parameters above are calibrated for the shipped stack position and

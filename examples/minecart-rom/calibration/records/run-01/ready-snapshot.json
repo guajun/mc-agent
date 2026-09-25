@@ -1,32 +1,49 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "captured_at": "2026-09-26T01:02:26+0800",
+  "captured_at": "2026-09-26T01:14:12+0800",
   "tick_frozen": true,
+  "world_day_tick": 6000,
   "lab": "rom15b",
   "server": {
     "lab": "rom15b",
     "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15b",
     "running": true,
-    "pid": 63428,
-    "startedAt": 1790355695.418836,
+    "pid": 71840,
+    "startedAt": 1790356385.1938899,
     "rcon_host": "127.0.0.1",
     "rcon_port": 27152,
     "world": "new world",
     "mods": [
-      "fabric-api-0.161.0+26.2.jar",
-      "fabric-carpet-26.2+v260616.jar"
+      {
+        "name": "fabric-api-0.161.0+26.2.jar",
+        "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+        "size": 2566123,
+        "origin": "modrinth",
+        "version": "0.161.0+26.2",
+        "required": false,
+        "deployedAt": 1790356384.1938279
+      },
+      {
+        "name": "fabric-carpet-26.2+v260616.jar",
+        "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c",
+        "size": 1536362,
+        "origin": "modrinth",
+        "version": "26.2",
+        "required": false,
+        "deployedAt": 1790356384.1960077
+      }
     ],
     "minecraft": "26.2",
     "loader": "0.19.5"
   },
   "spawn_order": [
-    "9c71a282-2c81-4a13-be7c-bc744a51c449",
-    "a1a8366c-c021-4feb-a7a4-638d5d2d1b9f",
-    "82f8f9cc-b3fe-4e8b-89c8-0da407167675"
+    "c788e20f-8225-422f-9666-ab941c6dabe4",
+    "ebfdbbf7-de9f-4bcb-91f8-f520943c0dbd",
+    "d70516cb-9a42-4517-92d6-a1d5935bd002"
   ],
   "carts": [
     {
-      "uuid": "9c71a282-2c81-4a13-be7c-bc744a51c449",
+      "uuid": "c788e20f-8225-422f-9666-ab941c6dabe4",
       "pos": [
         14.5,
         -51.9375,
@@ -44,11 +61,11 @@
           "id": "minecraft:stone"
         }
       ],
-      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Slot: 0b, id: \"minecraft:stone\"}], UUID: [I; -1670274430, 746670611, -1099121548, 1246872649], FlippedRotation: 0b, HasTicked: 0b}",
+      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Slot: 0b, id: \"minecraft:stone\"}], UUID: [I; -947330545, -2111487441, -1771656300, 476949476], FlippedRotation: 0b, HasTicked: 0b}",
       "spawn_index": 0
     },
     {
-      "uuid": "a1a8366c-c021-4feb-a7a4-638d5d2d1b9f",
+      "uuid": "ebfdbbf7-de9f-4bcb-91f8-f520943c0dbd",
       "pos": [
         14.5,
         -51.9375,
@@ -66,11 +83,11 @@
           "id": "minecraft:dirt"
         }
       ],
-      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 2, Slot: 1b, id: \"minecraft:dirt\"}], UUID: [I; -1582811540, -1071558677, -1482398835, 1563237279], FlippedRotation: 0b, HasTicked: 0b}",
+      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 2, Slot: 1b, id: \"minecraft:dirt\"}], UUID: [I; -335692809, -559985717, -1845955296, -1808003651], FlippedRotation: 0b, HasTicked: 0b}",
       "spawn_index": 1
     },
     {
-      "uuid": "82f8f9cc-b3fe-4e8b-89c8-0da407167675",
+      "uuid": "d70516cb-9a42-4517-92d6-a1d5935bd002",
       "pos": [
         14.5,
         -51.9375,
@@ -88,7 +105,7 @@
           "id": "minecraft:gold_ingot"
         }
       ],
-      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 3, Slot: 2b, id: \"minecraft:gold_ingot\"}], UUID: [I; -2097612340, -1275179381, -1983378012, 118912629], FlippedRotation: 0b, HasTicked: 0b}",
+      "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 3, Slot: 2b, id: \"minecraft:gold_ingot\"}], UUID: [I; -687532341, -1706932969, -1831427627, -1822699518], FlippedRotation: 0b, HasTicked: 0b}",
       "spawn_index": 2
     }
   ],
@@ -266,17 +283,17 @@
     "playerGameType": "1"
   },
   "entity_order": [
-    "9c71a282-2c81-4a13-be7c-bc744a51c449",
-    "a1a8366c-c021-4feb-a7a4-638d5d2d1b9f",
-    "82f8f9cc-b3fe-4e8b-89c8-0da407167675"
+    "c788e20f-8225-422f-9666-ab941c6dabe4",
+    "ebfdbbf7-de9f-4bcb-91f8-f520943c0dbd",
+    "d70516cb-9a42-4517-92d6-a1d5935bd002"
   ],
   "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
   "initialization": {
-    "started_at": "2026-09-26T01:02:28+0800",
-    "seconds": 39.059,
+    "started_at": "2026-09-26T01:14:14+0800",
+    "seconds": 41.288,
     "steps": [
       {
-        "at": "2026-09-26T01:01:54+0800",
+        "at": "2026-09-26T01:13:38+0800",
         "step": "machine-base",
         "detail": {
           "forceload": "0 -3 2 -1",
@@ -423,7 +440,7 @@
         }
       },
       {
-        "at": "2026-09-26T01:02:05+0800",
+        "at": "2026-09-26T01:13:51+0800",
         "step": "user",
         "detail": {
           "name": "Romuser",
@@ -450,16 +467,16 @@
         }
       },
       {
-        "at": "2026-09-26T01:02:05+0800",
+        "at": "2026-09-26T01:13:51+0800",
         "step": "note-block-reset",
         "detail": 20
       },
       {
-        "at": "2026-09-26T01:02:09+0800",
+        "at": "2026-09-26T01:13:55+0800",
         "step": "cart",
         "detail": {
           "index": 0,
-          "uuid": "9c71a282-2c81-4a13-be7c-bc744a51c449",
+          "uuid": "c788e20f-8225-422f-9666-ab941c6dabe4",
           "items": [
             {
               "slot": 0,
@@ -470,11 +487,11 @@
         }
       },
       {
-        "at": "2026-09-26T01:02:13+0800",
+        "at": "2026-09-26T01:13:59+0800",
         "step": "cart",
         "detail": {
           "index": 1,
-          "uuid": "a1a8366c-c021-4feb-a7a4-638d5d2d1b9f",
+          "uuid": "ebfdbbf7-de9f-4bcb-91f8-f520943c0dbd",
           "items": [
             {
               "slot": 1,
@@ -485,11 +502,11 @@
         }
       },
       {
-        "at": "2026-09-26T01:02:17+0800",
+        "at": "2026-09-26T01:14:03+0800",
         "step": "cart",
         "detail": {
           "index": 2,
-          "uuid": "82f8f9cc-b3fe-4e8b-89c8-0da407167675",
+          "uuid": "d70516cb-9a42-4517-92d6-a1d5935bd002",
           "items": [
             {
               "slot": 2,

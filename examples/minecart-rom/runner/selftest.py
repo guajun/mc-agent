@@ -408,6 +408,34 @@ def test_live_classifier() -> None:
         fixture.lab_status = original
 
 
+def test_evidence_helpers() -> None:
+    """The gate evidence helpers, against the committed calibration records."""
+    import evidence
+
+    spec = fixture.load_spec()
+    records = EXAMPLES / "calibration" / "records"
+    runs = evidence.find_ready_snapshots(records)
+    check(len(runs) >= 3, "at least three ready records committed")
+    rows = evidence.init_runs(runs, len(spec["program"]["entries"]))
+    check(len({row["state_hash"] for row in rows}) == 1, "state hash equal across committed runs")
+    check(len({row["order_hash"] for row in rows}) == 1, "order hash equal across committed runs")
+    check(all(row["ready"] and not row["early_output"] for row in rows), "committed runs are ready")
+    check(all(row["entity_count"] == 3 for row in rows), "three carts per run")
+    check(all(row["inventory_total"] == 6 for row in rows), "inventory totals match the program")
+    check(all(len(row["order_hash"]) == 16 for row in rows), "order hash is 16 hex")
+    snapshot = runs[-1]["snapshot"]
+    identity = evidence.player_identity(spec, snapshot)
+    check(identity["facing_target"] is True, "the committed user faces the note block")
+    check(identity["server_vantage_uuid"] == identity["uuid"], "server vantage uuid equals task uuid")
+    check(len(identity["uuid"]) == 36, "uuid is canonically formatted")
+    check(evidence.inventory_total(snapshot["carts"]) == 6, "inventory total helper")
+    check(evidence.early_output(snapshot, 3) is False, "early-output helper")
+    check(evidence.early_output({**snapshot, "carts": snapshot["carts"][:2]}, 3) is True, "short stack is early output")
+    # fail closed when the source save was not provided
+    rebuild = evidence.cleanup_rebuild(None)
+    check(rebuild["source_world_untouched"] is False, "no source world means untouched=false")
+
+
 def test_import_helpers(tmp: Path) -> None:
     lab = tmp / "portlab"
     lab.mkdir()
@@ -438,6 +466,7 @@ def run(keep: bool = False, verbose: bool = False) -> int:
         ("artifact layout", lambda: test_artifact_layout(tmp)),
         ("validate-ready", test_validate_ready),
         ("live classifier", test_live_classifier),
+        ("evidence helpers", test_evidence_helpers),
         ("lab helpers", lambda: test_import_helpers(tmp)),
     ]
     failures = 0

@@ -1,6 +1,7 @@
 starting lab rom15b in labs\rom15b
   java C:\Users\MSI-NB\AppData\Roaming\.hmcl\java\windows-x86_64\mojang-java-runtime-epsilon\bin\java.exe
-  -Xmx3G -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -jar fabric-server-mc.26.2-loader.0.19.5-launcher.1.1.2.jar nogui
-  pid 64536, log labs\rom15b\logs\console.log
+  -Xmx3G -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dmcagent.serverDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15b\mc-agent-server -Dmcagent.serverPort=11819 -Dmcagent.labName=rom15b -Dmcagent.labInstance=c0c10c33b92045858cec2ecf2d6c64f1 -Dmcagent.auditDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15b\audit -Dmcagent.worldDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15b\world -jar fabric-server-mc.26.2-loader.0.19.5-launcher.1.1.2.jar nogui
+  pid 81452, log labs\rom15b\logs\console.log
 waiting up to 300s for the server to say Done
-ready in 10.0s: [01:07:28] [Server thread/INFO]: Done (0.392s)! For help, type "help"
+ready in 12.1s: [01:20:47] [Server thread/INFO]: Done (0.334s)! For help, type "help"
+  note: labs\rom15b\mc-agent-server\port.txt has not appeared; the server-vantage mod writes it when it binds

@@ -52,11 +52,48 @@ Minecraft 26.2, Fabric loader 0.19.5 and Java 25. The base world itself is
 always downloaded into `labs/_cache/maps/` and verified before it is unpacked.
 
 Offline checks for the runner (hash mismatch, corrupt/unsafe archives, snapshot
-parsers, ready/reload/premature classifiers) run without a game or a network:
+parsers, ready/reload/premature classifiers, evidence helpers) run without a
+game or a network:
 
 ```powershell
 python examples/minecart-rom/runner/minecart_rom.py selftest
 ```
+
+## Stage-one gate integration
+
+The merged integration gate (`tools/stage1_gate.py`, issue #14) consumes a
+bundle of raw artifacts. `evidence` turns this fixture's records into the
+`fixture_map` slice of that bundle:
+
+```powershell
+python examples/minecart-rom/runner/minecart_rom.py evidence `
+    --records examples/minecart-rom/calibration/records `
+    --out labs/stage1-evidence `
+    --source-world "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test"
+```
+
+It writes `artifacts/fixture_map/{fixture-manifest,player-identity,command-block-scan,cleanup-rebuild}.json`
+and `init-runs.jsonl`, plus `bundle-fragment.json` with the evidence mapping.
+The builder verifies instead of asserting:
+
+* `map.download_verified` is true only when a cold download record hashes to
+  the manifest;
+* `map.bad_hash_rejected` re-runs the wrong-hash rejection against the artifact;
+* `world.tree_sha256` uses the gate's own `hash-tree` algorithm;
+* `source_world_untouched` is true only when the source save hashes to the
+  read-only baseline recorded in `docs/stage1-gate.md`;
+* `command-block-scan.json` scans every world copy passed with `--world-dir`
+  (and the lab copies referenced by the records);
+* `init-runs.jsonl` carries one row per valid initialization, with the
+  normalized state hash and a 16-hex order hash;
+* `player-identity.json` proves the user's view ray hits the note block.
+
+Before the gate check, bind the emitted `run_id`/`instance_id` values to the
+bundle's `run.child_runs` (the coordinator declares them; `--run-map OLD=NEW`
+can rewrite run ids at build time). A minimal bundle with only the
+`fixture_map` slice checked passes both `fixture_map` and `evidence_integrity`;
+the remaining checks stay blocked until the other prerequisites contribute
+their artifacts.
 
 ## The map artifact
 

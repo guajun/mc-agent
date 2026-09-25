@@ -185,6 +185,64 @@ def cmd_validate(args: argparse.Namespace) -> int:
     return 0 if result["ok"] else 1
 
 
+def cmd_evidence(args: argparse.Namespace) -> int:
+    """Build the fixture_map slice of the stage-one gate bundle from records."""
+    sys.path.insert(0, str(RUNNER))
+    import evidence as evidence_module
+
+    if not args.records:
+        raise fixture.FixtureError("evidence needs --records <root with run-*/ready-snapshot.json>")
+    spec = fixture.load_spec(Path(args.spec) if args.spec else None)
+    manifest = fixture.load_manifest(Path(args.manifest) if args.manifest else None)
+    cache = Path(args.cache).expanduser() if args.cache else fixture.MAP_CACHE
+    artifact = cache / manifest.filename
+    if not artifact.is_file():
+        raise fixture.FixtureError(
+            f"{artifact} is missing; run `fetch --cold` first (the evidence pack verifies the bytes)"
+        )
+    fixture.verify_artifact(artifact, manifest)
+    world = Path(args.world).expanduser() if args.world else (
+        cache / "unpacked" / manifest.filename.removesuffix(".zip") / "world"
+    )
+    if not (world / "level.dat").is_file():
+        raise fixture.FixtureError(
+            f"{world} is not an extracted world; pass --world or run `fetch` first"
+        )
+    world_dirs = [world]
+    for extra in args.world_dir or []:
+        path = Path(extra).expanduser()
+        if path not in world_dirs:
+            world_dirs.append(path)
+    for run in evidence_module.find_ready_snapshots(Path(args.records).expanduser()):
+        lab = run["snapshot"].get("lab")
+        if not lab:
+            continue
+        lab_world = fixture.LABS / lab / "world"
+        if (lab_world / "level.dat").is_file() and lab_world not in world_dirs:
+            world_dirs.append(lab_world)
+    run_map = {}
+    for mapping in args.run_map or []:
+        if "=" not in mapping:
+            raise fixture.FixtureError(f"--run-map needs OLD=NEW, got {mapping!r}")
+        old, new = mapping.split("=", 1)
+        run_map[old] = new
+    summary = evidence_module.build_pack(
+        records_root=Path(args.records).expanduser(),
+        out_dir=Path(args.out).expanduser(),
+        spec=spec,
+        manifest=manifest,
+        artifact=artifact,
+        world=world,
+        world_dirs=world_dirs,
+        source_world=Path(args.source_world).expanduser() if args.source_world else None,
+        run_map=run_map or None,
+        instance_id=args.instance_id or None,
+        lab=args.lab or None,
+    )
+    print(json.dumps(summary, indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_selftest(args: argparse.Namespace) -> int:
     sys.path.insert(0, str(RUNNER))
     import selftest
@@ -269,6 +327,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--run-id", default="")
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(handler=cmd_validate)
+
+    p = sub.add_parser("evidence", parents=[common], help="build the gate fixture_map evidence pack")
+    p.add_argument("--out", required=True, help="bundle root to write into")
+    p.add_argument("--world", default="", help="the extracted base world (default: cache copy)")
+    p.add_argument("--world-dir", action="append", default=[], help="extra world copy to scan")
+    p.add_argument("--source-world", default="", help="the read-only source save for the baseline check")
+    p.add_argument("--instance-id", default="", help="instance id for every init run")
+    p.add_argument("--lab", default="", help="lab name for the rebuild steps")
+    p.add_argument("--run-map", action="append", default=[], help="OLD=NEW run id mapping (repeatable)")
+    p.set_defaults(handler=cmd_evidence)
 
     p = sub.add_parser("selftest", help="offline tests (no game, no network required)")
     p.add_argument("--keep", action="store_true", help="keep the temporary files")

@@ -1,0 +1,29 @@
+{
+  "steps": [
+    "python examples/minecart-rom/runner/minecart_rom.py fetch --cold",
+    "python examples/minecart-rom/runner/minecart_rom.py import --lab rom15b --reset --rcon-port <rcon> --server-port <game> --java <jdk25>",
+    "python examples/minecart-rom/runner/minecart_rom.py start --lab rom15b",
+    "python examples/minecart-rom/runner/minecart_rom.py init --lab rom15b --records <records>",
+    "python examples/minecart-rom/runner/minecart_rom.py validate --lab rom15b --ready <records>/ready-snapshot.json",
+    "python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15b",
+    "rm -rf labs/rom15b/world   # discard the copy; the source save is never the world directory"
+  ],
+  "source_world_untouched": true,
+  "rebuild_reproducible": true,
+  "source_world": {
+    "provided": true,
+    "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
+    "tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "files": 40,
+    "bytes": 11556310,
+    "baseline": {
+      "source": "docs/stage1-gate.md independent read-only baseline",
+      "tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "files": 40,
+      "bytes": 11556310
+    },
+    "matches_baseline": true
+  },
+  "records": "examples/minecart-rom/calibration/records",
+  "commands": "README.md#quick-start"
+}
