@@ -134,7 +134,7 @@ that player: identity, dimension, position, yaw/pitch, eye, and
 direction. It never falls back to the host client or to the first entry of the
 player list.
 
-Verified combination (2026-09-25), dedicated Fabric 26.2 server, two Carpet
+Verified combination (2026-09-26), dedicated Fabric 26.2 server, two Carpet
 fake players, no player client attached:
 
 | Component | Version / commit | Note |
@@ -145,9 +145,12 @@ fake players, no player client attached:
 | Java | 25.0.1 | the lab server's java |
 
 The lab scene: Alice at `(0.5, 100.0, 0.5)` facing a dispenser at
-`(0, 101, 4)`, Bob at `(4.5, 100.0, 0.5)` facing an armor stand. The calls were
-made with `tools/mcp_probe.py` against the bridge's MCP server, exactly as an
-agent runtime would.
+`(0, 101, 4)`, Bob at `(4.5, 100.0, 0.5)` facing an armor stand. The full
+26-step transcript was produced by the identity-matrix runner over the bridge
+loopback API (`LocalApiClient`, the `cli.*` steps); the MCP captures come from
+`tools/mcp_probe.py` against the same daemon (`mc_player`, `mc_context`). Both
+surfaces share one daemon method, so the envelopes match; the raw mod replies
+are in the bundle as the comparison authority.
 
 | Call | Result |
 | --- | --- |

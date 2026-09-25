@@ -2,6 +2,7 @@
   "issue": "https://github.com/guajun/mc-agent/issues/16",
   "kind": "live fake-player identity / server-vantage view verification",
   "date": "2026-09-26",
+  "dateNote": "local time (+08:00): the preserved versions.txt stamp is 2026-09-26T00:03:22+08:00 and the step timestamps are 2026-09-26T00:02, i.e. 2026-09-25 in UTC",
   "verdict": "identity, dimension, position, yaw/pitch, eye and view target resolve for the exact fake player; unknown identities stay found:false; a task-start snapshot and a later live call differ when the player moved; a fake player's /say bundle is labelled timing=broadcast",
   "combination": {
     "mc-agent": {
@@ -90,6 +91,11 @@
       "name": "Alice"
     },
     "prompt": "look at the machine and report what you see"
+  },
+  "capture": {
+    "transcript_runner": "labs/_build/identity_matrix.py over the bridge loopback API (LocalApiClient); raw.* steps are direct mod-socket replies, cli.* steps go through the daemon",
+    "mcp_captures": "tools/mcp_probe.py against mc-bridge mcp (stdio); recorded as the mcp.* entries",
+    "note": "the cli.* and mcp.* paths share one daemon method, so their envelopes match; the raw.* replies are the comparison authority"
   },
   "steps": [
     {
@@ -2251,6 +2257,7 @@
     }
   },
   "bridge_fix_comparison": {
+    "comparison_scope": "view-shape only, not state-matched: the 0.4.0 prefix was captured with Alice at z=2.5 and the 0.4.1 capture at z=0.5. The compared fact is whether the mod's split top-level view reaches player.view, not the position.",
     "before": {
       "bridge": "0.4.0 (e5ed50a)",
       "mc_player_alice_keys": [
@@ -2261,6 +2268,11 @@
         "name"
       ],
       "view_present": false,
+      "capturedState": {
+        "x": 0.5,
+        "y": 100.0,
+        "z": 2.5
+      },
       "raw_output": "{\n  \"type\": \"player_context\",\n  \"player\": {\n    \"id\": 2,\n    \"uuid\": \"f0a8f4ba-99f5-412a-9189-db832c934913\",\n    \"type\": \"minecraft:player\",\n    \"class\": \"EntityPlayerMPFake\",\n    \"x\": 0.5,\n    \"y\": 100.0,\n    \"z\": 2.5,\n    \"vx\": 0.0,\n    \"vy\": -0.0784000015258789,\n    \"vz\": 0.0,\n    \"yaw\": 0.0,\n    \"pitch\": 0.0,\n    \"alive\": true,\n    \"removed\": false,\n    \"invulnerable\": false,\n    \"onGround\": true,\n    \"vehicle\": -1,\n    \"isVehicle\": false,\n    \"passengers\": [],\n    \"health\": 20.0,\n    \"maxHealth\": 20.0,\n    \"bodyEmpty\": true,\n    \"name\": \"Alice\",\n    \"gameMode\": \"creative\",\n    \"dimension\": \"minecraft:overworld\",\n    \"eye\": [\n      0.5,\n      101.62000000476837,\n      2.5\n    ]\n  },\n  \"found\": true,\n  \"uuid\": \"f0a8f4ba-99f5-412a-9189-db832c934913\",\n  \"name\": \"Alice\"\n}"
     },
     "after": {
@@ -2273,6 +2285,11 @@
         "name"
       ],
       "view_present": true,
+      "capturedState": {
+        "x": 0.5,
+        "y": 100.0,
+        "z": 0.5
+      },
       "note": "player.view carries eye, direction, blockRange, entityRange and target"
     }
   },

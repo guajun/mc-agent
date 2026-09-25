@@ -90,7 +90,7 @@ Scarpet（Carpet 的脚本语言，`/script`）是一个已经存在的中间方
 
 服务端视角同时也是**身份**视角。任务一般用 UUID 指名它的用户，智能体用 `mc_player`（MCP）或 `mc-bridge call player`（CLI）解析，拿到的就是**该玩家此刻**的服务端记录：身份、维度、位置、yaw/pitch、眼睛，以及 `player.view.target`——从该玩家自己的眼睛和视线算出的服务端射线。它不会回退到宿主客户端，也不会回退到玩家列表里的第一个人。
 
-实测组合（2026-09-25）：专用 Fabric 26.2 服务器、两个 Carpet 假人、没有任何玩家客户端连着。
+实测组合（2026-09-26）：专用 Fabric 26.2 服务器、两个 Carpet 假人、没有任何玩家客户端连着。
 
 | 组件 | 版本 / 提交 | 说明 |
 | --- | --- | --- |
@@ -99,7 +99,7 @@ Scarpet（Carpet 的脚本语言，`/script`）是一个已经存在的中间方
 | Minecraft / Fabric loader | 26.2 / 0.19.5 | Carpet 26.2+v260616、Fabric API 0.161.0+26.2 |
 | Java | 25.0.1 | 实验室服务器所用 |
 
-场景：Alice 在 `(0.5, 100.0, 0.5)` 面向 `(0, 101, 4)` 的发射器，Bob 在 `(4.5, 100.0, 0.5)` 面向盔甲架。调用方式与智能体运行时一致：对 bridge 的 MCP server 用 `tools/mcp_probe.py`。
+场景：Alice 在 `(0.5, 100.0, 0.5)` 面向 `(0, 101, 4)` 的发射器，Bob 在 `(4.5, 100.0, 0.5)` 面向盔甲架。完整的 26 步原始记录由身份矩阵 runner 经 bridge 的 loopback API 产生（`LocalApiClient`，即 `cli.*` 步骤）；MCP 抓取来自对同一 daemon 运行 `tools/mcp_probe.py`（`mc_player`、`mc_context`）。两个界面共用同一个 daemon 方法，所以信封一致；原始 mod 回复在证据包里作为对照权威。
 
 | 调用 | 结果 |
 | --- | --- |
