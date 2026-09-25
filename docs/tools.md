@@ -61,7 +61,7 @@ Ask for `types=` filtering and a larger `limit` when you want more.
 | --- | --- |
 | `mc-agent-loop run --backend hermes --trigger @codex` | stay connected, answer chat |
 | `mc-agent-loop once "<prompt>" --backend hermes` | one turn, no chat needed |
-| `mc-agent-loop backends` | what is available: `hermes`, `echo`, `codex` |
+| `mc-agent-loop backends` | what is available: `hermes`, `echo` |
 
 Useful flags: `--env-file .env` (keeps the API key out of the command line),
 `--reply-mode command --reply-command 'execute as <name> run say {text}'` (gives

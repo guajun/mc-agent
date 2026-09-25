@@ -54,7 +54,7 @@ mc-agent-loop/             智能体 loop 与它的后端
 | --- | --- |
 | `mc-agent-loop run --backend hermes --trigger @codex` | 常驻，响应聊天 |
 | `mc-agent-loop once "<提示>" --backend hermes` | 跑一轮，不需要聊天触发 |
-| `mc-agent-loop backends` | 可用的后端：`hermes`、`echo`、`codex` |
+| `mc-agent-loop backends` | 可用的后端：`hermes`、`echo` |
 
 常用参数：`--env-file .env`（让 key 不出现在命令行里）、`--reply-mode command --reply-command 'execute as <名字> run say {text}'`（让智能体用自己的名义说话，见 [智能体在游戏里是谁](player-identity.md)）、`--trigger`、`--ignore-sender`、`--cooldown`、`--chunk-size`、`--history`。
 

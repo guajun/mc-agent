@@ -41,12 +41,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--backend",
         default="echo",
-        choices=("echo", "hermes", "codex"),
+        choices=("echo", "hermes"),
         help="agent loop backend; hermes needs the API server running and .env loaded",
     )
     parser.add_argument(
         "--prompt",
-        default="@codex say hello and name your player character",
+        default="@agent say hello and name your player character",
         help="chat line pushed by the fake mod",
     )
     parser.add_argument("--timeout", type=float, default=45.0, help="seconds to wait for a reply")
@@ -121,7 +121,7 @@ async def main() -> int:
         loop = subprocess.Popen(
             [
                 sys.executable, "-u", "-m", "mc_agent_loop", "run",
-                "--backend", args.backend, "--trigger", "@codex",
+                "--backend", args.backend, "--trigger", "@agent",
                 "--api-port", str(args.api_port),
                 "--cooldown", "0", "--min-reply-interval", "0",
             ],
