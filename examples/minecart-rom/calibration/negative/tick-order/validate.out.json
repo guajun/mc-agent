@@ -1,6 +1,6 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T01:51:23+0800",
+  "checked_at": "2026-09-26T02:19:48+0800",
   "verdict": "FIXTURE_INVALID",
   "ok": false,
   "problems": [
@@ -10,9 +10,18 @@
       "now": "[11.5d, -53.0d, -24.5d]"
     },
     {
+      "check": "seat-unexpected",
+      "uuid": "001a02d4-abd4-47c6-b55d-6706416e9d88"
+    },
+    {
+      "check": "user-vehicle-changed",
+      "at_ready": "a6e97b7d-2995-4817-a886-d7eb750850b4",
+      "now": ""
+    },
+    {
       "check": "interface-order-hash-changed",
-      "at_ready": "8e16a4719008dd23",
-      "now": "05f3da66f67362ee"
+      "at_ready": "ef4cb2d7f04dfd2b",
+      "now": "e83737aaf00d380f"
     }
   ],
   "ready_snapshot": "examples\\minecart-rom\\calibration\\negative\\tick-order\\ready-snapshot.json",

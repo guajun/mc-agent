@@ -2,25 +2,25 @@
   "records": "examples\\minecart-rom\\calibration\\negative\\reload",
   "cart_count": 3,
   "spawn_order": [
-    "21bfd82a-e442-46b2-b7b7-7ddd44d0a500",
-    "1d765780-4b92-453c-b6ae-3707856ba887",
-    "0fc5e890-61da-46f1-9a84-2b61040c0d24"
+    "b01f6a42-2460-4038-9f2f-1c0e7be8eb12",
+    "843af52e-703a-4536-ae71-86098adc7726",
+    "58c80924-823b-4da3-afa4-290dddf960bc"
   ],
   "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
   "tick_order": [
-    "21bfd82a-e442-46b2-b7b7-7ddd44d0a500",
-    "1d765780-4b92-453c-b6ae-3707856ba887",
-    "0fc5e890-61da-46f1-9a84-2b61040c0d24"
+    "b01f6a42-2460-4038-9f2f-1c0e7be8eb12",
+    "843af52e-703a-4536-ae71-86098adc7726",
+    "58c80924-823b-4da3-afa4-290dddf960bc"
   ],
   "tick_order_hash": "a3ba375742d0de28",
   "rcon_order": [
-    "21bfd82a-e442-46b2-b7b7-7ddd44d0a500",
-    "1d765780-4b92-453c-b6ae-3707856ba887",
-    "0fc5e890-61da-46f1-9a84-2b61040c0d24"
+    "b01f6a42-2460-4038-9f2f-1c0e7be8eb12",
+    "843af52e-703a-4536-ae71-86098adc7726",
+    "58c80924-823b-4da3-afa4-290dddf960bc"
   ],
   "interface": {
-    "order_hash": "c76894f662c17686",
-    "tick": 796,
+    "order_hash": "58f7173900a717b1",
+    "tick": 808,
     "mod_version": "0.6.0",
     "cross_check_ok": true
   },
@@ -175,7 +175,9 @@
     "UUID": "[I; 1052844757, -64534506, -1102594165, -388504211]",
     "Pos": "[11.5d, -53.6d, -24.5d]",
     "Rotation": "[0.0f, 50.5055f]",
-    "playerGameType": "1"
+    "playerGameType": "1",
+    "RootVehicle": "{Entity: {NoGravity: 1b, Brain: {memories: {}}, Invulnerable: 0b, FallFlying: 0b, ShowArms: 0b, PortalCooldown: 0, AbsorptionAmount: 0.0f, DisabledSlots: 0, DeathTime: 0s, Pose: {}, id: \"minecraft:armor_stand\", Invisible: 1b, UUID: [I; -1292609063, 1038108542, -1705420909, 730593143], Tags: [\"minecart-rom-fixture\"], Motion: [0.0d, 0.0d, 0.0d], Small: 0b, Health: 20.0f, fall_distance: 0.0d, Air: 300s, OnGround: 1b, Marker: 1b, Rotation: [0.0f, 0.0f], current_impulse_context_reset_grace_time: 0, Pos: [11.5d, -53.0d, -24.5d], Fire: 0s, NoBasePlate: 0b, attributes: [{id: \"minecraft:movement_speed\", base: 0.7d}], HurtTime: 0s}, Attach: [I; -1292609063, 1038108542, -1705420909, 730593143]}",
+    "vehicle_uuid": "b2f459d9-3de0-477e-9a59-57932b8bf777"
   },
   "validation": {
     "ok": true,

@@ -10,6 +10,13 @@
   ],
   "source_world_untouched": true,
   "rebuild_reproducible": true,
+  "rebuild_check": {
+    "first_sha256": "71e11e8a2b234a865f4c89610823490ee98b877fd029b60d75471acbe15caa47",
+    "second_sha256": "71e11e8a2b234a865f4c89610823490ee98b877fd029b60d75471acbe15caa47",
+    "identical": true,
+    "world_sha256": "642d91fae8569e5467c74ed2c355908cafb3464c506c0a1d4bf99d9234934d61",
+    "exported_at": "2026-01-01T00:00:00Z"
+  },
   "source_world": {
     "provided": true,
     "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",

@@ -1,15 +1,16 @@
 {
   "format": "mc-agent/fixture-map-evidence@1",
   "map": {
-    "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
-    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
-    "bytes": 748718,
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/f7d8e43c1316e4f9d37f1ef3a59a779c33921cd6/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+    "bytes": 748712,
     "mc_version": "26.2",
     "immutable": true,
+    "url_pin": "commit",
     "download_verified": true,
     "bad_hash_rejected": true,
     "download_record": "examples/minecart-rom/calibration/records/cold-download/download.json",
-    "bad_hash_check": "sha256 mismatch for minecart-rom-base-1.0.0.zip: manifest says 0000000000000000000000000000000000000000000000000000000000000000, file is 11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd"
+    "bad_hash_check": "sha256 mismatch for minecart-rom-base-1.0.0.zip: manifest says 0000000000000000000000000000000000000000000000000000000000000000, file is 46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387"
   },
   "mods": [
     {
@@ -40,9 +41,9 @@
   ],
   "world": {
     "directory": "labs/_cache/maps/unpacked/minecart-rom-base-1.0.0/world",
-    "tree_sha256": "0a2c8dcaae48a7173aa11660dd83fd608da04332174ec54c1e7a4644a6dd5029",
+    "tree_sha256": "a9b6c381721ac8c95cced15fc227cfdd4035ea27d64538e37da84e680b8ba79a",
     "files": 31,
     "hash_tool": "tools/stage1_gate.py hash-tree",
-    "source_export_file_hash": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361"
+    "source_export_file_hash": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51"
   }
 }

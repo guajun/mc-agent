@@ -1,33 +1,33 @@
 {
   "cache": {
-    "path": "labs\\_cache\\maps\\minecart-rom-base-1.0.0.zip",
-    "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "path": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\_cache\\maps\\minecart-rom-base-1.0.0.zip",
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/f7d8e43c1316e4f9d37f1ef3a59a779c33921cd6/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
     "http_status": 200,
-    "bytes": 748718,
-    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
+    "bytes": 748712,
+    "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
     "cache_hit": false,
-    "seconds": 1.821
+    "seconds": 2.106
   },
   "extract": {
     "entries": 32,
-    "uncompressed_bytes": 11532405,
+    "uncompressed_bytes": 11532400,
     "roots": [
       "EXPORT.json",
       "world"
     ],
-    "staging": "labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0",
-    "world": "labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0\\world",
-    "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+    "staging": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0",
+    "world": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0\\world",
+    "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
     "world_files": 31,
-    "world_bytes": 11530857,
+    "world_bytes": 11530852,
     "export": {
       "format": "mc-agent/minecart-rom-export@1",
       "version": "1.0.0",
       "source": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
       "level_name": "Minecart ROM base",
-      "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+      "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
       "world_files": 31,
-      "world_uncompressed_bytes": 11530857,
+      "world_uncompressed_bytes": 11530852,
       "level_dat": {
         "changed": [
           "singleplayer_uuid",
@@ -82,7 +82,8 @@
       ],
       "command_blocks": [],
       "tool": "examples/minecart-rom/runner/export_world.py",
-      "exported_at": "2026-09-25T16:52:09Z"
-    }
+      "exported_at": "2026-01-01T00:00:00Z"
+    },
+    "archive_sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387"
   }
 }

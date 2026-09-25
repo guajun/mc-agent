@@ -12,6 +12,8 @@
   ],
   "download_verified": true,
   "bad_hash_rejected": true,
+  "url_pin": "commit",
+  "rebuild_reproducible": true,
   "command_blocks": 0,
   "source_world_untouched": true,
   "player": "Romuser",

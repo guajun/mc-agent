@@ -1,40 +1,61 @@
 {
   "lab": "rom15d",
   "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15d",
-  "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+  "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
   "world_files": 31,
-  "world_bytes": 11530857,
+  "world_bytes": 11530852,
   "manifest_version": "1.0.0",
+  "mod_pins": {
+    "ok": true,
+    "pins": [
+      {
+        "name": "fabric-api",
+        "version": "0.161.0+26.2",
+        "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a"
+      },
+      {
+        "name": "carpet",
+        "version": "26.2+v260616",
+        "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c"
+      },
+      {
+        "name": "mc-agent-interface-mod",
+        "version": "0.6.0",
+        "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f"
+      }
+    ]
+  },
   "download": {
     "path": "labs\\_scratch\\mapcache\\minecart-rom-base-1.0.0.zip",
-    "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/f7d8e43c1316e4f9d37f1ef3a59a779c33921cd6/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
     "http_status": 200,
-    "bytes": 748718,
-    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
+    "bytes": 748712,
+    "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
     "cache_hit": false,
-    "seconds": 1.971
+    "seconds": 1.831
   },
   "extract": {
     "entries": 32,
-    "uncompressed_bytes": 11532405,
+    "uncompressed_bytes": 11532400,
     "roots": [
       "EXPORT.json",
       "world"
     ],
     "staging": "labs\\_scratch\\mapcache\\unpacked\\minecart-rom-base-1.0.0",
     "world": "labs\\_scratch\\mapcache\\unpacked\\minecart-rom-base-1.0.0\\world",
-    "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+    "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
     "world_files": 31,
-    "world_bytes": 11530857
+    "world_bytes": 11530852,
+    "archive_sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387"
   },
   "export": {
     "format": "mc-agent/minecart-rom-export@1",
     "version": "1.0.0",
     "source": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
     "level_name": "Minecart ROM base",
-    "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+    "world_sha256": "b9d7c2cde9f8ad8502da21c15dcb23e06d6deaf29df3635d479745ac3413ae51",
     "world_files": 31,
-    "world_uncompressed_bytes": 11530857,
+    "world_uncompressed_bytes": 11530852,
     "level_dat": {
       "changed": [
         "singleplayer_uuid",
@@ -89,6 +110,6 @@
     ],
     "command_blocks": [],
     "tool": "examples/minecart-rom/runner/export_world.py",
-    "exported_at": "2026-09-25T16:52:09Z"
+    "exported_at": "2026-01-01T00:00:00Z"
   }
 }

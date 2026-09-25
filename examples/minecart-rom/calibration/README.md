@@ -4,7 +4,7 @@ Measured on 2026-09-26 on this machine:
 
 | Item | Value |
 | --- | --- |
-| Artifact | `minecart-rom-base-1.0.0.zip`, 748,718 bytes, SHA-256 `11d45a85…157bd`, world hash `c766c971…14361` |
+| Artifact | `minecart-rom-base-1.0.0.zip`, 748,712 bytes, SHA-256 `46954828…a01387`, world hash `b9d7c2cd…413ae51` (byte-for-byte reproducible export) |
 | Minecraft | 26.2 (`DataVersion 4903`) |
 | Fabric loader / installer | 0.19.5 / 1.1.2 |
 | Java | Microsoft OpenJDK 25.0.1 (HMCL runtime `mojang-java-runtime-epsilon`) |
@@ -47,10 +47,18 @@ real-url-run      READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28 
 
 `real-url-run` is the acceptance run for this issue: it starts from an empty map
 cache and downloads the ZIP over HTTPS from the URL pinned in
-`map-manifest.json` (HTTP 200, 748,718 bytes, SHA-256 match), imports the world,
+`map-manifest.json` (HTTP 200, 748,712 bytes, SHA-256 match), imports the world,
 starts a fresh lab with the interface mod, initializes, and validates `READY` –
 all in one sequence. `records/cold-download/` holds the download-only record
 from the same URL.
+
+The artifact is byte-for-byte reproducible: exporting the unchanged source save
+twice gives the same ZIP (`46954828…`) and world hash (`b9d7c2cd…`) —
+`export-reproducibility.json` records both runs, the source tree hash and the
+match with the committed artifact — and the evidence pack proves it again by
+exporting the imported world twice (`rebuild_check.identical: true`). Provisioning deploys the pinned Fabric API,
+Carpet and mc-agent-interface jars and fails closed if the deployed hashes do
+not match `map-manifest.json`.
 
 A custom-program run is recorded separately in `records-challenge/run-01`: a
 sealed 4-cart challenge (seed 20260926, program SHA-256 `9f97d515…`) was
@@ -75,9 +83,9 @@ a validated ready state, then modifies it:
 | machine broken after ready (one slime block removed) | `FIXTURE_INVALID`, `machine-state` | `negative/machine-broken/` |
 | world unfrozen after ready (`tick unfreeze`) | `FIXTURE_INVALID`, `world-not-frozen` | `negative/unfrozen/` |
 | inventory/NBT tampered after ready (`data merge` changes an item) | `FIXTURE_INVALID`, `cart-nbt-changed` + `normalized-state-changed` | `negative/nbt-tampered/` |
-| tick order / full order hash changed (seat replaced) | `FIXTURE_INVALID`, `interface-order-hash-changed` (+ `user-pos-changed`) | `negative/tick-order/` |
+| tick order / full order hash changed (seat replaced) | `FIXTURE_INVALID`, `interface-order-hash-changed`, `seat-unexpected`, `user-vehicle-changed` (+ `user-pos-changed`) | `negative/tick-order/` |
 | premature output (a cart pressed and launched before hand-off) | `PREMATURE_OUTPUT`, plus `machine-state`/`cart-nbt-changed`/`premature-motion` | `negative/premature-output/` |
-| server restart after ready | `FIXTURE_INVALID:RELOAD`, `server-restarted` | `negative/reload/` |
+| server restart after ready | `FIXTURE_INVALID:RELOAD`, `server-restarted`, `seat-count`, `tick-order-unavailable` | `negative/reload/` |
 | dirty machine before init | init aborts: `machine is not in its calibrated base state`, exact broken positions listed | `negative/init-failure/` |
 | wrong artifact SHA-256, corrupt/absolute/zip-slip/symlink archives | explicit failures, nothing written outside the target | `runner/selftest.py` (offline, 75 checks) |
 
@@ -135,7 +143,10 @@ The full bundle still reports the other six checks as `blocked` because their
 prerequisites (bridge#6, #16, #17, #18, #19) have not contributed their own
 artifacts yet; that is the integration gate's job, not this fixture's. The
 generated slice is committed under `gate/` and can be rebuilt from the records
-at any time.
+at any time. The slice now derives both evidence booleans: `map.immutable` is
+true because the URL carries a 40-hex commit pin (`url_pin: commit`), and
+`rebuild_reproducible` is true only after two byte-identical exports of the
+imported world.
 
 The source save re-hashed to the gate's own read-only baseline
 `8cd54c86…5324a` (40 files, 11,556,310 bytes) both before and after the export,
@@ -155,3 +166,7 @@ which is what backs `source_world_untouched: true`.
 * The public calibration program is not the grading challenge: evaluation runs
   should generate a sealed `challenge` program and seal the observed pop order
   separately.
+* **Stage-two operator note:** this calibration tree contains the calibration
+  program and its observed pop order. Before a cold-start run, initialize with
+  a fresh `--program` challenge and keep `examples/minecart-rom/calibration/**`
+  out of the agent-visible workspace/context.

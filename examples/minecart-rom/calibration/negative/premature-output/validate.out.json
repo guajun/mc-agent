@@ -1,6 +1,6 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T01:52:33+0800",
+  "checked_at": "2026-09-26T02:20:57+0800",
   "verdict": "PREMATURE_OUTPUT",
   "ok": false,
   "problems": [
@@ -97,31 +97,31 @@
     },
     {
       "check": "cart-nbt-changed",
-      "uuid": "08831bc5-9bc4-4ff5-af36-90c694d0835c",
-      "at_ready": "5ac41f7c7fbfd5d5645bd90ed81fc84a5645b8d5548f527c2a147b3a6d7b20b3",
-      "now": "85d22fa81092b9d7e203f45d6fcb5a46202a74b77348f89a5f17e2bf68c8d778",
+      "uuid": "e8183b4b-7b5d-4e63-b616-fb23a7bc415a",
+      "at_ready": "720ffee9a5657ebc8ef9b1ddc2755abf80a27948515049fa82e540d35c3798d4",
+      "now": "105011a0bf33cf0a9208c31e68887d862ddacf9cea72523fd74a2bbb12698821",
       "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Sl",
       "now_nbt": "{Motion: [0.0d, 1.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.03999999910593033d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.49d, -21.5d], Fire: 0s, Items: "
     },
     {
       "check": "cart-nbt-changed",
-      "uuid": "6a80e803-c37e-4277-b1af-33c036d2f5b7",
-      "at_ready": "602f19b49bc03e0908e3c5fc567569460ed49822424aca887a47b3575f27cb79",
-      "now": "c72cdf594ac97bcdedd65cdf1e7a4da3848ded4183ea87ee49a2344c8255acbc",
+      "uuid": "91e7acc8-5d15-42c8-a832-c5b09596622d",
+      "at_ready": "322f7ef547d0d057fb910bc3c0a90028e5cd0f0eb3a71d8f298d06f5c2b1d4e3",
+      "now": "a7ae776272c7dc09a31d66cc948ea6226136c9875e4b83dce70830345c9bf0c8",
       "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 2, Sl",
       "now_nbt": "{Motion: [0.0d, 1.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.03999999910593033d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.49d, -21.5d], Fire: 0s, Items: "
     },
     {
       "check": "cart-nbt-changed",
-      "uuid": "d057d5a3-cea7-4df5-8f83-cf90010def12",
-      "at_ready": "afb41c2ea3d1659ddb2ff15955991071ba194b4a2422ccc710ef965eab1cb759",
-      "now": "9700a10216cfbe82e78296d17fe81b5b6ce6d1ecae1124bd86e3959b3a79990f",
+      "uuid": "9d9ef5a0-c364-4227-8460-5e97ee80b143",
+      "at_ready": "79fce923b49c53fa21187b32c9fd826936aded63ce6d24a0371e978e7954df4b",
+      "now": "4d9eb05258192fcdc2044faf439be482fc18c35ec79acf444b5193bedaa19300",
       "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 3, Sl",
       "now_nbt": "{Motion: [0.0d, 1.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.03999999910593033d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.49d, -21.5d], Fire: 0s, Items: "
     },
     {
       "check": "premature-motion",
-      "uuid": "08831bc5-9bc4-4ff5-af36-90c694d0835c",
+      "uuid": "e8183b4b-7b5d-4e63-b616-fb23a7bc415a",
       "motion": [
         0.0,
         1.0,
@@ -130,7 +130,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "6a80e803-c37e-4277-b1af-33c036d2f5b7",
+      "uuid": "91e7acc8-5d15-42c8-a832-c5b09596622d",
       "motion": [
         0.0,
         1.0,
@@ -139,7 +139,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "d057d5a3-cea7-4df5-8f83-cf90010def12",
+      "uuid": "9d9ef5a0-c364-4227-8460-5e97ee80b143",
       "motion": [
         0.0,
         1.0,
