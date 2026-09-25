@@ -1,0 +1,280 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "checked_at": "2026-09-26T00:54:31+0800",
+  "verdict": "READY",
+  "ok": true,
+  "problems": [],
+  "snapshot": {
+    "format": "mc-agent/minecart-rom-record@1",
+    "captured_at": "2026-09-26T00:54:29+0800",
+    "tick_frozen": true,
+    "lab": "rom15b",
+    "server": {
+      "lab": "rom15b",
+      "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15b",
+      "running": true,
+      "pid": 92524,
+      "startedAt": 1790355210.8705447,
+      "rcon_host": "127.0.0.1",
+      "rcon_port": 27152,
+      "world": "new world",
+      "mods": [
+        "fabric-api-0.161.0+26.2.jar",
+        "fabric-carpet-26.2+v260616.jar"
+      ],
+      "minecraft": "26.2",
+      "loader": "0.19.5"
+    },
+    "spawn_order": [
+      "6f4405c0-3cf0-4159-9c6a-03b421bf20ac",
+      "a8f5ec8f-0b76-4d54-bca3-f5816132d644",
+      "1628e47a-2d80-4070-923a-65039b1f8c3c"
+    ],
+    "carts": [
+      {
+        "uuid": "6f4405c0-3cf0-4159-9c6a-03b421bf20ac",
+        "pos": [
+          14.5,
+          -51.9375,
+          -21.5
+        ],
+        "motion": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "items": [
+          {
+            "count": 1,
+            "Slot": 0,
+            "id": "minecraft:stone"
+          }
+        ],
+        "spawn_index": 0
+      },
+      {
+        "uuid": "a8f5ec8f-0b76-4d54-bca3-f5816132d644",
+        "pos": [
+          14.5,
+          -51.9375,
+          -21.5
+        ],
+        "motion": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "items": [
+          {
+            "count": 2,
+            "Slot": 1,
+            "id": "minecraft:dirt"
+          }
+        ],
+        "spawn_index": 1
+      },
+      {
+        "uuid": "1628e47a-2d80-4070-923a-65039b1f8c3c",
+        "pos": [
+          14.5,
+          -51.9375,
+          -21.5
+        ],
+        "motion": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "items": [
+          {
+            "count": 3,
+            "Slot": 2,
+            "id": "minecraft:gold_ingot"
+          }
+        ],
+        "spawn_index": 2
+      }
+    ],
+    "cart_count": 3,
+    "stack": {
+      "rail_block": [
+        14,
+        -52,
+        -22
+      ],
+      "spawn": [
+        14.5,
+        -52.0,
+        -21.5
+      ],
+      "rest_pos": [
+        14.5,
+        -51.9375,
+        -21.5
+      ],
+      "stack_axis": "y",
+      "notes": "Every cart is summoned at `spawn`; overlapping carts stack in summon order. The order is recorded, never assumed to equal the pop order."
+    },
+    "machine": {
+      "ok": true,
+      "checks": [
+        {
+          "pos": [
+            11,
+            -54,
+            -23
+          ],
+          "block": "minecraft:note_block[instrument=harp,powered=false]",
+          "ok": true
+        },
+        {
+          "pos": [
+            11,
+            -54,
+            -22
+          ],
+          "block": "minecraft:sticky_piston[extended=false,facing=up]",
+          "ok": true
+        },
+        {
+          "pos": [
+            11,
+            -53,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            12,
+            -53,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            13,
+            -53,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            14,
+            -53,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            11,
+            -52,
+            -22
+          ],
+          "block": "minecraft:redstone_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            14,
+            -52,
+            -22
+          ],
+          "block": "minecraft:powered_rail[powered=false,shape=north_south]",
+          "ok": true
+        },
+        {
+          "pos": [
+            11,
+            -51,
+            -22
+          ],
+          "block": "minecraft:sand",
+          "ok": true
+        },
+        {
+          "pos": [
+            11,
+            -50,
+            -22
+          ],
+          "block": "minecraft:sand",
+          "ok": true
+        },
+        {
+          "pos": [
+            13,
+            -49,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            11,
+            -48,
+            -22
+          ],
+          "block": "minecraft:sticky_piston[extended=false,facing=east]",
+          "ok": true
+        },
+        {
+          "pos": [
+            12,
+            -48,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            13,
+            -48,
+            -22
+          ],
+          "block": "minecraft:slime_block",
+          "ok": true
+        },
+        {
+          "pos": [
+            12,
+            -47,
+            -22
+          ],
+          "block": "minecraft:redstone_block",
+          "ok": true
+        }
+      ],
+      "note": 20,
+      "note_block": [
+        11,
+        -54,
+        -23
+      ]
+    },
+    "user": {
+      "name": "Romuser",
+      "UUID": "[I; 1052844757, -64534506, -1102594165, -388504211]",
+      "Pos": "[11.5d, -53.6d, -24.5d]",
+      "Rotation": "[0.0f, 50.5055f]",
+      "playerGameType": "1"
+    },
+    "entity_order": [
+      "6f4405c0-3cf0-4159-9c6a-03b421bf20ac",
+      "a8f5ec8f-0b76-4d54-bca3-f5816132d644",
+      "1628e47a-2d80-4070-923a-65039b1f8c3c"
+    ],
+    "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be"
+  },
+  "ready_snapshot": "examples\\minecart-rom\\calibration\\records\\run-02\\ready-snapshot.json",
+  "records_dir": "examples\\minecart-rom\\calibration\\records\\run-02"
+}

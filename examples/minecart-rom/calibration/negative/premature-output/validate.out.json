@@ -1,0 +1,42 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "checked_at": "2026-09-26T00:56:46+0800",
+  "verdict": "PREMATURE_OUTPUT",
+  "ok": false,
+  "problems": [
+    {
+      "check": "normalized-state-changed",
+      "at_ready": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+      "now": "8eb92c99429e9cf810fd1c33cb874a6e65d8c93d29a84109fce6eb5d51d784b5"
+    },
+    {
+      "check": "premature-motion",
+      "uuid": "4ba80e62-e1e8-4828-b6bd-1756638531b0",
+      "motion": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "check": "premature-motion",
+      "uuid": "fea95757-1ca9-4c96-b81d-6bbfe08243e4",
+      "motion": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    },
+    {
+      "check": "premature-motion",
+      "uuid": "3cfef551-06c5-4987-aa1c-4d8249b1aa99",
+      "motion": [
+        0.0,
+        1.0,
+        0.0
+      ]
+    }
+  ],
+  "ready_snapshot": "examples\\minecart-rom\\calibration\\negative\\premature-output\\ready-snapshot.json",
+  "records_dir": "examples\\minecart-rom\\calibration\\negative\\premature-output"
+}

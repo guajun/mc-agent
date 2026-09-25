@@ -1,0 +1,86 @@
+{
+  "format": "mc-agent/map-manifest@1",
+  "name": "minecart-rom-base",
+  "version": "1.0.0",
+  "description": "Base world for the Minecart ROM fixture: a floating note-block driven minecart popper over the void, exported from the source save with players, logs and test residue removed.",
+  "artifact": {
+    "filename": "minecart-rom-base-1.0.0.zip",
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/REPLACE_WITH_ZIP_COMMIT/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "mirrors": [],
+    "size": 748718,
+    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd"
+  },
+  "game": {
+    "minecraft": "26.2",
+    "fabric_loader": "0.19.5",
+    "fabric_installer": "1.1.2",
+    "java": "25",
+    "data_version": 4903,
+    "source_level_name": "Minecart ROM test",
+    "datapack_features": {
+      "enabled": [
+        "vanilla",
+        "fabric-convention-tags-v2"
+      ],
+      "disabled": [
+        "minecart_improvements",
+        "redstone_experiments",
+        "trade_rebalance"
+      ],
+      "notes": "minecart_improvements must stay disabled: the machine relies on the classic minecart behaviour, and the stack only forms when the experiment is off."
+    }
+  },
+  "mods": [
+    {
+      "name": "fabric-api",
+      "version": "0.161.0+26.2",
+      "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a",
+      "source": "https://api.modrinth.com/v2/project/fabric-api/version",
+      "required": true
+    },
+    {
+      "name": "fabric-carpet",
+      "version": "26.2+v260616",
+      "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c",
+      "source": "https://api.modrinth.com/v2/project/carpet/version",
+      "required": true,
+      "notes": "Carpet provides the real fake player (`/player <name> spawn`, `use`, `look`, `turn`, `tick`)."
+    },
+    {
+      "name": "wavecarpet",
+      "version": "0.6.1+26.2",
+      "sha256": "ddfcd05db0c96cc628e08992edd76b5521230a5f09037030efae6136c2d89bcd",
+      "source": "local client mods folder",
+      "required": false,
+      "notes": "The source save carries wavecarpet_pistonbolt.dat, but the calibration reproduced the full machine cycle with only Fabric API + Carpet. Not needed for the fixture."
+    },
+    {
+      "name": "carpet-tis-addition",
+      "version": "1.81.0",
+      "sha256": "d1a245cb4e5670b9908e2fed80c2ba024f611f7d26eb505448e01b9ce93dfbb3",
+      "source": "local client mods folder",
+      "required": false,
+      "notes": "Present in the source client; not needed by the fixture."
+    }
+  ],
+  "world": {
+    "sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+    "files": 31,
+    "uncompressed_bytes": 11530910,
+    "hash": "sorted relative path + file sha256, session.lock excluded; see runner/export_world.py"
+  },
+  "source": {
+    "save": "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test",
+    "exported_at": "2026-09-26T00:23:00Z",
+    "tool": "examples/minecart-rom/runner/export_world.py",
+    "removed": [
+      "players/ (player data and identity)",
+      "logical singleplayer_uuid in level.dat",
+      "session.lock, level.dat_old",
+      "all saved entities: 3 leftover falling minecraft:item stacks at y=-113/-108/-95",
+      "logs/, stats/, advancements/",
+      "0 command blocks (every chunk palette scanned at export)"
+    ],
+    "never_modified": true
+  }
+}

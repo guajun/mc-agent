@@ -1,0 +1,6 @@
+starting lab rom15b in labs\rom15b
+  java C:\Users\MSI-NB\AppData\Roaming\.hmcl\java\windows-x86_64\mojang-java-runtime-epsilon\bin\java.exe
+  -Xmx3G -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -jar fabric-server-mc.26.2-loader.0.19.5-launcher.1.1.2.jar nogui
+  pid 108540, log labs\rom15b\logs\console.log
+waiting up to 300s for the server to say Done
+ready in 11.0s: [00:58:03] [Server thread/INFO]: Done (0.382s)! For help, type "help"

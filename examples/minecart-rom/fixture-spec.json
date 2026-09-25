@@ -1,0 +1,290 @@
+{
+  "format": "mc-agent/fixture-spec@1",
+  "spec_version": "1.0.0",
+  "fixture": {
+    "name": "minecart-rom",
+    "tag": "minecart-rom-fixture",
+    "description": "A note-block driven minecart popper on a floating slime platform above the void; one right-click pops the bottom chest minecart of the stack on the rail."
+  },
+  "machine": {
+    "name": "note-block minecart popper",
+    "bounds": {
+      "from": [
+        0,
+        -64,
+        -40
+      ],
+      "to": [
+        32,
+        -40,
+        -10
+      ]
+    },
+    "input": {
+      "kind": "minecraft:note_block",
+      "block": [
+        11,
+        -54,
+        -23
+      ],
+      "interaction": "player right-click (Carpet `player <name> use` while looking at the north face)",
+      "instrument": "harp",
+      "start_note": 20,
+      "note_advances_per_press": 1,
+      "powered_pulse_ticks": 1,
+      "notes": "Clicking the note block plays it and advances its note property by one. The adjacent up-facing sticky piston fires for one tick; the machine returns to this base state after the cycle."
+    },
+    "checks": [
+      {
+        "pos": [
+          11,
+          -54,
+          -23
+        ],
+        "block": "minecraft:note_block[instrument=harp,powered=false]"
+      },
+      {
+        "pos": [
+          11,
+          -54,
+          -22
+        ],
+        "block": "minecraft:sticky_piston[extended=false,facing=up]"
+      },
+      {
+        "pos": [
+          11,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          12,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          13,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          14,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          11,
+          -52,
+          -22
+        ],
+        "block": "minecraft:redstone_block"
+      },
+      {
+        "pos": [
+          14,
+          -52,
+          -22
+        ],
+        "block": "minecraft:powered_rail[powered=false,shape=north_south]"
+      },
+      {
+        "pos": [
+          11,
+          -51,
+          -22
+        ],
+        "block": "minecraft:sand"
+      },
+      {
+        "pos": [
+          11,
+          -50,
+          -22
+        ],
+        "block": "minecraft:sand"
+      },
+      {
+        "pos": [
+          13,
+          -49,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          11,
+          -48,
+          -22
+        ],
+        "block": "minecraft:sticky_piston[extended=false,facing=east]"
+      },
+      {
+        "pos": [
+          12,
+          -48,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          13,
+          -48,
+          -22
+        ],
+        "block": "minecraft:slime_block"
+      },
+      {
+        "pos": [
+          12,
+          -47,
+          -22
+        ],
+        "block": "minecraft:redstone_block"
+      }
+    ],
+    "stack": {
+      "rail_block": [
+        14,
+        -52,
+        -22
+      ],
+      "spawn": [
+        14.5,
+        -52.0,
+        -21.5
+      ],
+      "rest_pos": [
+        14.5,
+        -51.9375,
+        -21.5
+      ],
+      "stack_axis": "y",
+      "notes": "Every cart is summoned at `spawn`; overlapping carts stack in summon order. The order is recorded, never assumed to equal the pop order."
+    },
+    "output_boundary": {
+      "kind": "plane",
+      "axis": "x",
+      "greater_than": 15.0,
+      "notes": "A cart counts as popped on the first tick its x exceeds this plane (the popped cart crosses x=15.5 on cycle tick 3). The plane does not change any behaviour."
+    },
+    "cycle_ticks": 4,
+    "min_press_interval_ticks": 4,
+    "pop_order_observed": "spawn order (calibrated 2026-09-26, three carts)"
+  },
+  "scene": {
+    "dimension": "minecraft:overworld",
+    "world_type": "flat void (level-type minecraft:flat, layers air, biome minecraft:the_void)",
+    "min_build_height": -64,
+    "entity_removal_y": -128,
+    "notes": "No catch platform anywhere; a popped cart flies to about y=-44.6, drifts east to about x=23.5 and falls. Entities below y=-128 are removed by the game.",
+    "pop_to_removal_seconds": [
+      5.7,
+      8.0
+    ],
+    "pop_to_removal_ticks_estimate": [
+      110,
+      160
+    ],
+    "end_condition": "every cart in the program has been popped and removed",
+    "timeout_seconds": 180
+  },
+  "user": {
+    "name": "romuser",
+    "kind": "carpet-fake-player",
+    "gamemode": "creative",
+    "dimension": "minecraft:overworld",
+    "spawn": [
+      11.5,
+      -53.0,
+      -24.5
+    ],
+    "facing": [
+      0.0,
+      50.0
+    ],
+    "aim_target": [
+      11.5,
+      -53.8,
+      -23.0
+    ],
+    "hover_seat": {
+      "enabled": true,
+      "pos": [
+        11.5,
+        -53.0,
+        -24.5
+      ],
+      "nbt": "{NoGravity:1b,Invisible:1b,Marker:1b,Tags:[\"minecart-rom-fixture\"]}",
+      "notes": "The machine floats over the void and the fake player has no flight toggle; an invisible NoGravity marker armor stand keeps the creative user at the operating position. It has no collision, no AI, and is not part of the machine."
+    },
+    "source_vantage": {
+      "pos": [
+        11.312228940004276,
+        -50.63309544616742,
+        -27.597964419663445
+      ],
+      "rotation": [
+        -11.310856819152832,
+        19.09354019165039
+      ],
+      "save_player": "players/data/cbe8edd0-aeae-4e8d-9454-dd8c84ad5ea1.dat",
+      "notes": "Where the source save's player was when the map was exported; about 6.8 blocks from the note block, so it is discovery context, not an interaction position."
+    },
+    "notes": "Carpet capitalises the first letter of a name without underscores; romuser -> Romuser. Names with underscores are not capitalised, so the fixture uses a plain name."
+  },
+  "program": {
+    "name": "calibration-default-v1",
+    "entries": [
+      {
+        "index": 0,
+        "items": [
+          {
+            "slot": 0,
+            "id": "minecraft:stone",
+            "count": 1
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "items": [
+          {
+            "slot": 1,
+            "id": "minecraft:dirt",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "items": [
+          {
+            "slot": 2,
+            "id": "minecraft:gold_ingot",
+            "count": 3
+          }
+        ]
+      }
+    ]
+  },
+  "validation": {
+    "position_tolerance": 0.05,
+    "require_frozen": true,
+    "expected_carts": 3,
+    "notes": "The ready contract: N carts, same UUIDs, same in-memory order, at rest on the stack rail, inventories matching the program, machine at its base state, world frozen."
+  }
+}
