@@ -43,6 +43,7 @@ nav:
       - "Unattended Hermes: webhook + Skill": hermes-unattended.md
       - Headless lab servers: lab-server.md
       - Building a mod for a lab: mod-building.md
+      - "Audit test mod (read-only evidence)": minecart-audit.md
       - Checking a fork: fork-verify.md
       - Stage-one integration gate: stage1-gate.md
       - Stage-one integration run: stage1-integration.md
@@ -85,6 +86,7 @@ plugins:
             "Unattended Hermes: webhook + Skill": "Hermes 无人值守：webhook + Skill"
             Headless lab servers: 无头实验室服务器
             Building a mod for a lab: 为实验室构建 mod
+            "Audit test mod (read-only evidence)": "审计测试 mod（只读证据）"
             Checking a fork: 校验一次分叉
             Stage-one integration gate: 阶段一集成门禁
             Stage-one integration run: 阶段一集成运行

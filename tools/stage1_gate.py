@@ -1608,10 +1608,17 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
             ctx.require(row, "attempted", "bool", where=where)
             processed = ctx.require(row, "processed", "int", minimum=0, where=where)
             ctx.require(row, "evidence_ref", "string", nonempty=True, where=where)
+            verdict = ctx.require(row, "verifier_verdict", "string", nonempty=True, where=where)
             if _is_int(processed) and processed != 0:
                 ctx.fail(
                     "negative_case_processed",
                     f"{where}{case}: {processed} fake operation(s) were counted as real processing",
+                )
+            if isinstance(verdict, str) and verdict != "fail":
+                ctx.fail(
+                    "negative_case_verdict",
+                    f"{where}{case}: verifier_verdict {verdict!r} is not 'fail'; an "
+                    "incomplete/error log is not a rejected negative",
                 )
             if isinstance(case, str):
                 seen.add(case)
@@ -3088,7 +3095,8 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
     _write_jsonl(
         root / "artifacts/independent_test_mod/negative-cases.jsonl",
         [
-            {"case": case, "attempted": case != "no_interaction", "processed": 0, "evidence_ref": f"audit:neg:{case}"}
+            {"case": case, "attempted": case != "no_interaction", "processed": 0,
+             "evidence_ref": f"audit:neg:{case}", "verifier_verdict": "fail"}
             for case in NEGATIVE_CASES
         ],
     )
