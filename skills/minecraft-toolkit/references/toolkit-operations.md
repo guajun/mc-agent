@@ -121,6 +121,7 @@ The toolkit returns a stable envelope around whatever the connected mod reports;
     "seq": 7,
     "capturedAt": 1730000000000,
     "tick": 4210,
+    "timing": "receipt",             // receipt = network chat packet; broadcast = server-side say
     "uuid": "1a2b3c4d-...",
     "name": "Alice",
     "dimension": "minecraft:overworld",
@@ -137,8 +138,16 @@ A miss is structured and never another player's bundle:
 { "type": "context_bundle", "id": "ctx-42", "found": false, "status": "expired", "context": null }
 ```
 
+`timing` is the honesty field. `receipt` means the bundle was frozen when a
+network chat packet arrived. `broadcast` means a server-side broadcast - a
+Carpet fake player's `execute as <name> run say ...` is one - and is not
+packet-time history. Both are real, fetchable bundles; label them as what they
+are.
+
 `player` wraps its answer the same way (`type: "player_context"`, `found`,
-`uuid`, `name`, and the `player` object), so `found` is always the branch.
+`uuid`, `name`, and the `player` object), and `player.view` carries the live
+ray (`eye`, `direction`, `blockRange`, `entityRange`, `target`), so `found` is
+always the branch and the view is always with the player.
 
 Read a command's answer:
 

@@ -25,9 +25,10 @@ The daemon and its client.
 | `mc-bridge watch --events chat,game` | stream events as JSON lines |
 | `mc-bridge mcp` | serve the tools over MCP (stdio) for an agent runtime |
 
-Methods: `status`, `capabilities`, `state`, `entities`, `screen`, `command`,
-`chat`, `mark`, `wait`, `record_start`, `record_stop`, `connect`, `world`, `lan`,
-`snapshot`, `snapshots`, `fork`, `restore`, `order`, `events`, `stop`.
+Methods: `status`, `capabilities`, `state`, `player`, `context`, `entities`,
+`screen`, `command`, `command_output`, `chat`, `mark`, `wait`, `record_start`,
+`record_stop`, `connect`, `world`, `lan`, `snapshot`, `snapshots`, `fork`,
+`restore`, `order`, `save`, `events`, `stop`.
 
 The loopback API is newline-delimited JSON, so anything that speaks a socket can
 use it - see the [bridge README](https://github.com/guajun/mc-agent-bridge).
@@ -40,6 +41,8 @@ What an agent runtime sees when the bridge is registered as an MCP server.
 | --- | --- |
 | `mc_status`, `mc_capabilities` | is it connected, what can this instance do |
 | `mc_state` | where the player is, health, dimension, tick |
+| `mc_player` | one player's server-known context - identity, dimension, position, rotation, eye and view target (by UUID) |
+| `mc_context` | the frozen context bundle behind a chat event's `context_id` |
 | `mc_entities` | **summarised** entity list: counts by type plus the N closest |
 | `mc_command` | send a command |
 | `mc_command_output` | send a command **and read its answer** - use this when the answer matters |
@@ -56,13 +59,15 @@ JSON for a 64-block radius, which is not something a model can read usefully.
 Ask for `types=` filtering and a larger `limit` when you want more.
 
 !!! info "The server-vantage Toolkit and its Skill"
-    The bridge is becoming a Harness-neutral server-vantage Toolkit: `player`
-    and `context` join the surface for per-player and chat-time context, and
+    The bridge is the Harness-neutral server-vantage Toolkit: `player` and
+    `context` are part of the surface for per-player and chat-time context, and
     `capabilities` reports exactly which operations the connected mod supports.
-    Agents learn the workflow from the portable [Toolkit Skill](toolkit-skill.md);
-    `mc-bridge call capabilities` (or `mc_capabilities`) is the authority for
-    what a given connection can do. To run that skill unattended from game
-    events, see [Unattended Hermes](hermes-unattended.md).
+    The interface mod ships both (0.6.0); bridge 0.4.1
+    ([PR #8](https://github.com/guajun/mc-agent-bridge/pull/8)) keeps the view
+    ray with the player. Agents learn the workflow from the portable
+    [Toolkit Skill](toolkit-skill.md); `mc-bridge call capabilities` (or
+    `mc_capabilities`) is the authority for what a given connection can do. To
+    run that skill unattended from game events, see [Unattended Hermes](hermes-unattended.md).
 
 ## mc-agent-loop
 

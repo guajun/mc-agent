@@ -1,0 +1,2308 @@
+{
+  "issue": "https://github.com/guajun/mc-agent/issues/16",
+  "kind": "live fake-player identity / server-vantage view verification",
+  "date": "2026-09-26",
+  "dateNote": "local time (+08:00): the preserved versions.txt stamp is 2026-09-26T00:03:22+08:00 and the step timestamps are 2026-09-26T00:02, i.e. 2026-09-25 in UTC",
+  "verdict": "identity, dimension, position, yaw/pitch, eye and view target resolve for the exact fake player; unknown identities stay found:false; a task-start snapshot and a later live call differ when the player moved; a fake player's /say bundle is labelled timing=broadcast",
+  "combination": {
+    "mc-agent": {
+      "head": "df86cadaffc466bbe190b64c1e5202d973910cd6",
+      "branch": "codex/rom13-meta16"
+    },
+    "mc-agent-interface-mod": {
+      "version": "0.6.0",
+      "commit": "3b93ceb137f8e05624d9d443356c0db78c4b4751",
+      "jar": "labs/_build/mods/mc-agent-interface-0.6.0.jar",
+      "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+      "built-from": "origin/main (PR #4 + PR #5 merged)"
+    },
+    "mc-agent-bridge": {
+      "version": "0.4.1",
+      "commit": "2cd491ecd7e615cfec0e5f7aac45d45ea3f68b52",
+      "pull_request": "https://github.com/guajun/mc-agent-bridge/pull/8",
+      "note": "0.4.0 dropped the mod's top-level view; 0.4.1 merges it into player.view"
+    },
+    "minecraft": "26.2",
+    "fabric-loader": "0.19.5",
+    "fabric-installer": "1.1.2",
+    "fabric-api": {
+      "version": "0.161.0+26.2",
+      "sha256": "e5b858ceb13290c274e31cb888ff5a1a40cb91067e7ffab0b5b775aec51e216a"
+    },
+    "carpet": {
+      "version": "26.2+v260616",
+      "sha256": "f6ada912af65c91536d4b0d80adf26cc438253252ddaf259f2c6617ae471311c"
+    },
+    "launcher": {
+      "name": "fabric-server-mc.26.2-loader.0.19.5-launcher.1.1.2.jar",
+      "sha256": "f1d2bafd0b3b97630b0cdd8e890cd102db3dbe60877a38a5c813aa929e691127"
+    },
+    "java": "openjdk 25.0.1 (Microsoft build 25.0.1+8-LTS)"
+  },
+  "lab": {
+    "name": "identity-live",
+    "path": "labs/identity-live",
+    "world": "void (flat air, minecraft:the_void)",
+    "dedicated": true,
+    "attached_player_client": null,
+    "ports": {
+      "game": 27160,
+      "rcon": 27161,
+      "bridge-api": 27162,
+      "mod-socket": 27163
+    },
+    "mod_port_property": "-Dmcagent.serverPort=27163 (JAVA_TOOL_OPTIONS)"
+  },
+  "scene": {
+    "floor": "fill -12 99 -12 16 99 16 minecraft:stone",
+    "machine_target": "setblock 0 101 4 minecraft:dispenser[facing=north]",
+    "entity_target": "summon minecraft:armor_stand 4.5 100.0 4.5 {NoGravity:1b,Invulnerable:1b,PersistenceRequired:1b}",
+    "players": {
+      "Alice": {
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "spawn": "0.5 100.0 0.5",
+        "looks": "toward +Z at the dispenser"
+      },
+      "Bob": {
+        "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "spawn": "4.5 100.0 0.5",
+        "looks": "toward +Z at the armor stand"
+      }
+    },
+    "setup_commands": [
+      "carpet commandPlayer true",
+      "forceload add -16 -16 24 24",
+      "fill -12 99 -12 16 99 16 minecraft:stone",
+      "setblock 0 101 4 minecraft:dispenser[facing=north]",
+      "summon minecraft:armor_stand 4.5 100.0 4.5 {NoGravity:1b,Invulnerable:1b,PersistenceRequired:1b}",
+      "player Alice spawn at 0.5 100.0 0.5",
+      "player Bob spawn at 4.5 100.0 0.5",
+      "execute as Alice run tp @s 0.5 100.0 0.5 0 0",
+      "execute as Bob run tp @s 4.5 100.0 0.5 0 0"
+    ]
+  },
+  "task_entry": {
+    "schema": "mc-agent-task/1",
+    "entry": "external-cli",
+    "session": "cold-start",
+    "createdAt": 1790352152407,
+    "user": {
+      "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+      "name": "Alice"
+    },
+    "prompt": "look at the machine and report what you see"
+  },
+  "capture": {
+    "transcript_runner": "labs/_build/identity_matrix.py over the bridge loopback API (LocalApiClient); raw.* steps are direct mod-socket replies, cli.* steps go through the daemon",
+    "mcp_captures": "tools/mcp_probe.py against mc-bridge mcp (stdio); recorded as the mcp.* entries",
+    "note": "the cli.* and mcp.* paths share one daemon method, so their envelopes match; the raw.* replies are the comparison authority"
+  },
+  "steps": [
+    {
+      "step": "task-entry",
+      "at": "2026-09-26T00:02:32",
+      "request": "external-cli",
+      "response": {
+        "schema": "mc-agent-task/1",
+        "entry": "external-cli",
+        "session": "cold-start",
+        "createdAt": 1790352152407,
+        "user": {
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "name": "Alice"
+        },
+        "prompt": "look at the machine and report what you see"
+      }
+    },
+    {
+      "step": "capabilities",
+      "at": "2026-09-26T00:02:32",
+      "request": "bridge call capabilities",
+      "response": {
+        "type": "capabilities",
+        "millis": 1790352152408,
+        "protocol": 1,
+        "mod": "mc-agent-interface",
+        "version": "0.6.0",
+        "instance": "server",
+        "capabilities": [
+          "state",
+          "entities",
+          "player",
+          "player:view",
+          "command",
+          "context",
+          "wait",
+          "mark",
+          "snapshot",
+          "events:game",
+          "events:chat"
+        ],
+        "modCapabilities": [
+          "command",
+          "context",
+          "entities",
+          "events:chat",
+          "events:game",
+          "mark",
+          "player",
+          "player:view",
+          "snapshot",
+          "state",
+          "wait"
+        ],
+        "surface": {
+          "instance": "server",
+          "vantage": "server",
+          "modCapabilities": [
+            "command",
+            "context",
+            "entities",
+            "events:chat",
+            "events:game",
+            "mark",
+            "player",
+            "player:view",
+            "snapshot",
+            "state",
+            "wait"
+          ],
+          "supported": [
+            "status",
+            "capabilities",
+            "state",
+            "player",
+            "entities",
+            "command",
+            "command_output",
+            "wait",
+            "mark",
+            "events",
+            "context",
+            "save",
+            "snapshot",
+            "snapshots",
+            "fork",
+            "restore",
+            "order",
+            "stop"
+          ],
+          "unsupported": [
+            "chat",
+            "record_start",
+            "record_stop",
+            "screen",
+            "connect",
+            "world",
+            "lan"
+          ],
+          "operations": [
+            {
+              "name": "status",
+              "description": "Bridge health: mod connection, resolved port/vantage, buffered events.",
+              "requires": [],
+              "supported": true
+            },
+            {
+              "name": "capabilities",
+              "description": "The connected mod's capabilities and the filtered toolkit surface.",
+              "requires": [],
+              "supported": true
+            },
+            {
+              "name": "state",
+              "description": "World/server state and the online player list.",
+              "requires": [
+                "state"
+              ],
+              "supported": true
+            },
+            {
+              "name": "player",
+              "description": "Server-side context for one player: identity, position, rotation, view target.",
+              "requires": [
+                "player_context"
+              ],
+              "supported": true,
+              "dependency": "https://github.com/guajun/mc-agent-interface-mod/issues/1",
+              "dependencyLabel": "mc-agent-interface-mod#1 (Expose server-side context for a named player)"
+            },
+            {
+              "name": "entities",
+              "description": "Entities the instance ticks, in tick order.",
+              "requires": [
+                "entities"
+              ],
+              "supported": true
+            },
+            {
+              "name": "command",
+              "description": "Run a command as the mod's command source.",
+              "requires": [
+                "command"
+              ],
+              "supported": true
+            },
+            {
+              "name": "command_output",
+              "description": "Run a command and collect the answer it produced.",
+              "requires": [
+                "command"
+              ],
+              "supported": true
+            },
+            {
+              "name": "chat",
+              "description": "Send a chat message as the client-vantage player.",
+              "requires": [
+                "chat"
+              ],
+              "supported": false,
+              "missing": [
+                "chat"
+              ],
+              "reason": "the connected server-vantage mod does not advertise chat"
+            },
+            {
+              "name": "record_start",
+              "description": "Start per-tick entity sampling (client vantage).",
+              "requires": [
+                "record"
+              ],
+              "supported": false,
+              "missing": [
+                "record"
+              ],
+              "reason": "the connected server-vantage mod does not advertise record"
+            },
+            {
+              "name": "record_stop",
+              "description": "Stop the running sampling session (client vantage).",
+              "requires": [
+                "record"
+              ],
+              "supported": false,
+              "missing": [
+                "record"
+              ],
+              "reason": "the connected server-vantage mod does not advertise record"
+            },
+            {
+              "name": "wait",
+              "description": "Block until the game advanced N ticks.",
+              "requires": [
+                "wait"
+              ],
+              "supported": true
+            },
+            {
+              "name": "screen",
+              "description": "Current client GUI screen (client vantage only).",
+              "requires": [
+                "screen"
+              ],
+              "supported": false,
+              "missing": [
+                "screen"
+              ],
+              "reason": "the connected server-vantage mod does not advertise screen"
+            },
+            {
+              "name": "mark",
+              "description": "Annotate the event stream with a text marker.",
+              "requires": [
+                "mark"
+              ],
+              "supported": true
+            },
+            {
+              "name": "connect",
+              "description": "Join a server (client vantage only).",
+              "requires": [
+                "connect"
+              ],
+              "supported": false,
+              "missing": [
+                "connect"
+              ],
+              "reason": "the connected server-vantage mod does not advertise connect"
+            },
+            {
+              "name": "world",
+              "description": "Open a single-player save (client vantage only).",
+              "requires": [
+                "world"
+              ],
+              "supported": false,
+              "missing": [
+                "world"
+              ],
+              "reason": "the connected server-vantage mod does not advertise world"
+            },
+            {
+              "name": "lan",
+              "description": "Publish the single-player world to the LAN (client vantage only).",
+              "requires": [
+                "lan"
+              ],
+              "supported": false,
+              "missing": [
+                "lan"
+              ],
+              "reason": "the connected server-vantage mod does not advertise lan"
+            },
+            {
+              "name": "events",
+              "description": "Replay buffered events since a cursor.",
+              "requires": [],
+              "supported": true
+            },
+            {
+              "name": "context",
+              "description": "Retrieve a chat-time player context bundle by its context id.",
+              "requires": [
+                "context_bundle"
+              ],
+              "supported": true,
+              "dependency": "https://github.com/guajun/mc-agent-interface-mod/issues/2",
+              "dependencyLabel": "mc-agent-interface-mod#2 (Capture and cache player context with chat events)"
+            },
+            {
+              "name": "save",
+              "description": "World-save metadata reported by STATE: level, world directory, players.",
+              "requires": [
+                "state"
+              ],
+              "supported": true
+            },
+            {
+              "name": "snapshot",
+              "description": "Write the entity set in tick order to the instance's disk.",
+              "requires": [
+                "snapshot"
+              ],
+              "supported": true
+            },
+            {
+              "name": "snapshots",
+              "description": "List the snapshots already on the connected instance.",
+              "requires": [
+                "snapshot"
+              ],
+              "supported": true
+            },
+            {
+              "name": "fork",
+              "description": "Freeze, snapshot, copy the world files, resume.",
+              "requires": [
+                "snapshot",
+                "command"
+              ],
+              "supported": true
+            },
+            {
+              "name": "restore",
+              "description": "Summon a snapshot's entities in the recorded order.",
+              "requires": [
+                "command"
+              ],
+              "supported": true
+            },
+            {
+              "name": "order",
+              "description": "Compare a fresh snapshot's order hash with a saved fork.",
+              "requires": [
+                "snapshot"
+              ],
+              "supported": true
+            },
+            {
+              "name": "stop",
+              "description": "Shut the daemon down.",
+              "requires": [],
+              "supported": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": "state",
+      "at": "2026-09-26T00:02:32",
+      "request": "bridge call state",
+      "response": {
+        "type": "state",
+        "millis": 1790352152410,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 455,
+        "inWorld": true,
+        "levelName": "world",
+        "worldDir": "F:\\mc-agent-worktrees\\rom13\\meta16\\labs\\identity-live\\.\\world\\.",
+        "players": 2,
+        "serverVersion": "26.2",
+        "playerList": [
+          {
+            "name": "Alice",
+            "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+            "x": 0.5,
+            "y": 100.0,
+            "z": 0.5,
+            "dimension": "minecraft:overworld"
+          },
+          {
+            "name": "Bob",
+            "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+            "x": 4.5,
+            "y": 100.0,
+            "z": 0.5,
+            "dimension": "minecraft:overworld"
+          }
+        ],
+        "levels": [
+          {
+            "dimension": "minecraft:overworld",
+            "entities": 3
+          },
+          {
+            "dimension": "minecraft:the_end",
+            "entities": 0
+          },
+          {
+            "dimension": "minecraft:the_nether",
+            "entities": 0
+          }
+        ]
+      }
+    },
+    {
+      "step": "raw.player.alice.uuid",
+      "at": "2026-09-26T00:02:32",
+      "request": "PLAYER f0a8f4ba-99f5-412a-9189-db832c934913",
+      "response": {
+        "type": "player",
+        "millis": 1790352152416,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 456,
+        "query": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "found": true,
+        "matchedBy": "uuid",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ]
+        },
+        "view": {
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ],
+          "direction": [
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              0.5,
+              101.62000000476837,
+              4.0
+            ],
+            "distance": 3.5,
+            "type": "block",
+            "block": {
+              "x": 0,
+              "y": 101,
+              "z": 4,
+              "id": "minecraft:dispenser",
+              "name": "Dispenser",
+              "face": "north",
+              "inside": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "raw.player.bob.uuid",
+      "at": "2026-09-26T00:02:32",
+      "request": "PLAYER d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+      "response": {
+        "type": "player",
+        "millis": 1790352152438,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 456,
+        "query": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "found": true,
+        "matchedBy": "uuid",
+        "player": {
+          "id": 3,
+          "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 4.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Bob",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ]
+        },
+        "view": {
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ],
+          "direction": [
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              4.5,
+              101.62000000476837,
+              4.25
+            ],
+            "distance": 3.75,
+            "type": "entity",
+            "entity": {
+              "id": 1,
+              "uuid": "e5bd6b53-8b74-4f7f-b388-51d6bfeee63c",
+              "type": "minecraft:armor_stand",
+              "class": "ArmorStand",
+              "x": 4.5,
+              "y": 100.0,
+              "z": 4.5,
+              "vx": 0.0,
+              "vy": 0.0,
+              "vz": 0.0,
+              "yaw": 0.0,
+              "pitch": 0.0,
+              "alive": true,
+              "removed": false,
+              "invulnerable": true,
+              "onGround": false,
+              "vehicle": -1,
+              "isVehicle": false,
+              "passengers": [],
+              "health": 20.0,
+              "maxHealth": 20.0,
+              "bodyEmpty": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "raw.player.unknown.uuid",
+      "at": "2026-09-26T00:02:32",
+      "request": "PLAYER 11111111-2222-3333-4444-555555555555",
+      "response": {
+        "type": "player",
+        "millis": 1790352152441,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 456,
+        "query": "11111111-2222-3333-4444-555555555555",
+        "found": false,
+        "error": "no online player matches 11111111-2222-3333-4444-555555555555"
+      }
+    },
+    {
+      "step": "raw.player.unknown.name",
+      "at": "2026-09-26T00:02:32",
+      "request": "PLAYER nobody_here",
+      "response": {
+        "type": "player",
+        "millis": 1790352152453,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 456,
+        "query": "nobody_here",
+        "found": false,
+        "error": "no online player matches nobody_here"
+      }
+    },
+    {
+      "step": "cli.player.alice.uuid",
+      "at": "2026-09-26T00:02:32",
+      "request": "player {\"player\":\"f0a8f4ba-99f5-412a-9189-db832c934913\"}",
+      "response": {
+        "type": "player_context",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ],
+          "view": {
+            "eye": [
+              0.5,
+              101.62000000476837,
+              0.5
+            ],
+            "direction": [
+              0.0,
+              -0.0,
+              1.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                0.5,
+                101.62000000476837,
+                4.0
+              ],
+              "distance": 3.5,
+              "type": "block",
+              "block": {
+                "x": 0,
+                "y": 101,
+                "z": 4,
+                "id": "minecraft:dispenser",
+                "name": "Dispenser",
+                "face": "north",
+                "inside": false
+              }
+            }
+          }
+        },
+        "found": true,
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "name": "Alice"
+      }
+    },
+    {
+      "step": "cli.player.bob.uuid",
+      "at": "2026-09-26T00:02:32",
+      "request": "player {\"player\":\"d664f4b4-d688-4d28-9fbd-3d58ef2844b4\"}",
+      "response": {
+        "type": "player_context",
+        "player": {
+          "id": 3,
+          "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 4.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Bob",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ],
+          "view": {
+            "eye": [
+              4.5,
+              101.62000000476837,
+              0.5
+            ],
+            "direction": [
+              0.0,
+              -0.0,
+              1.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                4.5,
+                101.62000000476837,
+                4.25
+              ],
+              "distance": 3.75,
+              "type": "entity",
+              "entity": {
+                "id": 1,
+                "uuid": "e5bd6b53-8b74-4f7f-b388-51d6bfeee63c",
+                "type": "minecraft:armor_stand",
+                "class": "ArmorStand",
+                "x": 4.5,
+                "y": 100.0,
+                "z": 4.5,
+                "vx": 0.0,
+                "vy": 0.0,
+                "vz": 0.0,
+                "yaw": 0.0,
+                "pitch": 0.0,
+                "alive": true,
+                "removed": false,
+                "invulnerable": true,
+                "onGround": false,
+                "vehicle": -1,
+                "isVehicle": false,
+                "passengers": [],
+                "health": 20.0,
+                "maxHealth": 20.0,
+                "bodyEmpty": true
+              }
+            }
+          }
+        },
+        "found": true,
+        "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "name": "Bob"
+      }
+    },
+    {
+      "step": "cli.player.alice.name",
+      "at": "2026-09-26T00:02:32",
+      "request": "player {\"player\":\"Alice\"}",
+      "response": {
+        "type": "player_context",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ],
+          "view": {
+            "eye": [
+              0.5,
+              101.62000000476837,
+              0.5
+            ],
+            "direction": [
+              0.0,
+              -0.0,
+              1.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                0.5,
+                101.62000000476837,
+                4.0
+              ],
+              "distance": 3.5,
+              "type": "block",
+              "block": {
+                "x": 0,
+                "y": 101,
+                "z": 4,
+                "id": "minecraft:dispenser",
+                "name": "Dispenser",
+                "face": "north",
+                "inside": false
+              }
+            }
+          }
+        },
+        "found": true,
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "name": "Alice"
+      }
+    },
+    {
+      "step": "cli.player.bob.name",
+      "at": "2026-09-26T00:02:32",
+      "request": "player {\"player\":\"Bob\"}",
+      "response": {
+        "type": "player_context",
+        "player": {
+          "id": 3,
+          "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 4.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Bob",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ],
+          "view": {
+            "eye": [
+              4.5,
+              101.62000000476837,
+              0.5
+            ],
+            "direction": [
+              0.0,
+              -0.0,
+              1.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                4.5,
+                101.62000000476837,
+                4.25
+              ],
+              "distance": 3.75,
+              "type": "entity",
+              "entity": {
+                "id": 1,
+                "uuid": "e5bd6b53-8b74-4f7f-b388-51d6bfeee63c",
+                "type": "minecraft:armor_stand",
+                "class": "ArmorStand",
+                "x": 4.5,
+                "y": 100.0,
+                "z": 4.5,
+                "vx": 0.0,
+                "vy": 0.0,
+                "vz": 0.0,
+                "yaw": 0.0,
+                "pitch": 0.0,
+                "alive": true,
+                "removed": false,
+                "invulnerable": true,
+                "onGround": false,
+                "vehicle": -1,
+                "isVehicle": false,
+                "passengers": [],
+                "health": 20.0,
+                "maxHealth": 20.0,
+                "bodyEmpty": true
+              }
+            }
+          }
+        },
+        "found": true,
+        "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "name": "Bob"
+      }
+    },
+    {
+      "step": "cli.player.unknown.uuid",
+      "at": "2026-09-26T00:02:32",
+      "request": "player {\"player\":\"11111111-2222-3333-4444-555555555555\"}",
+      "response": {
+        "type": "player_context",
+        "player": null,
+        "found": false,
+        "requested": "11111111-2222-3333-4444-555555555555"
+      }
+    },
+    {
+      "step": "cli.player.unknown.name",
+      "at": "2026-09-26T00:02:32",
+      "request": "player {\"player\":\"nobody_here\"}",
+      "response": {
+        "type": "player_context",
+        "player": null,
+        "found": false,
+        "requested": "nobody_here"
+      }
+    },
+    {
+      "step": "raw.task-start.alice",
+      "at": "2026-09-26T00:02:32",
+      "request": "PLAYER f0a8f4ba-99f5-412a-9189-db832c934913",
+      "response": {
+        "type": "player",
+        "millis": 1790352152484,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 457,
+        "query": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "found": true,
+        "matchedBy": "uuid",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ]
+        },
+        "view": {
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ],
+          "direction": [
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              0.5,
+              101.62000000476837,
+              4.0
+            ],
+            "distance": 3.5,
+            "type": "block",
+            "block": {
+              "x": 0,
+              "y": 101,
+              "z": 4,
+              "id": "minecraft:dispenser",
+              "name": "Dispenser",
+              "face": "north",
+              "inside": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "task-start.alice",
+      "at": "2026-09-26T00:02:32",
+      "request": "first player call of the task",
+      "response": {
+        "step": "task-start",
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "name": "Alice",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ],
+          "view": {
+            "eye": [
+              0.5,
+              101.62000000476837,
+              0.5
+            ],
+            "direction": [
+              0.0,
+              -0.0,
+              1.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                0.5,
+                101.62000000476837,
+                4.0
+              ],
+              "distance": 3.5,
+              "type": "block",
+              "block": {
+                "x": 0,
+                "y": 101,
+                "z": 4,
+                "id": "minecraft:dispenser",
+                "name": "Dispenser",
+                "face": "north",
+                "inside": false
+              }
+            }
+          }
+        },
+        "view": null
+      }
+    },
+    {
+      "step": "after-move.alice",
+      "at": "2026-09-26T00:02:32",
+      "request": "player call after moving 2 blocks",
+      "response": {
+        "type": "player_context",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 2.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            2.5
+          ],
+          "view": {
+            "eye": [
+              0.5,
+              101.62000000476837,
+              2.5
+            ],
+            "direction": [
+              0.0,
+              -0.0,
+              1.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                0.5,
+                101.62000000476837,
+                4.0
+              ],
+              "distance": 1.5,
+              "type": "block",
+              "block": {
+                "x": 0,
+                "y": 101,
+                "z": 4,
+                "id": "minecraft:dispenser",
+                "name": "Dispenser",
+                "face": "north",
+                "inside": false
+              }
+            }
+          }
+        },
+        "found": true,
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "name": "Alice"
+      }
+    },
+    {
+      "step": "raw.after-move.alice",
+      "at": "2026-09-26T00:02:33",
+      "request": "PLAYER f0a8f4ba-99f5-412a-9189-db832c934913",
+      "response": {
+        "type": "player",
+        "millis": 1790352153014,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 468,
+        "query": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "found": true,
+        "matchedBy": "uuid",
+        "player": {
+          "id": 2,
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 2.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Alice",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            0.5,
+            101.62000000476837,
+            2.5
+          ]
+        },
+        "view": {
+          "eye": [
+            0.5,
+            101.62000000476837,
+            2.5
+          ],
+          "direction": [
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              0.5,
+              101.62000000476837,
+              4.0
+            ],
+            "distance": 1.5,
+            "type": "block",
+            "block": {
+              "x": 0,
+              "y": 101,
+              "z": 4,
+              "id": "minecraft:dispenser",
+              "name": "Dispenser",
+              "face": "north",
+              "inside": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "raw.player.bob.miss",
+      "at": "2026-09-26T00:02:33",
+      "request": "PLAYER d664f4b4-d688-4d28-9fbd-3d58ef2844b4 (pitch=-90)",
+      "response": {
+        "type": "player",
+        "millis": 1790352153523,
+        "instance": "server",
+        "protocol": 1,
+        "modVersion": "0.6.0",
+        "tick": 478,
+        "query": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "found": true,
+        "matchedBy": "uuid",
+        "player": {
+          "id": 3,
+          "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 4.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": -90.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Bob",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ]
+        },
+        "view": {
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ],
+          "direction": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              4.5,
+              106.62000000476837,
+              0.5
+            ],
+            "distance": 5.0,
+            "type": "miss"
+          }
+        }
+      }
+    },
+    {
+      "step": "cli.player.bob.miss",
+      "at": "2026-09-26T00:02:33",
+      "request": "player {\"player\":\"d664f4b4-d688-4d28-9fbd-3d58ef2844b4\"}",
+      "response": {
+        "type": "player_context",
+        "player": {
+          "id": 3,
+          "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+          "type": "minecraft:player",
+          "class": "EntityPlayerMPFake",
+          "x": 4.5,
+          "y": 100.0,
+          "z": 0.5,
+          "vx": 0.0,
+          "vy": -0.0784000015258789,
+          "vz": 0.0,
+          "yaw": 0.0,
+          "pitch": -90.0,
+          "alive": true,
+          "removed": false,
+          "invulnerable": false,
+          "onGround": true,
+          "vehicle": -1,
+          "isVehicle": false,
+          "passengers": [],
+          "health": 20.0,
+          "maxHealth": 20.0,
+          "bodyEmpty": true,
+          "name": "Bob",
+          "gameMode": "creative",
+          "dimension": "minecraft:overworld",
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ],
+          "view": {
+            "eye": [
+              4.5,
+              101.62000000476837,
+              0.5
+            ],
+            "direction": [
+              0.0,
+              1.0,
+              0.0
+            ],
+            "blockRange": 5.0,
+            "entityRange": 5.0,
+            "target": {
+              "hit": [
+                4.5,
+                106.62000000476837,
+                0.5
+              ],
+              "distance": 5.0,
+              "type": "miss"
+            }
+          }
+        },
+        "found": true,
+        "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "name": "Bob"
+      }
+    },
+    {
+      "step": "raw.context.stats.before",
+      "at": "2026-09-26T00:02:33",
+      "request": "CONTEXT",
+      "response": {
+        "type": "context_stats",
+        "millis": 1790352153538,
+        "status": "ok",
+        "cache": {
+          "capacity": 256,
+          "ttlMillis": 300000,
+          "size": 0,
+          "hits": 0,
+          "misses": 0,
+          "expired": 0,
+          "evicted": 0
+        }
+      }
+    },
+    {
+      "step": "events.after.say",
+      "at": "2026-09-26T00:02:34",
+      "request": "events since 5",
+      "response": {
+        "events": [
+          {
+            "type": "chat",
+            "millis": 1790352153549,
+            "seq": 6,
+            "text": "hello from the fake player",
+            "sender": "Alice",
+            "context_id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+            "context": {
+              "schema": "player-context/1",
+              "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+              "name": "Alice",
+              "tick": 478,
+              "timing": "broadcast",
+              "dimension": "minecraft:overworld",
+              "x": 0.5,
+              "y": 100.0,
+              "z": 2.5,
+              "yaw": 0.0,
+              "pitch": 0.0,
+              "view": {
+                "type": "block"
+              }
+            },
+            "event": true,
+            "streamId": "b6863a4a04d84847ae300ffa32ab7a05",
+            "eventId": "b6863a4a04d84847ae300ffa32ab7a05:6",
+            "category": "chat",
+            "receivedAt": 1790352153549,
+            "contextId": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73"
+          }
+        ],
+        "next": 7,
+        "dropped": false
+      }
+    },
+    {
+      "step": "events.after.say.timing",
+      "at": "2026-09-26T00:02:34",
+      "request": "chat event context timing",
+      "response": {
+        "context_id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+        "sender": "Alice",
+        "timing": "broadcast",
+        "context": {
+          "schema": "player-context/1",
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "name": "Alice",
+          "tick": 478,
+          "timing": "broadcast",
+          "dimension": "minecraft:overworld",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 2.5,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "view": {
+            "type": "block"
+          }
+        }
+      }
+    },
+    {
+      "step": "raw.context.broadcast",
+      "at": "2026-09-26T00:02:34",
+      "request": "CONTEXT_GET ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+      "response": {
+        "type": "context",
+        "millis": 1790352154561,
+        "context_id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+        "status": "ok",
+        "ageMillis": 1013,
+        "context": {
+          "schema": "player-context/1",
+          "context_id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+          "seq": 1,
+          "capturedAt": 1790352153548,
+          "tick": 478,
+          "timing": "broadcast",
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "name": "Alice",
+          "dimension": "minecraft:overworld",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 2.5,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "view": {
+            "type": "block",
+            "distance": 1.5,
+            "block": "minecraft:dispenser",
+            "pos": [
+              0,
+              101,
+              4
+            ],
+            "face": "north",
+            "hit": [
+              0.5,
+              101.62000000476837,
+              4.0
+            ]
+          }
+        },
+        "cache": {
+          "capacity": 256,
+          "ttlMillis": 300000,
+          "size": 1
+        }
+      }
+    },
+    {
+      "step": "cli.context.broadcast",
+      "at": "2026-09-26T00:02:34",
+      "request": "context {\"id\":\"ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73\"}",
+      "response": {
+        "type": "context_bundle",
+        "id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+        "found": true,
+        "context": {
+          "schema": "player-context/1",
+          "context_id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+          "seq": 1,
+          "capturedAt": 1790352153548,
+          "tick": 478,
+          "timing": "broadcast",
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "name": "Alice",
+          "dimension": "minecraft:overworld",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 2.5,
+          "yaw": 0.0,
+          "pitch": 0.0,
+          "view": {
+            "type": "block",
+            "distance": 1.5,
+            "block": "minecraft:dispenser",
+            "pos": [
+              0,
+              101,
+              4
+            ],
+            "face": "north",
+            "hit": [
+              0.5,
+              101.62000000476837,
+              4.0
+            ]
+          }
+        },
+        "status": "ok"
+      }
+    },
+    {
+      "step": "raw.context.stats.after",
+      "at": "2026-09-26T00:02:34",
+      "request": "CONTEXT",
+      "response": {
+        "type": "context_stats",
+        "millis": 1790352154565,
+        "status": "ok",
+        "cache": {
+          "capacity": 256,
+          "ttlMillis": 300000,
+          "size": 1,
+          "hits": 2,
+          "misses": 0,
+          "expired": 0,
+          "evicted": 0
+        }
+      }
+    },
+    {
+      "step": "context.fabricated",
+      "at": "2026-09-26T00:02:34",
+      "request": "context {\"id\":\"ctx-not-real\"}",
+      "response": {
+        "type": "context_bundle",
+        "id": "ctx-not-real",
+        "found": false,
+        "context": {
+          "context_id": "ctx-not-real"
+        },
+        "status": "not_found"
+      }
+    }
+  ],
+  "mcp": {
+    "mc_capabilities": {
+      "type": "capabilities",
+      "millis": 1790352160636,
+      "protocol": 1,
+      "mod": "mc-agent-interface",
+      "version": "0.6.0",
+      "instance": "server",
+      "capabilities": [
+        "state",
+        "entities",
+        "player",
+        "player:view",
+        "command",
+        "context",
+        "wait",
+        "mark",
+        "snapshot",
+        "events:game",
+        "events:chat"
+      ],
+      "modCapabilities": [
+        "command",
+        "context",
+        "entities",
+        "events:chat",
+        "events:game",
+        "mark",
+        "player",
+        "player:view",
+        "snapshot",
+        "state",
+        "wait"
+      ],
+      "surface": {
+        "instance": "server",
+        "vantage": "server",
+        "modCapabilities": [
+          "command",
+          "context",
+          "entities",
+          "events:chat",
+          "events:game",
+          "mark",
+          "player",
+          "player:view",
+          "snapshot",
+          "state",
+          "wait"
+        ],
+        "supported": [
+          "status",
+          "capabilities",
+          "state",
+          "player",
+          "entities",
+          "command",
+          "command_output",
+          "wait",
+          "mark",
+          "events",
+          "context",
+          "save",
+          "snapshot",
+          "snapshots",
+          "fork",
+          "restore",
+          "order",
+          "stop"
+        ],
+        "unsupported": [
+          "chat",
+          "record_start",
+          "record_stop",
+          "screen",
+          "connect",
+          "world",
+          "lan"
+        ],
+        "operations": [
+          {
+            "name": "status",
+            "description": "Bridge health: mod connection, resolved port/vantage, buffered events.",
+            "requires": [],
+            "supported": true
+          },
+          {
+            "name": "capabilities",
+            "description": "The connected mod's capabilities and the filtered toolkit surface.",
+            "requires": [],
+            "supported": true
+          },
+          {
+            "name": "state",
+            "description": "World/server state and the online player list.",
+            "requires": [
+              "state"
+            ],
+            "supported": true
+          },
+          {
+            "name": "player",
+            "description": "Server-side context for one player: identity, position, rotation, view target.",
+            "requires": [
+              "player_context"
+            ],
+            "supported": true,
+            "dependency": "https://github.com/guajun/mc-agent-interface-mod/issues/1",
+            "dependencyLabel": "mc-agent-interface-mod#1 (Expose server-side context for a named player)"
+          },
+          {
+            "name": "entities",
+            "description": "Entities the instance ticks, in tick order.",
+            "requires": [
+              "entities"
+            ],
+            "supported": true
+          },
+          {
+            "name": "command",
+            "description": "Run a command as the mod's command source.",
+            "requires": [
+              "command"
+            ],
+            "supported": true
+          },
+          {
+            "name": "command_output",
+            "description": "Run a command and collect the answer it produced.",
+            "requires": [
+              "command"
+            ],
+            "supported": true
+          },
+          {
+            "name": "chat",
+            "description": "Send a chat message as the client-vantage player.",
+            "requires": [
+              "chat"
+            ],
+            "supported": false,
+            "missing": [
+              "chat"
+            ],
+            "reason": "the connected server-vantage mod does not advertise chat"
+          },
+          {
+            "name": "record_start",
+            "description": "Start per-tick entity sampling (client vantage).",
+            "requires": [
+              "record"
+            ],
+            "supported": false,
+            "missing": [
+              "record"
+            ],
+            "reason": "the connected server-vantage mod does not advertise record"
+          },
+          {
+            "name": "record_stop",
+            "description": "Stop the running sampling session (client vantage).",
+            "requires": [
+              "record"
+            ],
+            "supported": false,
+            "missing": [
+              "record"
+            ],
+            "reason": "the connected server-vantage mod does not advertise record"
+          },
+          {
+            "name": "wait",
+            "description": "Block until the game advanced N ticks.",
+            "requires": [
+              "wait"
+            ],
+            "supported": true
+          },
+          {
+            "name": "screen",
+            "description": "Current client GUI screen (client vantage only).",
+            "requires": [
+              "screen"
+            ],
+            "supported": false,
+            "missing": [
+              "screen"
+            ],
+            "reason": "the connected server-vantage mod does not advertise screen"
+          },
+          {
+            "name": "mark",
+            "description": "Annotate the event stream with a text marker.",
+            "requires": [
+              "mark"
+            ],
+            "supported": true
+          },
+          {
+            "name": "connect",
+            "description": "Join a server (client vantage only).",
+            "requires": [
+              "connect"
+            ],
+            "supported": false,
+            "missing": [
+              "connect"
+            ],
+            "reason": "the connected server-vantage mod does not advertise connect"
+          },
+          {
+            "name": "world",
+            "description": "Open a single-player save (client vantage only).",
+            "requires": [
+              "world"
+            ],
+            "supported": false,
+            "missing": [
+              "world"
+            ],
+            "reason": "the connected server-vantage mod does not advertise world"
+          },
+          {
+            "name": "lan",
+            "description": "Publish the single-player world to the LAN (client vantage only).",
+            "requires": [
+              "lan"
+            ],
+            "supported": false,
+            "missing": [
+              "lan"
+            ],
+            "reason": "the connected server-vantage mod does not advertise lan"
+          },
+          {
+            "name": "events",
+            "description": "Replay buffered events since a cursor.",
+            "requires": [],
+            "supported": true
+          },
+          {
+            "name": "context",
+            "description": "Retrieve a chat-time player context bundle by its context id.",
+            "requires": [
+              "context_bundle"
+            ],
+            "supported": true,
+            "dependency": "https://github.com/guajun/mc-agent-interface-mod/issues/2",
+            "dependencyLabel": "mc-agent-interface-mod#2 (Capture and cache player context with chat events)"
+          },
+          {
+            "name": "save",
+            "description": "World-save metadata reported by STATE: level, world directory, players.",
+            "requires": [
+              "state"
+            ],
+            "supported": true
+          },
+          {
+            "name": "snapshot",
+            "description": "Write the entity set in tick order to the instance's disk.",
+            "requires": [
+              "snapshot"
+            ],
+            "supported": true
+          },
+          {
+            "name": "snapshots",
+            "description": "List the snapshots already on the connected instance.",
+            "requires": [
+              "snapshot"
+            ],
+            "supported": true
+          },
+          {
+            "name": "fork",
+            "description": "Freeze, snapshot, copy the world files, resume.",
+            "requires": [
+              "snapshot",
+              "command"
+            ],
+            "supported": true
+          },
+          {
+            "name": "restore",
+            "description": "Summon a snapshot's entities in the recorded order.",
+            "requires": [
+              "command"
+            ],
+            "supported": true
+          },
+          {
+            "name": "order",
+            "description": "Compare a fresh snapshot's order hash with a saved fork.",
+            "requires": [
+              "snapshot"
+            ],
+            "supported": true
+          },
+          {
+            "name": "stop",
+            "description": "Shut the daemon down.",
+            "requires": [],
+            "supported": true
+          }
+        ]
+      }
+    },
+    "mc_state": {
+      "type": "state",
+      "millis": 1790352197526,
+      "instance": "server",
+      "protocol": 1,
+      "modVersion": "0.6.0",
+      "tick": 1358,
+      "inWorld": true,
+      "levelName": "world",
+      "worldDir": "F:\\mc-agent-worktrees\\rom13\\meta16\\labs\\identity-live\\.\\world\\.",
+      "players": 2,
+      "serverVersion": "26.2",
+      "playerList": [
+        {
+          "name": "Alice",
+          "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+          "x": 0.5,
+          "y": 100.0,
+          "z": 0.5,
+          "dimension": "minecraft:overworld"
+        },
+        {
+          "name": "Bob",
+          "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+          "x": 4.5,
+          "y": 100.0,
+          "z": 0.5,
+          "dimension": "minecraft:overworld"
+        }
+      ],
+      "levels": [
+        {
+          "dimension": "minecraft:overworld",
+          "entities": 3
+        },
+        {
+          "dimension": "minecraft:the_end",
+          "entities": 0
+        },
+        {
+          "dimension": "minecraft:the_nether",
+          "entities": 0
+        }
+      ]
+    },
+    "mc_player_alice": {
+      "type": "player_context",
+      "player": {
+        "id": 2,
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "type": "minecraft:player",
+        "class": "EntityPlayerMPFake",
+        "x": 0.5,
+        "y": 100.0,
+        "z": 0.5,
+        "vx": 0.0,
+        "vy": -0.0784000015258789,
+        "vz": 0.0,
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "alive": true,
+        "removed": false,
+        "invulnerable": false,
+        "onGround": true,
+        "vehicle": -1,
+        "isVehicle": false,
+        "passengers": [],
+        "health": 20.0,
+        "maxHealth": 20.0,
+        "bodyEmpty": true,
+        "name": "Alice",
+        "gameMode": "creative",
+        "dimension": "minecraft:overworld",
+        "eye": [
+          0.5,
+          101.62000000476837,
+          0.5
+        ],
+        "view": {
+          "eye": [
+            0.5,
+            101.62000000476837,
+            0.5
+          ],
+          "direction": [
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              0.5,
+              101.62000000476837,
+              4.0
+            ],
+            "distance": 3.5,
+            "type": "block",
+            "block": {
+              "x": 0,
+              "y": 101,
+              "z": 4,
+              "id": "minecraft:dispenser",
+              "name": "Dispenser",
+              "face": "north",
+              "inside": false
+            }
+          }
+        }
+      },
+      "found": true,
+      "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+      "name": "Alice"
+    },
+    "mc_player_bob": {
+      "type": "player_context",
+      "player": {
+        "id": 3,
+        "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+        "type": "minecraft:player",
+        "class": "EntityPlayerMPFake",
+        "x": 4.5,
+        "y": 100.0,
+        "z": 0.5,
+        "vx": 0.0,
+        "vy": -0.0784000015258789,
+        "vz": 0.0,
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "alive": true,
+        "removed": false,
+        "invulnerable": false,
+        "onGround": true,
+        "vehicle": -1,
+        "isVehicle": false,
+        "passengers": [],
+        "health": 20.0,
+        "maxHealth": 20.0,
+        "bodyEmpty": true,
+        "name": "Bob",
+        "gameMode": "creative",
+        "dimension": "minecraft:overworld",
+        "eye": [
+          4.5,
+          101.62000000476837,
+          0.5
+        ],
+        "view": {
+          "eye": [
+            4.5,
+            101.62000000476837,
+            0.5
+          ],
+          "direction": [
+            0.0,
+            -0.0,
+            1.0
+          ],
+          "blockRange": 5.0,
+          "entityRange": 5.0,
+          "target": {
+            "hit": [
+              4.5,
+              101.62000000476837,
+              4.25
+            ],
+            "distance": 3.75,
+            "type": "entity",
+            "entity": {
+              "id": 1,
+              "uuid": "e5bd6b53-8b74-4f7f-b388-51d6bfeee63c",
+              "type": "minecraft:armor_stand",
+              "class": "ArmorStand",
+              "x": 4.5,
+              "y": 100.0,
+              "z": 4.5,
+              "vx": 0.0,
+              "vy": 0.0,
+              "vz": 0.0,
+              "yaw": 0.0,
+              "pitch": 0.0,
+              "alive": true,
+              "removed": false,
+              "invulnerable": true,
+              "onGround": false,
+              "vehicle": -1,
+              "isVehicle": false,
+              "passengers": [],
+              "health": 20.0,
+              "maxHealth": 20.0,
+              "bodyEmpty": true
+            }
+          }
+        }
+      },
+      "found": true,
+      "uuid": "d664f4b4-d688-4d28-9fbd-3d58ef2844b4",
+      "name": "Bob"
+    },
+    "mc_player_unknown": {
+      "type": "player_context",
+      "player": null,
+      "found": false,
+      "requested": "11111111-2222-3333-4444-555555555555"
+    },
+    "mc_context_real": {
+      "type": "context_bundle",
+      "id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+      "found": true,
+      "context": {
+        "schema": "player-context/1",
+        "context_id": "ctx-6dc89e44-35b8-45b3-9b50-ff21c1ea9e73",
+        "seq": 1,
+        "capturedAt": 1790352153548,
+        "tick": 478,
+        "timing": "broadcast",
+        "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913",
+        "name": "Alice",
+        "dimension": "minecraft:overworld",
+        "x": 0.5,
+        "y": 100.0,
+        "z": 2.5,
+        "yaw": 0.0,
+        "pitch": 0.0,
+        "view": {
+          "type": "block",
+          "distance": 1.5,
+          "block": "minecraft:dispenser",
+          "pos": [
+            0,
+            101,
+            4
+          ],
+          "face": "north",
+          "hit": [
+            0.5,
+            101.62000000476837,
+            4.0
+          ]
+        }
+      },
+      "status": "ok"
+    },
+    "mc_context_fabricated": {
+      "type": "context_bundle",
+      "id": "ctx-not-real",
+      "found": false,
+      "context": {
+        "context_id": "ctx-not-real"
+      },
+      "status": "not_found"
+    }
+  },
+  "bridge_fix_comparison": {
+    "comparison_scope": "view-shape only, not state-matched: the 0.4.0 prefix was captured with Alice at z=2.5 and the 0.4.1 capture at z=0.5. The compared fact is whether the mod's split top-level view reaches player.view, not the position.",
+    "before": {
+      "bridge": "0.4.0 (e5ed50a)",
+      "mc_player_alice_keys": [
+        "type",
+        "player",
+        "found",
+        "uuid",
+        "name"
+      ],
+      "view_present": false,
+      "capturedState": {
+        "x": 0.5,
+        "y": 100.0,
+        "z": 2.5
+      },
+      "raw_output": "{\n  \"type\": \"player_context\",\n  \"player\": {\n    \"id\": 2,\n    \"uuid\": \"f0a8f4ba-99f5-412a-9189-db832c934913\",\n    \"type\": \"minecraft:player\",\n    \"class\": \"EntityPlayerMPFake\",\n    \"x\": 0.5,\n    \"y\": 100.0,\n    \"z\": 2.5,\n    \"vx\": 0.0,\n    \"vy\": -0.0784000015258789,\n    \"vz\": 0.0,\n    \"yaw\": 0.0,\n    \"pitch\": 0.0,\n    \"alive\": true,\n    \"removed\": false,\n    \"invulnerable\": false,\n    \"onGround\": true,\n    \"vehicle\": -1,\n    \"isVehicle\": false,\n    \"passengers\": [],\n    \"health\": 20.0,\n    \"maxHealth\": 20.0,\n    \"bodyEmpty\": true,\n    \"name\": \"Alice\",\n    \"gameMode\": \"creative\",\n    \"dimension\": \"minecraft:overworld\",\n    \"eye\": [\n      0.5,\n      101.62000000476837,\n      2.5\n    ]\n  },\n  \"found\": true,\n  \"uuid\": \"f0a8f4ba-99f5-412a-9189-db832c934913\",\n  \"name\": \"Alice\"\n}"
+    },
+    "after": {
+      "bridge": "0.4.1 (2cd491e, PR #8)",
+      "mc_player_alice_keys": [
+        "type",
+        "player",
+        "found",
+        "uuid",
+        "name"
+      ],
+      "view_present": true,
+      "capturedState": {
+        "x": 0.5,
+        "y": 100.0,
+        "z": 0.5
+      },
+      "note": "player.view carries eye, direction, blockRange, entityRange and target"
+    }
+  },
+  "not_tested_here": [
+    "receipt-time native chat from a real network client (this lab has no attached player client)",
+    "webhook entry and the context_id it would carry (external CLI entry was used instead)",
+    "any Harness model backend; the task entry and the live mc_player calls are the whole path",
+    "ROM/fixture-level behaviour; the scene is a generic machine target, not the meta15 fixture"
+  ],
+  "findings": [
+    "The released mod's PLAYER reply puts the entity record under player and the ray under a separate top-level view; bridge 0.4.0 returned only player, dropping the view.",
+    "bridge 0.4.1 merges the ray into player.view; the raw mod reply stays the comparison authority.",
+    "A Carpet fake player's execute-as-say broadcast produces a context bundle with timing=broadcast, not timing=receipt; the bundle id is real and fetchable, but it is not packet-time history.",
+    "The fake players are live ServerPlayers: state.playerList includes both, and a UUID query returns that player even when another player is first in the list."
+  ]
+}
