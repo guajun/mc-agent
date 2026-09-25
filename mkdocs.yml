@@ -41,6 +41,7 @@ nav:
       - Installing the Toolkit Skill: toolkit-skill.md
       - "Unattended Hermes: webhook + Skill": hermes-unattended.md
       - Headless lab servers: lab-server.md
+      - "Audit test mod (read-only evidence)": minecart-audit.md
       - Checking a fork: fork-verify.md
   - Reference:
       - Tools: tools.md
@@ -78,6 +79,7 @@ plugins:
             Installing the Toolkit Skill: 安装 Toolkit Skill
             "Unattended Hermes: webhook + Skill": "Hermes 无人值守：webhook + Skill"
             Headless lab servers: 无头实验室服务器
+            "Audit test mod (read-only evidence)": "审计测试 mod（只读证据）"
             Checking a fork: 校验一次分叉
             Reference: 参考
             Tools: 工具

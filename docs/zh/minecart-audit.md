@@ -1,0 +1,154 @@
+# 矿车审计测试 mod
+
+`tests/mods/minecart-audit/` 是一个独立的**测试侧** Fabric mod：它在服务端记录机器真实发生了什么——玩家的输入尝试、服务端对音符盒触发的处理、每辆离开堆叠的箱子矿车，以及矿车被虚空移除之前捕获的有序库存。
+
+它不是智能体的 logger，不含 ROM 解题逻辑，也不放置命令方块。它只读取世界并追加自己的 JSONL 文件。智能体仍需自建 logger；这个 mod 是评测者对同一次运行的独立证据来源。
+
+它服务的任务是 [issue #14](https://github.com/guajun/mc-agent/issues/14) 的 Minecart ROM；mod 本身刻意保持通用——区域、矿车类型和标识来自配置文件，因此可以审计任何由音符盒驱动、带矿车堆叠的机器。
+
+## 构建与安装
+
+Minecraft Java 26.2 自带未混淆类，因此只要有 JDK 和一份正常游戏安装即可构建——不需要 Gradle、不需要重映射。构建脚本与 `interface-mod/build.py` 采用同一模式。
+
+```powershell
+python tests/mods/minecart-audit/build.py `
+    --minecraft-dir "D:\MC\MC_Game\.minecraft" `
+    --jdk "C:\path\to\jdk-25"
+# -> tests/mods/minecart-audit/dist/mc-minecart-audit-0.1.0.jar
+```
+
+`--jdk` 依次回退到 `$MC_AGENT_JAVA`、`labs/*/lab.json` 中记录的 JDK、`$JAVA_HOME`，最后是 PATH 上的 `javac`。`--minecraft-dir` 默认 `D:\MC\MC_Game\.minecraft`，可用 `$MC_AGENT_MINECRAFT_DIR` 覆盖。
+
+用 `lab_server.py` 把 jar 和 Fabric API 一起装进实验室：
+
+```powershell
+python tools/lab_server.py provision --name audit --void --fabric-api --carpet `
+    --mod-jar tests/mods/minecart-audit/dist/mc-minecart-audit-0.1.0.jar
+```
+
+> `lab_server.copy_if_different` 目前只比较文件大小，同尺寸重建的 jar 会被跳过。在 [issue #17](https://github.com/guajun/mc-agent/issues/17) 落地前，重新 provision 之前请先删掉 `labs/<lab>/mods/` 里的旧 jar。
+
+## 配置
+
+服务端启动时读取 `<服务端运行目录>/mc-audit/config.json`（可用 `-Dmcaudit.config=<path>` 覆盖位置）。配置缺失或格式错误时不会静默通过：mod 会写 `mc-audit/status-unconfigured.json`、在控制台报错并停用自己；测试程序可以检测到该状态，因此"没装好"不可能被当作"已审计"。
+
+```json
+{
+  "runId": "rom-2026-09-26-1",
+  "instanceId": "lab-a",
+  "dimension": "minecraft:overworld",
+  "provenance": {
+    "kind": "source-world | fork | restore",
+    "reference": "D:/.../Minecart ROM test",
+    "snapshotId": "...",
+    "snapshotHash": "..."
+  },
+  "outputDir": "mc-audit",
+  "maxBytes": 67108864,
+  "sampleIntervalTicks": 1,
+  "correlationWindowTicks": 2,
+  "cartTypes": ["minecraft:chest_minecart"],
+  "agentUuids": ["49e96464-aa17-46b3-b5c6-87574b6b48b4"],
+  "inputRegions": [
+    { "name": "note-block", "from": [0, -59, 0], "to": [0, -59, 0] }
+  ],
+  "stackRegion": { "from": [2, -60, -1], "to": [3, -59, 1] },
+  "outputRegion": { "from": [4, -140, -8], "to": [8, -60, 8] }
+}
+```
+
+区域是闭区间方块盒：某点所属方块（各轴取 `floor`）落在 `from..to` 内即算在区域内。`inputRegions` 命名机器输入位置；`stackRegion` 是矿车堆叠所在、也作为追踪起点；`outputRegion` 是可选的第二个越界标记。当 `cartTypes` 实体在 `dimension` 中加载进 `stackRegion` 时被追踪；矿车首次离开 `stackRegion` 或进入 `outputRegion` 时记为"出堆"。`agentUuids` 可选：设置后只有这些玩家会被分类为智能体；留空则任何玩家都算玩家操作者（verifier 仍会报告 UUID）。
+
+## 生命周期与控制命令
+
+`/mcaudit`（权限等级 gamemaster，RCON 为 owner）是测试侧的控制面。这些命令绝不操作机器。
+
+| 命令 | 含义 |
+| --- | --- |
+| `/mcaudit status` | 当前 run、实例、阶段、序号、追踪矿车、不完整原因 |
+| `/mcaudit phase init` | fixture 初始化（可重复） |
+| `/mcaudit phase restore` | 快照恢复 / fork 准备 |
+| `/mcaudit phase experiment_start` | 打开智能体操作窗口 |
+| `/mcaudit phase experiment_end` | 关闭窗口 |
+| `/mcaudit mark <label>` | 测试脚本标记；不会被误判为操作 |
+| `/mcaudit flush` | 强制刷新状态文件 |
+| `/mcaudit end` | 写入 `audit_end` 并关闭 JSONL |
+
+服务端启动时写 `audit_ready`，关闭时写 `audit_end`。若服务端在 `audit_end` 之前死亡，会话保持打开，状态文件或之后的 verifier 会报审计不完整——缺日志是响亮的失败，而不是静默通过。
+
+## 证据文件
+
+```
+mc-audit/
+  audit-<runId>.jsonl          原始事件流，每个事件都 flush
+  status-<runId>.json          当前快照（阶段、计数、矿车、hook 开销）
+  latest.json                  指向当前 run 的文件
+  status-unconfigured.json     配置缺失/损坏时写入
+  config.json                  mod 实际读取的配置
+```
+
+每个事件都带 `seq`（文件内严格递增，服务端重启后继续播种）、`tick`（服务端 tick）、`wall`、`run`、`inst`、`session`、`phase`、`type`。重启会追加新的 `session_start`；因此一个 `runId` 可以跨多次服务端会话（mod 重新部署、快照恢复都需要），同时不丢失顺序。`maxBytes` 限制日志大小；溢出会置 `truncated`，verifier 将其视为不完整。
+
+主要事件类型：
+
+| 类型 | 含义 |
+| --- | --- |
+| `input_attempt` | 玩家对音符盒的交互尝试：操作者 UUID、手、物品、结果，以及位置是否属于配置的输入区 |
+| `input_request` | `NoteBlock.playNote`，真正的请求；携带触发实体（`player`、`entity` 或 `redstone_or_environment`） |
+| `input_processed` | `NoteBlock.triggerEvent`，服务端处理音符；关联 `requestSeq`/`attemptSeq`，记录 note/instrument 与 `agentOp` |
+| `cart_tracked` | 配置类型矿车加载进堆叠区：有序库存与来源阶段 |
+| `cart_sample` | 周期性位置/运动/库存采样，按矿车与 tick 去重 |
+| `cart_exit` | 矿车首次离开堆叠区 / 进入输出区（采样或移除时） |
+| `cart_remove` | 移除：原因（虚空为 `DISCARDED`）、位置、运动，以及在容器掉落内容**之前**捕获的有序库存 |
+| `cart_inventory_change` | 追踪期间观测到的库存变化 |
+| `cart_teleport`, `cart_reload`, `cart_reappeared` | 替代行为证据（传送、区块重载、UUID 复用） |
+| `audit_incomplete` | 审计不可信的原因（关联缺失、hook 异常等） |
+| `audit_end` | 每个会话的收尾：计数、矿车汇总、hook 开销 |
+
+矿车 hook 刻意注入在 `Entity.remove` 与 `AbstractMinecartContainer.remove` 的 HEAD，早于内容销毁——因为 vanilla 快速路径会先掉落内容，仅靠 tick 末采样会漏掉快速下坠。音符盒 hook 区分玩家尝试（`useItemOn`/`useWithoutItem`）、携带触发实体的请求（`playNote`）与服务端处理（`triggerEvent`）；任意右键、发声和命令反馈都不会被当成机器操作。
+
+所有 hook 只用 `@Inject`：没有 redirect、没有 overwrite、不修改状态、不取消回调。每个 hook 的调用次数、总纳秒与最大纳秒都写进状态文件和 `audit_end`，观测开销可度量。
+
+## 读取证据
+
+`tools/minecart_audit.py check` 读取一个 JSONL 并给出判定：
+
+```powershell
+python tools/minecart_audit.py check --log labs/audit/mc-audit/audit-<run>.jsonl `
+    --status labs/audit/mc-audit/status-<run>.json --json
+python tools/minecart_audit.py selftest        # 合成正/负用例
+```
+
+退出码：`0` 通过、`1` 失败、`2` 不完整/不可读。报告直接回答验收问题：
+
+* `machine_operated` — 至少一次目标输入在服务端被真正处理，并关联到玩家请求与使用尝试，且发生在实验阶段；
+* `input_chain` — 每个目标处理事件都有先行的请求；智能体操作还必须有关联窗口内的尝试，否则显式以"顺序证据不足"失败；
+* `transient_outputs` — 实验期间被移除的每辆矿车都有出堆证据，并在销毁前捕获有序库存；重复出堆与重复移除都会失败；
+* `ordering` — 文件顺序即发生顺序，出堆序号严格递增，同 tick 多输出必须有不同序号；
+* `completeness` — `audit_end` 为 complete、无 `audit_incomplete`、无截断，并且会话模型与状态文件一致。
+
+负例既由 verifier 的 selftest 覆盖（无操作、错误位置、仅 marker、仅答案、缺请求、仅环境触发、重复输出、实例串日志、截断、缺结尾），也由下面的 live smoke 覆盖。
+
+## Live smoke
+
+```powershell
+python tests/mods/minecart-audit/live_smoke.py
+```
+
+脚本会构建 mod，在 issue 指定端口（27180-27189）拉起一次性虚空实验室，并运行：
+
+* 一次跨服务端重启的正向运行（两个会话、一次智能体操作、一辆矿车在被虚空移除前被捕获）；
+* `无操作`、`错误位置`、`仅 marker`、`仅红石` 四个负向运行——都必须被 verifier 判失败；
+* 装了 mod 但没有配置的实验室——必须报告"not configured"；
+* 一个不装 mod 的对照实验室跑同一脚本，对比可观察结果（音符被调、矿车消失），证明 hook 不改变 fixture 行为；
+* 源存档的只读副本在装了 mod 的情况下正常加载；
+* 实例间日志隔离。
+
+证据写进 `labs/rom18-evidence/`（`summary.json`、原始日志、verifier 报告、控制台日志）；该目录被 git 忽略，是本地产物而非仓库内容。
+
+## 限制
+
+* 这是插桩，不是对抗性沙箱。它不承诺抵抗同权限恶意代码；它为人工审查记录证据。
+* 完整 fixture 集成（真实 ROM 地图、确定性矿车初始化、忠实的快照恢复）依赖 [#15](https://github.com/guajun/mc-agent/issues/15)、[bridge #6](https://github.com/guajun/mc-agent-bridge/issues/6) 和 [#17](https://github.com/guajun/mc-agent/issues/17)。配置中的 `provenance` 字段已为这些运行的关联做好准备。
+* 把工具调用关联到 `input_*` 事件属于 [#19](https://github.com/guajun/mc-agent/issues/19) 的审计 harness：mod 精确记录操作者 UUID、tick 和序号，使关联成为可能，但它自己不读取工具轨迹。
+* 同 tick 多输出的顺序在 verifier 中有强制校验与单测；live smoke 的 fixture 每次只产生一辆矿车，因此该点由合成用例覆盖而非真实同 tick 双输出。
