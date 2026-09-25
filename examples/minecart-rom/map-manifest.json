@@ -5,7 +5,7 @@
   "description": "Base world for the Minecart ROM fixture: a floating note-block driven minecart popper over the void, exported from the source save with players, logs and test residue removed.",
   "artifact": {
     "filename": "minecart-rom-base-1.0.0.zip",
-    "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/f7d8e43c1316e4f9d37f1ef3a59a779c33921cd6/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
     "mirrors": [],
     "size": 748712,
     "sha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
