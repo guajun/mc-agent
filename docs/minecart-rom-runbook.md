@@ -42,8 +42,8 @@ extracts the reviewed #20 artifacts into a parameterized regression.
 | stage-one gate tool | merged (#22) | `tools/stage1_gate.py`; `selftest` **152 checks** |
 | cold-start protocol tools | merged (#25) | `tools/coldstart.py`, `harness_preflight.py`, `run_trace.py`, `run_audit.py` |
 | combined integration driver | merged (#28, `2675825`) | `tools/stage1_integration.py`; [stage-one integration run](stage1-integration.md) |
-| fixture #15 | PR [#27](https://github.com/guajun/mc-agent/pull/27) open (head `4741be6`), **not accepted** | `examples/minecart-rom/` on the branch |
-| audit mod #18 | PR [#26](https://github.com/guajun/mc-agent/pull/26) open (head `0e8c15b`), **not accepted** | `tests/mods/minecart-audit/` on the branch |
+| fixture #15 | PR [#27](https://github.com/guajun/mc-agent/pull/27) open; inspected snapshot `37fb824` (2026-09-26), **not accepted** | `examples/minecart-rom/` on the branch |
+| audit mod #18 | PR [#26](https://github.com/guajun/mc-agent/pull/26) open; inspected snapshot `0e8c15b` (2026-09-26), **not accepted** | `tests/mods/minecart-audit/` on the branch |
 | live stage-one gate | **BLOCKED** (1 pass, 0 fail, 7 blocked) | [`docs/evidence/rom13-stage1/integration-summary.json`](evidence/rom13-stage1/integration-summary.json) |
 | stage #20 | not started | no cold-start run directory, no agent logger |
 | stage #21 | not prepared | - |
@@ -53,12 +53,18 @@ Merged prerequisite PRs at this time: bridge#8, bridge#9, #22, #23, #24, #25,
 #28. Issues #16, #17 and bridge#6 are closed with evidence comments; #15 and
 #18 stay open.
 
-!!! warning "Tracking caveat"
-    GitHub currently shows **#14 and #19 closed** (2026-09-25) while the live
-    stage-one gate is `blocked`, #14's checklist is unchecked, and #15/#18
-    remain open. Do not cite the closed state as acceptance: either the issue
-    state or the checklist is wrong, and the coordinator should reconcile it.
-    No command in this repository should flip a gate to done by editing prose.
+The PR heads above are **immutable inspected snapshots**, not live claims: both
+branches were still being repaired at that snapshot. Before executing a recipe,
+resolve the actual accepted/merged head, for example
+`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`, and re-check the
+flags against that tree.
+
+!!! note "Tracker history (historical record, 2026-09-25)"
+    #14 and #19 were briefly closed right after the tooling PRs merged,
+    then **reopened** at 18:26 UTC the same day once the still-blocked live gate
+    and the unchecked #14 checklist were pointed out. This is history, not a
+    status: an issue's state is never acceptance, and no closure should precede
+    a reviewed gate `pass`.
 
 ## Stage 1: gate checks and the circularity guard
 
@@ -136,9 +142,12 @@ Defaults and outputs (verified against `stage1_integration.py`):
   `45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f` and is
   read from the #16/#18 peer build directories; the driver refuses a different
   hash;
-* the run directory is `labs/rom13-integration/run-<stamp>/`, with
-  `trajectory.final.jsonl`, `normalize-inputs.json`, `bundle/`, `bundle-spec.json`
-  and `summary.json`/`summary.md`; see
+* the integration root `labs/rom13-integration/` holds `normalize-inputs.json`,
+  `bundle/` (with `bundle/bundle-spec.json`), `summary.json`/`summary.md`,
+  `build/`, `audit-mod-src/` and `bridge6-restore-collection/`; the live run
+  directory `labs/rom13-integration/run-<stamp>/` holds `trajectory.jsonl` and
+  the frozen `trajectory.final.jsonl` (plus `run.json`, `task.md`,
+  `evidence.json`, `visibility.json`); see
   [`docs/evidence/rom13-stage1/README.md`](evidence/rom13-stage1/README.md).
 
 The gaps a re-run must fill from accepted prerequisite output are: the #15
@@ -149,8 +158,12 @@ verified joins described above.
 
 ### 1.3 Fixture (#15, after PR #27 is accepted)
 
-The runner ships with PR #27; at the time of writing it is **not** on `main`.
-Once accepted, from the branch/merged tree:
+This recipe was verified against the PR #27 snapshot `37fb824` (2026-09-26);
+after that snapshot the branch was still under repair, so it is **not** on
+`main` yet. Before running, resolve the actual accepted/merged head
+(`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`) and re-check
+the runner flags against that tree. The recipe below is from that inspected
+snapshot tree:
 
 ```powershell
 python examples/minecart-rom/runner/minecart_rom.py fetch --cold
@@ -235,9 +248,9 @@ model `deepseek-flash`, provider `deepseek`. `SKIP` never counts as `PASS`.
 Preconditions: stage-one gate PASS reviewed; a new sealed challenge program
 generated for this run (never the public calibration default); the fixture
 ready and validated; the #18 audit mod loaded on both labs; a fresh pi session.
-The fixture runner itself comes with #15 (PR #27) - stage two cannot start
-before that is accepted. Example ports below stay inside the coldstart
-config's reserved `27190-27199` range.
+The fixture runner itself comes with #15 (PR #27; snapshot and head resolution
+in section 1.3) - stage two cannot start before that is accepted. Example ports
+below stay inside the coldstart config's reserved `27190-27199` range.
 
 ### 2.1 Pinned harness defaults
 
@@ -336,9 +349,9 @@ advance.
    frozen inputs), then `stage1_gate.py check ... --source-world ... --report`.
 4. Post the report and raw artifact locations to issue #14; the coordinator
    reviews hashes and raw logs. Only a reviewed full `pass` authorizes #20.
-5. Reconcile the GitHub state of #14/#19 (currently closed) with the gate
-   evidence - do not close #14 as accepted merely because the tooling PR
-   merged.
+5. Keep #14/#19 open (reopened 2026-09-25) until a reviewed full `pass`; do
+   not close either on a tooling merge, and never cite a tracker state as
+   acceptance.
 6. Prepare the fresh #20 environment per section 2 (new challenge, clean
    context, recorded visibility, no pre-written logger) and run it as a
    separate pi session once the gate pass is reviewed.

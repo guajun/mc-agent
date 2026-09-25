@@ -35,8 +35,8 @@ issue 标成完成；在门禁或审计真正输出通过之前，不得把本�
 | 阶段一门禁工具 | 已合并（#22） | `tools/stage1_gate.py`；`selftest` **152 checks** |
 | 冷启动协议工具 | 已合并（#25） | `tools/coldstart.py`、`harness_preflight.py`、`run_trace.py`、`run_audit.py` |
 | 组合集成驱动 | 已合并（#28，`2675825`） | `tools/stage1_integration.py`；[阶段一集成运行](stage1-integration.md) |
-| fixture #15 | PR [#27](https://github.com/guajun/mc-agent/pull/27) 仍开启（head `4741be6`），**未接受** | 分支上的 `examples/minecart-rom/` |
-| 审计 mod #18 | PR [#26](https://github.com/guajun/mc-agent/pull/26) 仍开启（head `0e8c15b`），**未接受** | 分支上的 `tests/mods/minecart-audit/` |
+| fixture #15 | PR [#27](https://github.com/guajun/mc-agent/pull/27) 仍开启；已检查快照 `37fb824`（2026-09-26），**未接受** | 分支上的 `examples/minecart-rom/` |
+| 审计 mod #18 | PR [#26](https://github.com/guajun/mc-agent/pull/26) 仍开启；已检查快照 `0e8c15b`（2026-09-26），**未接受** | 分支上的 `tests/mods/minecart-audit/` |
 | 真实阶段一门禁 | **BLOCKED**（1 pass、0 fail、7 blocked） | [`docs/evidence/rom13-stage1/integration-summary.json`](evidence/rom13-stage1/integration-summary.json) |
 | 阶段 #20 | 未开始 | 无冷启动 run 目录、无 Agent logger |
 | 阶段 #21 | 未准备 | - |
@@ -45,10 +45,14 @@ issue 标成完成；在门禁或审计真正输出通过之前，不得把本�
 此时已合并的前置 PR：bridge#8、bridge#9、#22、#23、#24、#25、#28。#16、#17 与 bridge#6
 已带证据评论关闭；#15 与 #18 仍开启。
 
-!!! warning "跟踪状态警告"
-    GitHub 目前显示 **#14 与 #19 已关闭**（2026-09-25），但真实阶段一门禁仍为 `blocked`，
-    #14 的 checklist 未勾选，#15/#18 仍开启。不要把"已关闭"当作验收：要么 issue 状态错了，
-    要么 checklist 错了，应由协调者消除矛盾。本仓库不得靠改文字把门禁标成完成。
+上表中的 PR head 是**不可变快照**，不是实时声明：快照之后两个分支仍在修复。执行配方前请解析
+实际已接受/已合并的 head（例如 `gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`），
+并按该树重新核对参数。
+
+!!! note "跟踪器历史（历史记录，2026-09-25）"
+    #14 与 #19 在工具 PR 合并后曾被短暂关闭，当天 18:26 UTC 在仍为 blocked 的实机门禁
+    与未勾选的 #14 checklist 被指出后已**重新开启**。这是历史而非状态：issue 状态从不是验收，
+    任何关闭都不应先于复核过的门禁 `pass`。
 
 ## 阶段一：门禁检查与循环依赖防护
 
@@ -114,8 +118,12 @@ python tools/stage1_integration.py run --bundle-only      # 逐字节可复现�
 * interface mod jar 哈希固定为
   `45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f`，从 #16/#18 对等
   worktree 的构建目录只读取得；哈希不符会被拒绝；
-* run 目录为 `labs/rom13-integration/run-<stamp>/`，含 `trajectory.final.jsonl`、
-  `normalize-inputs.json`、`bundle/`、`bundle-spec.json`、`summary.json`/`summary.md`；见
+* 集成根目录 `labs/rom13-integration/` 含 `normalize-inputs.json`、`bundle/`
+  （内有 `bundle/bundle-spec.json`）、`summary.json`/`summary.md`、`build/`、
+  `audit-mod-src/` 与 `bridge6-restore-collection/`；实机 run 目录
+  `labs/rom13-integration/run-<stamp>/` 含 `trajectory.jsonl` 与冻结的
+  `trajectory.final.jsonl`（以及 `run.json`、`task.md`、`evidence.json`、
+  `visibility.json`）；见
   [`docs/evidence/rom13-stage1/README.md`](evidence/rom13-stage1/README.md)。
 
 2026-09-25 运行缺少的，就是重跑时必须从已接受前置补齐的： #15 fixture 证据、
@@ -124,7 +132,10 @@ harness `tool_environment` 与 smoke 套件/版本锁/证据索引，以及上�
 
 ### 1.3 Fixture（#15，PR #27 接受后）
 
-Runner 随 PR #27 提供；当前**不在** `main`。接受后，在分支/合并后的树上：
+本配方针对 PR #27 快照 `37fb824`（2026-09-26）核实；该快照之后分支仍在修复，因此尚未进入
+`main`。运行前请解析实际已接受/已合并的 head
+（`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`），并按该树重新核对 runner 参数。
+下面代码块来自该已检查快照树：
 
 ```powershell
 python examples/minecart-rom/runner/minecart_rom.py fetch --cold
@@ -203,8 +214,8 @@ python tools/harness_preflight.py run --config examples/coldstart/harness-pi.jso
 
 前置：阶段一门禁 PASS 且已复核；为本次运行生成全新密封 challenge 程序（绝不用公开校准
 默认程序）；fixture ready 且通过校验；两个 lab 都加载 #18 审计 mod；全新 pi 会话。fixture
-runner 本身随 #15（PR #27）提供——未接受前阶段二不能开始。下面的示例端口保持在冷启动配置
-保留的 `27190-27199` 区间内。
+runner 本身随 #15（PR #27；快照与 head 解析见 1.3）提供——未接受前阶段二不能开始。
+下面的示例端口保持在冷启动配置保留的 `27190-27199` 区间内。
 
 ### 2.1 固定 Harness 默认值
 
@@ -289,8 +300,8 @@ PENDING，绝不是通过。关键记录缺失一律 fail closed。
    `stage1_gate.py check ... --source-world ... --report`。
 4. 把报告与原始产物位置贴到 issue #14；协调者复核哈希与原始日志。只有复核过的完整 `pass`
    才放行 #20。
-5. 消除 #14/#19 的 GitHub 状态（当前显示已关闭）与门禁证据的矛盾——不得仅因工具 PR 合并就
-   把 #14 当作已接受关闭。
+5. 在复核过的完整 `pass` 之前保持 #14/#19 开启（已于 2026-09-25 重新开启）；不得因工具合并
+   而关闭，也不得把跟踪器状态当作验收。
 6. 按第 2 节准备全新 #20 环境（新 challenge、干净上下文、记录可见性、不预写 logger），在
    门禁 pass 复核后以独立 pi 会话运行。
 7. 只有当 #20 被审计为真实成功之后，才按第 3 节条件从它的产物提取 #21。

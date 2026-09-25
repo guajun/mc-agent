@@ -178,8 +178,10 @@ asserted, which is why the gate blocks instead of false-passing.
 1. **#15 fixture**: map manifest with immutable URL/sha256, three init runs with
    declared child-run provenance, the fixture player identity, the
    command-block scan covering the fixture and both lab worlds, and the
-   cleanup/rebuild record. PR #27 is still under review (head `4741be6` at the
-   time of writing) and is **not accepted** here.
+   cleanup/rebuild record. PR #27 is still under review and is **not accepted**
+   here; the fixture claims on this page were written against its snapshot
+   `37fb824` and must be re-verified against the accepted/merged head before
+   the next gate run.
 2. **Same-run restore (`bridge#6`)**: snapshot-before/after trees, a bound
    restore record, `source-unchanged.json` and the six failure cases for the
    *gate run's* instances. The merged bridge6 evidence is collected separately
@@ -204,9 +206,9 @@ asserted, which is why the gate blocks instead of false-passing.
 * The driver's RCON-to-event attribution is intentionally unverified
   (candidacy, not proof). The gate still needs test-side smoke joins with
   explicit proof; the stage-two audit additionally joins the agent's own calls.
-* The #18 adapter tracks the PR #26 branch (this run targeted `502f561`); if
-  that head changes before merge, re-verify the mapping against the accepted
-  head before the next gate run.
+* The #18 adapter tracks the PR #26 branch; this run mapped a `502f561`
+  snapshot of it. Before the next gate run, resolve the accepted/merged head and
+  re-verify the mapping against that tree.
 * Snapshot `meta.json` cannot prove which live instance produced it, so the
   restore check binds endpoint identity through the restore record and the
   audit/trace provenance (see [the gate limitations](stage1-gate.md#limits)).
