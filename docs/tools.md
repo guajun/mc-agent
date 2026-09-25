@@ -98,6 +98,9 @@ primitives above.
 | `game_cmd.py` | run a game command and print the feedback it produced |
 | `mcp_probe.py` | call one MCP tool against a running bridge, exactly as an agent would |
 | `stage1_gate.py` | fail-closed stage-one evidence gate for issue #14: validate a bundle of prerequisite artifacts, recompute hashes/order/source-world state, never pass on missing evidence |
+| `harness_preflight.py` | check the fixed harness/model contract: terminal, files, source fetch, JDK build, bridge CLI/MCP, reserved ports and a live lab, with hashed evidence |
+| `run_trace.py` | open a cold-start run, snapshot the documents/skills the agent can see, and record the tool trajectory (calls, results, phases, artifacts, pi session import, explicit review resolutions) |
+| `run_audit.py` | judge a run against the five required facts (`machine_operated`, `logger_armed_before_activation`, `transient_outputs_captured`, `agent_read_log`, `answer_correct`) with evidence references, required reviews and failure classification |
 
 Examples:
 
@@ -116,6 +119,16 @@ python tools/fork_verify.py diff "<recording A>" "<recording B>"
 
 python tools/stage1_gate.py list
 python tools/stage1_gate.py selftest
+
+python tools/harness_preflight.py run --config examples/coldstart/harness-pi.json \
+    --out labs/coldstart/preflight
+python tools/run_trace.py init --run-dir labs/coldstart/run-01 \
+    --task-file examples/coldstart/task-minecart-rom.md --harness pi --model <model>
+python tools/run_trace.py import-pi --run-dir labs/coldstart/run-01 --session "$PI_SESSION_FILE"
+python tools/run_trace.py review --run-dir labs/coldstart/run-01 \
+    --id machine_operated.causality --status resolved --by <reviewer> \
+    --evidence trajectory:c2-noteblock
+python tools/run_audit.py run --run-dir labs/coldstart/run-01
 ```
 
 ## Protocols
@@ -125,3 +138,4 @@ python tools/stage1_gate.py selftest
 | interface protocol v1 | mod and bridge | [mod README](https://github.com/guajun/mc-agent-interface-mod) |
 | loopback JSON-lines API | bridge and everything else | [bridge README](https://github.com/guajun/mc-agent-bridge) |
 | snapshot / fork protocol | mod, bridge and lab tooling | [Forking a live world](protocol-snapshot.md) |
+| cold-start run protocol | harness, test side, agent logger and audit | [Auditable cold-start runs](coldstart-protocol.md) |
