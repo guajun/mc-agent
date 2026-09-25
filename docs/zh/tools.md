@@ -79,6 +79,7 @@ mc-agent-loop/             智能体 loop 与它的后端
 | `fake_player.py` | 生成、驱动、查询 Carpet 假人——不需要第二个客户端就有身体 |
 | `game_cmd.py` | 执行一条游戏命令并打印它产生的反馈 |
 | `mcp_probe.py` | 像智能体一样调用某一个 MCP 工具 |
+| `stage1_gate.py` | issue #14 的失败关闭式阶段一证据门禁：校验前置证据包，重算哈希/顺序/源存档状态，缺证据绝不通过 |
 
 例子：
 
@@ -92,6 +93,9 @@ python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
 python tools/lab_server.py exec --name lab-01 "tick freeze"
 
 python tools/fork_verify.py diff "<录制 A>" "<录制 B>"
+
+python tools/stage1_gate.py list
+python tools/stage1_gate.py selftest
 ```
 
 ## 协议

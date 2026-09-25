@@ -91,6 +91,7 @@ primitives above.
 | `fake_player.py` | spawn, drive, and query a Carpet fake player - the agent's body without a second client |
 | `game_cmd.py` | run a game command and print the feedback it produced |
 | `mcp_probe.py` | call one MCP tool against a running bridge, exactly as an agent would |
+| `stage1_gate.py` | fail-closed stage-one evidence gate for issue #14: validate a bundle of prerequisite artifacts, recompute hashes/order/source-world state, never pass on missing evidence |
 
 Examples:
 
@@ -104,6 +105,9 @@ python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
 python tools/lab_server.py exec --name lab-01 "tick freeze"
 
 python tools/fork_verify.py diff "<recording A>" "<recording B>"
+
+python tools/stage1_gate.py list
+python tools/stage1_gate.py selftest
 ```
 
 ## Protocols

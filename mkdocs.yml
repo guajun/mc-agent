@@ -42,6 +42,7 @@ nav:
       - "Unattended Hermes: webhook + Skill": hermes-unattended.md
       - Headless lab servers: lab-server.md
       - Checking a fork: fork-verify.md
+      - Stage-one integration gate: stage1-gate.md
   - Reference:
       - Tools: tools.md
       - Troubleshooting: troubleshooting.md
@@ -79,6 +80,7 @@ plugins:
             "Unattended Hermes: webhook + Skill": "Hermes 无人值守：webhook + Skill"
             Headless lab servers: 无头实验室服务器
             Checking a fork: 校验一次分叉
+            Stage-one integration gate: 阶段一集成门禁
             Reference: 参考
             Tools: 工具
             Troubleshooting: 疑难排查
