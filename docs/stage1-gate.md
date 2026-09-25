@@ -412,6 +412,10 @@ The same algorithm and exclusion list are used by the gate and by
 
 ## Integration runbook (after the prerequisites merge)
 
+Parent-level current status, the stage-1/stage-2 handoff commands and the
+circularity guard are in the
+[Minecart ROM acceptance runbook](minecart-rom-runbook.md).
+
 1. Collect the raw artifacts from #15, bridge#6, #16-#19 into one bundle
    (`scaffold` prints the canonical layout). Keep raw logs; index them too.
 2. Fill `bundle.json`: `origin: live`, run id, child run ids, source-world path

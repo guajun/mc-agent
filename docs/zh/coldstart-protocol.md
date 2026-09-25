@@ -331,7 +331,8 @@ fixture 全新或未核验时，oracle 保持 `pending`；审计报 PENDING，�
 | 忠实快照恢复 | [mc-agent-bridge#6](https://github.com/guajun/mc-agent-bridge/issues/6) | `restore` 证据 |
 
 集成验收（真实冷启动被判 PASS）必须等待它们全部完成。本文档与工具可以并行开发、
-并行测试——`tools/tests/` 下的合成 fixture 正是这么做的。
+并行测试——`tools/tests/` 下的合成 fixture 正是这么做的。父级阶段交接与当前状态见
+[Minecart ROM 验收 runbook](minecart-rom-runbook.md)。
 
 ## 9. 不启动 Minecraft 验证工具
 

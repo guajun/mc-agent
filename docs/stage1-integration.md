@@ -163,7 +163,7 @@ across the old labs, so the gate's same-run restore binding is not claimed.
 | `fixture_map` | blocked | #15 map manifest/init runs are not accepted yet |
 | `restore_fidelity` | blocked | no same-run snapshot/restore artifacts for this run |
 | `player_context` | **pass** | real #16 identity, all five cases, pins |
-| `agent_dev_capability` | blocked | cold-start harness `tool_environment` and the fixture-specific `smoke_mod` are stage-two evidence |
+| `agent_dev_capability` | blocked | the harness `tool_environment` record (from `harness_preflight.py`, no model call) and the generic `smoke_mod` record were not declared in this bundle |
 | `independent_test_mod` | blocked | test-mod manifest, negative cases and audit lifecycle declaration still required |
 | `trace_persistence` | blocked | no verified agent-phase joins and no missing-log-detection artifact yet |
 | `smoke_fixture_validity` | blocked | smoke suites (offline/player/restore), calibration and fixture version lock need #15/#19 |
@@ -178,8 +178,10 @@ asserted, which is why the gate blocks instead of false-passing.
 1. **#15 fixture**: map manifest with immutable URL/sha256, three init runs with
    declared child-run provenance, the fixture player identity, the
    command-block scan covering the fixture and both lab worlds, and the
-   cleanup/rebuild record. PR #27 candidates (`f2a636f`) exist but are still
-   under review with open P1 fixes and are **not accepted** here.
+   cleanup/rebuild record. PR #27 is still under review and is **not accepted**
+   here; the fixture claims on this page were written against its snapshot
+   `37fb824` and must be re-verified against the accepted/merged head before
+   the next gate run.
 2. **Same-run restore (`bridge#6`)**: snapshot-before/after trees, a bound
    restore record, `source-unchanged.json` and the six failure cases for the
    *gate run's* instances. The merged bridge6 evidence is collected separately
@@ -187,10 +189,12 @@ asserted, which is why the gate blocks instead of false-passing.
 3. **#18/#19 test-mod completeness**: `test-mod-manifest.json`,
    `negative-cases.jsonl` (no interaction, wrong position, marker only, answer
    only) and the `audit-lifecycle.json` declaration; `missing-log-detection.jsonl`.
-4. **Cold start (#19/#20)**: harness `tool-environment.json`, the five smoke
-   suites (`smoke_offline`, `lab_boot`, `fake_player_mcp`, `snapshot_restore`,
-   `test_mod_load`), fixture calibration, `version-lock.json`, and the agent's
-   own tool-to-game joins with explicit proof.
+4. **Stage-one harness capability (#17/#19)**: harness `tool-environment.json`
+   (from `harness_preflight.py`), the five smoke suites (`smoke_offline`,
+   `lab_boot`, `fake_player_mcp`, `snapshot_restore`, `test_mod_load`), fixture
+   calibration and `version-lock.json` are all stage-one artifacts. The only
+   stage-two-only item is the agent's own tool-to-game joins, which belong to
+   the #20 audit - not to this gate.
 5. Re-run `stage1_integration.py run` (or `--bundle-only` after adding inputs)
    once those artifacts exist; the gate then decides. Only a full `pass`
    authorizes stage two.
@@ -200,12 +204,15 @@ asserted, which is why the gate blocks instead of false-passing.
 * The scene is generic instrumentation; it does not exercise the ROM machine
   and is not acceptance for #14.
 * The driver's RCON-to-event attribution is intentionally unverified
-  (candidacy, not proof); the stage-two run must join the agent's own calls.
-* The #18 adapter targets the committed PR #26 head `502f561`; if that PR
-  changes before merge the mapping must be re-verified.
+  (candidacy, not proof). The gate still needs test-side smoke joins with
+  explicit proof; the stage-two audit additionally joins the agent's own calls.
+* The #18 adapter tracks the PR #26 branch; this run mapped a `502f561`
+  snapshot of it. Before the next gate run, resolve the accepted/merged head and
+  re-verify the mapping against that tree.
 * Snapshot `meta.json` cannot prove which live instance produced it, so the
   restore check binds endpoint identity through the restore record and the
   audit/trace provenance (see [the gate limitations](stage1-gate.md#limits)).
 
 See also: [stage-one gate](stage1-gate.md), [cold-start protocol](coldstart-protocol.md),
-[mod building](mod-building.md), [lab servers](lab-server.md).
+[mod building](mod-building.md), [lab servers](lab-server.md),
+[Minecart ROM acceptance runbook](minecart-rom-runbook.md).

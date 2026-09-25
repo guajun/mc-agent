@@ -381,7 +381,9 @@ gate is fully green. The other workstreams own their ends:
 
 Integration acceptance (a real cold start judged PASS) must wait for all of
 them. This document and its tooling can be developed and tested in parallel,
-which is what the synthetic fixtures under `tools/tests/` do.
+which is what the synthetic fixtures under `tools/tests/` do. The parent-level
+stage handoff and current status are in the
+[Minecart ROM acceptance runbook](minecart-rom-runbook.md).
 
 ## 9. Verify the tooling without Minecraft
 
