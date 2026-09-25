@@ -49,6 +49,16 @@ public abstract class NoteBlockMixin {
         }
     }
 
+    @Inject(method = "attack(Lnet/minecraft/world/level/block/state/BlockState;"
+            + "Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;"
+            + "Lnet/minecraft/world/entity/player/Player;)V", at = @At("HEAD"))
+    private void mcaudit$attack(BlockState state, Level level, BlockPos pos, Player player, CallbackInfo info) {
+        AuditEngine engine = AuditEngine.get();
+        if (engine != null) {
+            engine.onNoteAttack(state, level, pos, player);
+        }
+    }
+
     @Inject(
             method = "useWithoutItem(Lnet/minecraft/world/level/block/state/BlockState;"
                     + "Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;"

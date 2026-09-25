@@ -133,6 +133,7 @@ def evaluate(
     parse_errors: list[str] | None = None,
     status: dict[str, Any] | None = None,
     require_machine: bool = True,
+    allow_open_history: bool = False,
 ) -> dict[str, Any]:
     checks = Checks()
     parse_errors = list(parse_errors or [])
@@ -199,12 +200,17 @@ def evaluate(
 
     checks.add(
         "sessions",
-        bool(ended_sessions),
+        bool(ended_sessions) and (allow_open_history or not open_sessions),
         f"{len(sessions)} session(s); ended={len(ended_sessions)}; open={len(open_sessions)}; "
         f"evaluated={checked_id}",
     )
     if not ended_sessions:
         reasons.append("no completed session (audit_end missing)")
+    if open_sessions and not allow_open_history:
+        reasons.append(
+            "open session(s) without audit_end: "
+            + ", ".join(session_summary(session)["id"] for session in open_sessions)
+        )
 
     session_events = checked_session["events"] if checked_session else []
     incomplete_events = [
@@ -220,11 +226,18 @@ def evaluate(
     reasons.extend(str(event.get("reason")) for event in incomplete_events)
     if truncated:
         reasons.append("audit log truncated by maxBytes")
+    if open_sessions and not allow_open_history:
+        reasons.append("a crashed/abandoned session leaves the audit incomplete")
     checks.add(
         "completeness",
-        not incomplete_events and not truncated and end is not None and end.get("status") == "complete",
+        not incomplete_events
+        and not truncated
+        and end is not None
+        and end.get("status") == "complete"
+        and (allow_open_history or not open_sessions),
         f"end={None if end is None else end.get('status')} "
-        f"incomplete={[event.get('reason') for event in incomplete_events]} truncated={truncated}",
+        f"incomplete={[event.get('reason') for event in incomplete_events]} truncated={truncated} "
+        f"open={len(open_sessions)}",
     )
     if status is not None and not status.get("ended") and open_sessions:
         checks.add("status_agrees", False, "status.json says the run is still open; audit may have died")
@@ -270,6 +283,32 @@ def evaluate(
     chain_errors: list[str] = []
     agent_ops: list[dict[str, Any]] = []
     environment_ops = 0
+
+    # One request/attempt may be credited to exactly one processing event. The
+    # engine consumes matches, so a reuse here means the log is stale, merged
+    # from another run, or was produced by a hook that double-fired.
+    request_use: dict[Any, list[Any]] = {}
+    attempt_use: dict[Any, list[Any]] = {}
+    for event in target_processed:
+        if isinstance(event.get("requestSeq"), int):
+            request_use.setdefault(event["requestSeq"], []).append(event.get("seq"))
+        if isinstance(event.get("attemptSeq"), int):
+            attempt_use.setdefault(event["attemptSeq"], []).append(event.get("seq"))
+    for request_seq, seqs in request_use.items():
+        if len(seqs) > 1:
+            chain_errors.append(
+                f"requestSeq {request_seq} is credited to {len(seqs)} processing events {seqs}"
+            )
+    for attempt_seq, seqs in attempt_use.items():
+        if len(seqs) > 1:
+            chain_errors.append(
+                f"attemptSeq {attempt_seq} is credited to {len(seqs)} processing events {seqs}"
+            )
+
+    def operator_uuid(event: dict[str, Any]) -> Any:
+        operator = event.get("operator")
+        return operator.get("uuid") if isinstance(operator, dict) else None
+
     for event in target_processed:
         request_seq = event.get("requestSeq")
         request = by_seq.get(request_seq)
@@ -289,12 +328,31 @@ def evaluate(
                 f"{window}-tick window of processing tick {event.get('tick')}"
             )
             continue
+        process_actor = operator_uuid(event)
+        request_actor = operator_uuid(request)
+        if process_actor is not None and request_actor is not None and process_actor != request_actor:
+            chain_errors.append(
+                f"seq {event.get('seq')}: processing actor {process_actor} differs from request "
+                f"actor {request_actor}"
+            )
+            continue
         if event.get("agentOp"):
             attempt_seq = event.get("attemptSeq")
             attempt = by_seq.get(attempt_seq)
             if attempt is None or attempt.get("type") != "input_attempt":
                 chain_errors.append(
-                    f"seq {event.get('seq')}: agent operation without a matching use attempt"
+                    f"seq {event.get('seq')}: agent operation without a matching attempt"
+                )
+                continue
+            attempt_actor = operator_uuid(attempt)
+            if (
+                process_actor is not None
+                and attempt_actor is not None
+                and process_actor != attempt_actor
+            ):
+                chain_errors.append(
+                    f"seq {event.get('seq')}: processing actor {process_actor} differs from attempt "
+                    f"actor {attempt_actor}"
                 )
                 continue
             agent_ops.append(event)
@@ -509,7 +567,13 @@ def cmd_check(args: argparse.Namespace) -> int:
             status = json.loads(Path(args.status).read_text(encoding="utf-8"))
         except (OSError, ValueError) as error:
             print(f"warning: cannot read status file: {error}", file=sys.stderr)
-    report = evaluate(events, errors, status, require_machine=not args.allow_no_operation)
+    report = evaluate(
+        events,
+        errors,
+        status,
+        require_machine=not args.allow_no_operation,
+        allow_open_history=args.allow_open_history,
+    )
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print_report(report, args.json)
@@ -605,6 +669,22 @@ def _selftest_cases() -> list[tuple[str, list[dict[str, Any]], str]]:
         cases.append((name, _renumber([dict(event) for event in events]), expected))
 
     add("positive", _base_stream(), "pass")
+
+    open_history = [
+        _event(1, "session_start", phase="bootstrap"),
+        _event(2, "audit_ready", phase="ready", config={"correlationWindowTicks": 2}),
+        _event(3, "phase", phase="ready", **{"from": "ready", "to": "init"}),
+    ] + [dict(event) for event in _base_stream()]
+    add("open_history_session", open_history, "incomplete")
+
+    reused = []
+    for event in _base_stream():
+        if event["type"] == "phase" and event.get("to") == "post":
+            reused.append(
+                dict(next(row for row in _base_stream() if row["type"] == "input_processed"))
+            )
+        reused.append(dict(event))
+    add("reused_request", reused, "fail")
 
     # negatives the acceptance criteria name explicitly
     add("no_operation", _drop_types(_base_stream(), "input_attempt", "input_request", "input_processed"), "fail")
@@ -929,6 +1009,11 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("--json-out", default="", help="also write the report here")
     check.add_argument("--expect-verdict", default="", help="comma separated allowed verdicts")
     check.add_argument("--allow-no-operation", action="store_true", help="do not require a machine operation")
+    check.add_argument(
+        "--allow-open-history",
+        action="store_true",
+        help="do not fail on an earlier crashed/abandoned session (default: incomplete)",
+    )
     check.set_defaults(handler=cmd_check)
     summary = commands.add_parser("summary", help="event type counts")
     summary.add_argument("--log", required=True)

@@ -164,7 +164,7 @@ public final class AuditEngine {
                 return;
             }
             Region region = config.inputRegionFor(pos.getX(), pos.getY(), pos.getZ());
-            InputRecord request = latest(requests, pos, serverTick);
+            InputRecord request = latest(requests, pos, serverTick, false);
             JsonObject event = log.event("input_attempt");
             event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
             event.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
@@ -176,23 +176,72 @@ public final class AuditEngine {
             event.addProperty("hand", hand == null ? null : hand.name());
             event.addProperty("result", resultName(result));
             event.addProperty("resultConsumesAction", result != null && result.consumesAction());
-            event.addProperty("requestSeq", request == null ? null : request.seq());
+            addSeq(event, "requestSeq", request);
             log.append(event);
-            record(attempts, new InputRecord(
-                    log.seq(),
-                    serverTick,
-                    "attempt",
-                    path,
-                    pos.getX(),
-                    pos.getY(),
-                    pos.getZ(),
-                    player instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
-                    player instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
-                    "player"));
+            if (region != null) {
+                // Only configured machine inputs feed the correlation maps; the
+                // event itself is still logged for attempts anywhere (the
+                // wrong-position negative case needs exactly that).
+                record(attempts, new InputRecord(
+                        log.seq(),
+                        serverTick,
+                        "attempt",
+                        path,
+                        pos.getX(),
+                        pos.getY(),
+                        pos.getZ(),
+                        player instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
+                        player instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
+                        "player"));
+            }
         } catch (Throwable error) {
             hookError("note_use", error);
         } finally {
             hook("note_use").record(System.nanoTime() - started);
+        }
+    }
+
+    /** Called at HEAD of NoteBlock.attack: a punch also plays the note in 26.2. */
+    public void onNoteAttack(BlockState state, Level level, BlockPos pos, Player player) {
+        if (ended) {
+            return;
+        }
+        long started = System.nanoTime();
+        try {
+            if (!(level instanceof ServerLevel)) {
+                return;
+            }
+            Region region = config.inputRegionFor(pos.getX(), pos.getY(), pos.getZ());
+            InputRecord request = latest(requests, pos, serverTick, false);
+            JsonObject event = log.event("input_attempt");
+            event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
+            event.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+            event.addProperty("region", region == null ? null : region.name);
+            event.addProperty("targetInput", region != null);
+            addOperator(event, player);
+            event.add("item", JsonNull.INSTANCE);
+            event.addProperty("path", "attack");
+            event.addProperty("hand", (String) null);
+            event.addProperty("result", (String) null);
+            addSeq(event, "requestSeq", request);
+            log.append(event);
+            if (region != null) {
+                record(attempts, new InputRecord(
+                        log.seq(),
+                        serverTick,
+                        "attempt",
+                        "attack",
+                        pos.getX(),
+                        pos.getY(),
+                        pos.getZ(),
+                        player instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
+                        player instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
+                        "player"));
+            }
+        } catch (Throwable error) {
+            hookError("note_attack", error);
+        } finally {
+            hook("note_attack").record(System.nanoTime() - started);
         }
     }
 
@@ -222,17 +271,19 @@ public final class AuditEngine {
                 event.addProperty("instrument", state.getValue(NoteBlock.INSTRUMENT).name());
             }
             log.append(event);
-            record(requests, new InputRecord(
-                    log.seq(),
-                    serverTick,
-                    "request",
-                    "playNote",
-                    pos.getX(),
-                    pos.getY(),
-                    pos.getZ(),
-                    entity instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
-                    entity instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
-                    trigger));
+            if (region != null) {
+                record(requests, new InputRecord(
+                        log.seq(),
+                        serverTick,
+                        "request",
+                        "playNote",
+                        pos.getX(),
+                        pos.getY(),
+                        pos.getZ(),
+                        entity instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
+                        entity instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
+                        trigger));
+            }
         } catch (Throwable error) {
             hookError("play_note", error);
         } finally {
@@ -253,8 +304,11 @@ public final class AuditEngine {
             }
             Region region = config.inputRegionFor(pos.getX(), pos.getY(), pos.getZ());
             boolean target = region != null;
-            InputRecord request = latest(requests, pos, serverTick);
-            InputRecord attempt = latest(attempts, pos, serverTick);
+            // One request/attempt may be credited to exactly one processing
+            // event: consuming the match stops a later trigger in the same
+            // window from inheriting the same player.
+            InputRecord request = latest(requests, pos, serverTick, target);
+            InputRecord attempt = target ? latest(attempts, pos, serverTick, true) : null;
             String operatorUuid = request != null ? request.operatorUuid() : null;
             JsonObject event = log.event("input_processed");
             event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
@@ -268,9 +322,9 @@ public final class AuditEngine {
                 event.addProperty("note", state.getValue(NoteBlock.NOTE));
                 event.addProperty("instrument", state.getValue(NoteBlock.INSTRUMENT).name());
             }
-            event.addProperty("requestSeq", request == null ? null : request.seq());
+            addSeq(event, "requestSeq", request);
             event.addProperty("requestTrigger", request == null ? null : request.trigger());
-            event.addProperty("attemptSeq", attempt == null ? null : attempt.seq());
+            addSeq(event, "attemptSeq", attempt);
             JsonObject operator = new JsonObject();
             if (request != null && request.operatorUuid() != null) {
                 operator.addProperty("uuid", request.operatorUuid());
@@ -552,6 +606,8 @@ public final class AuditEngine {
                     cart.samples++;
                 }
             }
+            prune(requests);
+            prune(attempts);
             writeStatus(false);
         } catch (Throwable error) {
             hookError("tick_end", error);
@@ -780,15 +836,44 @@ public final class AuditEngine {
      * The most recent record at {@code pos} inside the correlation window.
      * Order is insertion order (actual occurrence), never a sorted query.
      */
-    private InputRecord latest(Map<Long, ArrayDeque<InputRecord>> map, BlockPos pos, int tick) {
-        ArrayDeque<InputRecord> queue = map.get(BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ()));
+    private InputRecord latest(
+            Map<Long, ArrayDeque<InputRecord>> map, BlockPos pos, int tick, boolean consume) {
+        long key = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
+        ArrayDeque<InputRecord> queue = map.get(key);
         if (queue == null) {
             return null;
         }
         while (!queue.isEmpty() && tick - queue.peekFirst().tick() > config.correlationWindowTicks) {
             queue.pollFirst();
         }
-        return queue.peekLast();
+        InputRecord record = queue.peekLast();
+        if (record != null && consume) {
+            queue.pollLast();
+        }
+        if (queue.isEmpty()) {
+            map.remove(key);
+        }
+        return record;
+    }
+
+    /** Age out correlation entries that no processing event consumed. */
+    private void prune(Map<Long, ArrayDeque<InputRecord>> map) {
+        int horizon = Math.max(config.correlationWindowTicks * 4, 16);
+        map.entrySet().removeIf(entry -> {
+            ArrayDeque<InputRecord> queue = entry.getValue();
+            while (!queue.isEmpty() && serverTick - queue.peekFirst().tick() > horizon) {
+                queue.pollFirst();
+            }
+            return queue.isEmpty();
+        });
+    }
+
+    private static void addSeq(JsonObject event, String key, InputRecord record) {
+        if (record == null) {
+            event.addProperty(key, (Long) null);
+        } else {
+            event.addProperty(key, record.seq());
+        }
     }
 
     private static void addOperator(JsonObject event, Player player) {

@@ -531,14 +531,20 @@ async def run_stages(args: argparse.Namespace) -> int:
     player_records = []
     try:
         _result, record = await call(api_dst, "command_output", {
-            "command": "player Bot spawn at 0.5 100.0 0.5 facing 90 0", "wait": 0.5})
+            "command": "player Bot spawn at 0.5 100.0 0.5 facing 90 0", "wait": 1.0})
         player_records.append(record)
+        # The fake player joins asynchronously; wait for the entity itself
+        # before asking the bridge for its context.
+        for _ in range(40):
+            if "has the following entity data" in rcon("rom18-b6-dst", "data get entity Bot Pos"):
+                break
+            await asyncio.sleep(0.5)
         player = None
         for _ in range(20):
             player, record = await call(api_dst, "player", {"player": "Bot"})
             if player and player.get("found"):
                 break
-            await asyncio.sleep(0.25)
+            await asyncio.sleep(0.5)
         player_records.append(record)
     finally:
         await api_dst.close()

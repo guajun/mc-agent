@@ -74,7 +74,7 @@ python tools/lab_server.py provision --name audit --void --fabric-api --carpet `
 | `/mcaudit flush` | 强制刷新状态文件 |
 | `/mcaudit end` | 写入 `audit_end` 并关闭 JSONL |
 
-服务端启动时写 `audit_ready`，关闭时写 `audit_end`。若服务端在 `audit_end` 之前死亡，会话保持打开，状态文件或之后的 verifier 会报审计不完整——缺日志是响亮的失败，而不是静默通过。
+服务端启动时写 `audit_ready`，关闭时写 `audit_end`。若服务端在 `audit_end` 之前死亡，会话保持打开；verifier 会把文件里**任何**未关闭会话视为不完整（除非显式传 `--allow-open-history`），缺日志是响亮的失败而非静默通过。live smoke 里有专门的 kill/restart 负例。
 
 ## 证据文件
 
@@ -87,7 +87,7 @@ mc-audit/
   config.json                  mod 实际读取的配置
 ```
 
-每个事件都带 `seq`（文件内严格递增，服务端重启后继续播种）、`tick`（服务端 tick）、`wall`、`run`、`inst`、`session`、`phase`、`type`。重启会追加新的 `session_start`；因此一个 `runId` 可以跨多次服务端会话（mod 重新部署、快照恢复都需要），同时不丢失顺序。`maxBytes` 限制日志大小；溢出会置 `truncated`，verifier 将其视为不完整。
+每个事件都带 `seq`（文件内严格递增，服务端重启后继续播种）、`tick`（服务端 tick）、`wall`、`run`、`inst`、`session`、`phase`、`type`。重启会追加新的 `session_start`；因此一个 `runId` 可以跨多次服务端会话（mod 重新部署、快照恢复都需要），同时不丢失顺序。`maxBytes` 限制的是整个文件而不是单个会话：字节计数从已有文件大小续起，重启多次也不会重置预算；溢出会置 `truncated`，verifier 将其视为不完整。
 
 主要事件类型：
 
@@ -105,7 +105,9 @@ mc-audit/
 | `audit_incomplete` | 审计不可信的原因（关联缺失、hook 异常等） |
 | `audit_end` | 每个会话的收尾：计数、矿车汇总、hook 开销 |
 
-矿车 hook 刻意注入在 `Entity.remove` 与 `AbstractMinecartContainer.remove` 的 HEAD，早于内容销毁——因为 vanilla 快速路径会先掉落内容，仅靠 tick 末采样会漏掉快速下坠。音符盒 hook 区分玩家尝试（`useItemOn`/`useWithoutItem`）、携带触发实体的请求（`playNote`）与服务端处理（`triggerEvent`）；任意右键、发声和命令反馈都不会被当成机器操作。
+矿车 hook 刻意注入在 `Entity.remove` 与 `AbstractMinecartContainer.remove` 的 HEAD，早于内容销毁——因为 vanilla 快速路径会先掉落内容，仅靠 tick 末采样会漏掉快速下坠。音符盒 hook 区分玩家尝试（`useItemOn`/`useWithoutItem`，以及 26.2 的 `attack` 左键，记为 `path: "attack"`，避免左键污染证据链）、携带触发实体的请求（`playNote`）与服务端处理（`triggerEvent`）；任意右键、发声和命令反馈都不会被当成机器操作。
+
+一个请求或尝试只会记到一次处理事件：引擎消费已匹配记录，只有配置的输入位置进入关联表，过期条目每 tick 清理。verifier 在一个 `requestSeq`/`attemptSeq` 被多个目标 `input_processed` 引用，或尝试/请求/处理的 operator UUID 不一致时判失败。
 
 所有 hook 只用 `@Inject`：没有 redirect、没有 overwrite、不修改状态、不取消回调。每个 hook 的调用次数、总纳秒与最大纳秒都写进状态文件和 `audit_end`，观测开销可度量。
 
@@ -139,6 +141,7 @@ python tests/mods/minecart-audit/live_smoke.py
 
 * 一次跨服务端重启的正向运行（两个会话、一次智能体操作、一辆矿车在被虚空移除前被捕获）；
 * `无交互`、`错误位置`、`仅 marker`、`仅答案`、`仅红石` 五个负向运行——都必须被 verifier 判失败；
+* kill/restart 负例（`stop --force` 后重启、只关闭第二个会话）——verifier 必须对未关闭会话报 `incomplete`；
 * 装了 mod 但没有配置的实验室——必须报告"not configured"；
 * 一个不装 mod 的对照实验室跑同一脚本，对比可观察结果（音符被调、矿车消失），证明 hook 不改变 fixture 行为；
 * 源存档的只读副本在装了 mod 的情况下正常加载；

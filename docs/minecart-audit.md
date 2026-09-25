@@ -105,9 +105,11 @@ side's control surface. The commands never operate the machine.
 | `/mcaudit end` | writes `audit_end` and closes the JSONL |
 
 The server also writes `audit_ready` at startup and `audit_end` on shutdown. A
-server that dies before `audit_end` leaves an open session and the status file
-or a later verifier run reports an incomplete audit - missing evidence is a
-loud result, not a silent pass.
+server that dies before `audit_end` leaves an open session; the verifier treats
+**any** open session in the file as incomplete (an explicit
+`--allow-open-history` is required to ignore an earlier crashed session), so
+missing evidence is a loud result, not a silent pass. The live smoke includes a
+kill/restart negative for exactly this case.
 
 ## Evidence files
 
@@ -124,8 +126,10 @@ Every event carries `seq` (strictly increasing in the file, seeded across
 server restarts), `tick` (server tick), `wall`, `run`, `inst`, `session`,
 `phase` and `type`. A restart appends a new `session_start`; one `runId` can
 therefore span several server sessions (needed for mod redeploys and snapshot
-restores) without losing ordering. `maxBytes` caps the log; overflow sets
-`truncated` and the verifier treats the run as incomplete.
+restores) without losing ordering. `maxBytes` caps the whole file, not one
+session: the byte counter is seeded from the existing file size, so a run
+restarted several times cannot reset the budget. Overflow sets `truncated` and
+the verifier treats the run as incomplete.
 
 Key event types:
 
@@ -146,10 +150,19 @@ Key event types:
 The minecart hooks deliberately inject at `Entity.remove` and
 `AbstractMinecartContainer.remove` *before* content destruction, because the
 vanilla fast path drops contents first; end-of-tick sampling alone would lose
-a fast fall. The note-block hooks distinguish the player attempt
-(`useItemOn`/`useWithoutItem`), the request that carries the triggering entity
-(`playNote`) and the processing (`triggerEvent`); right-clicks, sounds and
-command feedback are never treated as machine operation.
+a fast fall. The note-block hooks distinguish the player attempts
+(`useItemOn`/`useWithoutItem`, and 26.2's `attack` punch, recorded with
+`path: "attack"` so a punch cannot poison the chain), the request that carries
+the triggering entity (`playNote`) and the processing (`triggerEvent`);
+right-clicks, sounds and command feedback are never treated as machine
+operation.
+
+A request or attempt is credited to exactly one processing event: the engine
+consumes the matched record, only configured input positions feed the
+correlation maps, and stale entries are pruned each tick. The verifier fails a
+run when one `requestSeq`/`attemptSeq` is referenced by more than one
+target `input_processed`, or when the attempt/request/processing operator
+UUIDs disagree.
 
 All hooks use `@Inject` only: no redirects, no overwrites, no mutation, no
 cancellation. Per-hook call counts, total nanoseconds and max nanoseconds are
@@ -201,11 +214,15 @@ The script builds the mod, raises disposable void labs on the issue's ports
   one cart captured before the void);
 * `no interaction`, `wrong position`, `marker only`, `answer only` and
   `redstone only` negative runs - all must fail the verifier;
+* a killed-server run (`stop --force`, restart, close the second session) -
+  the verifier must report `incomplete` for the abandoned session;
 * a lab with the mod but no config - must report "not configured";
 * a control lab without the mod running the same script, compared on the
   observable results (the note cycles, the cart is gone) to show the hooks do
   not change fixture behaviour;
-* a read-only copy of the source save loading with the mod installed;
+* a read-only copy of the source save loading with the mod installed; the save
+  is discovered under `--mc-dir`'s version instances (or `--source-save`), and
+  a missing save fails the run instead of silently passing subsections;
 * cross-instance log separation.
 
 Evidence lands in `labs/rom18-evidence/` (`summary.json`, the raw logs, the

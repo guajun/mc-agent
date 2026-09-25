@@ -59,9 +59,29 @@ def default_minecraft_dir() -> str:
     return str(candidates[0])
 
 
+def java_major(java: Path) -> int:
+    """Major version of a java executable, 0 when it cannot be read."""
+    try:
+        result = subprocess.run(
+            [str(java), "-version"], capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return 0
+    match = re.search(r'version "(\d+)', (result.stderr or "") + (result.stdout or ""))
+    return int(match.group(1)) if match else 0
+
+
 def find_jdk(explicit: str | None) -> Path:
-    """--jdk, then MC_AGENT_JAVA, then lab metadata, then JAVA_HOME, then PATH."""
-    candidates: list[tuple[str, str | None]] = [("--jdk", explicit), ("MC_AGENT_JAVA", os.environ.get("MC_AGENT_JAVA"))]
+    """A Java 25 JDK: --jdk, MC_AGENT_JAVA, lab metadata, JAVA_HOME, PATH, HMCL.
+
+    Minecraft 26.2 is class-file 69; a JDK 21 on PATH is a common trap, so
+    candidates are version-checked instead of taking the first hit.
+    """
+    candidates: list[Path] = []
+    for value in (explicit, os.environ.get("MC_AGENT_JAVA")):
+        if value:
+            candidates.append(Path(value))
     # tools/lab_server.py records the java it was provisioned with; reuse it
     # when no explicit JDK was given so a lab and its build agree on the JVM.
     for lab_json in sorted((PROJECT.parents[2] / "labs").glob("*/lab.json")):
@@ -70,23 +90,31 @@ def find_jdk(explicit: str | None) -> Path:
         except (OSError, ValueError):
             continue
         if recorded:
-            candidates.append((str(lab_json), recorded))
-    candidates.append(("JAVA_HOME", os.environ.get("JAVA_HOME")))
-    for origin, value in candidates:
-        if not value:
-            continue
-        path = Path(value)
-        if path.is_dir() and (path / "bin").is_dir():
-            return path
-        if path.is_file():
-            return path.parent.parent
-        found = shutil.which(value)
-        if found:
-            return Path(found).resolve().parent.parent
+            candidates.append(Path(recorded))
+    home = os.environ.get("JAVA_HOME")
+    if home:
+        candidates.append(Path(home))
     javac = shutil.which("javac")
     if javac:
-        return Path(javac).resolve().parent.parent
-    raise SystemExit(f"JDK not found for {origin}: pass --jdk or set JAVA_HOME/MC_AGENT_JAVA")
+        candidates.append(Path(javac).resolve().parent.parent)
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        for pattern in ("*/*/bin/java.exe", "*/*/bin/java"):
+            candidates.extend(sorted((Path(appdata) / ".hmcl" / "java").glob(pattern)))
+
+    checked: list[str] = []
+    for candidate in candidates:
+        java = candidate
+        if java.is_dir():
+            java = java / "bin" / ("java.exe" if os.name == "nt" else "java")
+        if not java.is_file():
+            continue
+        major = java_major(java)
+        checked.append(f"{java} (java {major or '?'})")
+        if major >= 25:
+            return java.parent.parent
+    detail = "; ".join(checked) if checked else "no java candidates"
+    raise SystemExit(f"no Java 25+ JDK found ({detail}); pass --jdk or set MC_AGENT_JAVA/JAVA_HOME")
 
 
 def version_key(path: Path) -> list[int]:
@@ -195,7 +223,10 @@ def main() -> int:
     sources = sorted(str(path) for path in SRC.rglob("*.java"))
     if not sources:
         raise SystemExit(f"no java sources under {SRC}")
-    args_file = out_dir / "javac.args"  # out/ is git-ignored; the args embed absolute paths
+    # javac @argfile must live outside the packaged directory: absolute paths
+    # must not end up inside the distributed jar.
+    args_dir = Path(tempfile.mkdtemp(prefix="mc-agent-audit-build-"))
+    args_file = args_dir / "javac.args"
     args_file.write_text(
         "\n".join(
             [

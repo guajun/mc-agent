@@ -110,7 +110,18 @@ LABS_CONFIG = {
     "rom18-src": (27186, 27187),
 }
 
-SOURCE_SAVE = Path("D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test")
+def default_source_save(mc_dir: Path) -> Path:
+    """Find Minecart ROM test under the launcher's saves or a version instance."""
+    candidates: list[Path] = []
+    versions = mc_dir / "versions"
+    if versions.is_dir():
+        for version in sorted(versions.iterdir()):
+            candidates.append(version / "saves" / "Minecart ROM test")
+    candidates.append(mc_dir / "saves" / "Minecart ROM test")
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return candidates[0]
 
 NOTE_1 = {"name": "note-block", "from": [0, -59, 0], "to": [0, -59, 0]}
 STACK_1 = {"name": "stack", "from": [2, -60, -1], "to": [3, -59, 1]}
@@ -398,7 +409,7 @@ def scenario_environment_only(name: str, run_id: str, instance: str) -> dict:
     return observable
 
 
-def scenario_source_world(mc_dir: Path, java: Path) -> dict:
+def scenario_source_world(mc_dir: Path, java: Path, source_save: Path) -> dict:
     """Load a read-only copy of the source save with the audit mod installed.
 
     This is the source-world half of "both the source world and the restored
@@ -406,9 +417,9 @@ def scenario_source_world(mc_dir: Path, java: Path) -> dict:
     save. The restored-copy half depends on the bridge restore work.
     """
     name = "rom18-src"
-    if not SOURCE_SAVE.is_dir():
-        return {"skipped": f"source save not present: {SOURCE_SAVE}"}
-    prepare_lab(name, with_mod=True, mc_dir=mc_dir, java=java, source_world=SOURCE_SAVE)
+    if not source_save.is_dir():
+        return {"skipped": f"source save not present: {source_save}"}
+    prepare_lab(name, with_mod=True, mc_dir=mc_dir, java=java, source_world=source_save)
     run_id = f"meta18-src-{time.strftime('%Y%m%d-%H%M%S')}"
     write_config(
         name,
@@ -417,7 +428,7 @@ def scenario_source_world(mc_dir: Path, java: Path) -> dict:
         [NOTE_1],
         {"name": "stack", "from": [-64, -64, -64], "to": [64, 64, 64]},
         OUTPUT_1,
-        provenance={"kind": "source-world", "reference": str(SOURCE_SAVE)},
+        provenance={"kind": "source-world", "reference": str(source_save)},
     )
     lab("start", "--name", name, "--wait", "300")
     status = rcon(name, "mcaudit status")
@@ -431,6 +442,23 @@ def scenario_source_world(mc_dir: Path, java: Path) -> dict:
     rcon(name, "mcaudit end")
     lab("stop", "--name", name, "--timeout", "120")
     return observable
+
+
+def scenario_crash(name: str, run_id: str, instance: str) -> dict:
+    """Kill the server mid-experiment: the abandoned session must be incomplete."""
+    write_config(name, run_id, instance, [NOTE_1], STACK_1, OUTPUT_1)
+    fresh_world(name)
+    lab("start", "--name", name, "--wait", "300")
+    rcon(name, "mcaudit phase init")
+    reset_machine(name)
+    summon_cart(name, 3.5, 0.5, "apple", 3)
+    rcon(name, "mcaudit phase experiment_start")
+    time.sleep(1)
+    lab("stop", "--name", name, "--force")  # no console, no audit_end
+    lab("start", "--name", name, "--wait", "300")
+    rcon(name, "mcaudit end")  # closes the second session only
+    lab("stop", "--name", name, "--timeout", "120")
+    return {"first_session_abandoned": True}
 
 
 def scenario_control(mc_dir: Path, java: Path) -> dict:
@@ -500,6 +528,8 @@ def main() -> int:
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--keep-labs", action="store_true", help="keep the disposable labs for inspection")
     parser.add_argument("--mc-dir", default=default_mc_dir())
+    parser.add_argument("--source-save", default="", help="read-only source save for the load check")
+    parser.add_argument("--allow-missing-source-world", action="store_true")
     parser.add_argument("--java", default=default_java(), help="Java 25 executable; discovered by default")
     args = parser.parse_args()
     mc_dir = Path(args.mc_dir)
@@ -551,11 +581,18 @@ def main() -> int:
     summary["scenarios"]["environment_only"]["verdict"] = verify("rom18-b", run_env, ["fail"])
 
     # 4) the source save (read-only copy) loads with the audit mod installed
-    summary["scenarios"]["source_world"] = scenario_source_world(mc_dir, java)
+    source_save = Path(args.source_save) if args.source_save else default_source_save(mc_dir)
+    summary["scenarios"]["source_world"] = scenario_source_world(mc_dir, java, source_save)
     if "run_id" in summary["scenarios"]["source_world"]:
         source_run = summary["scenarios"]["source_world"]["run_id"]
         summary["scenarios"]["source_world"]["verdict"] = verify(
             "rom18-src", source_run, ["pass"], allow_no_operation=True)
+
+    # 4b) a killed server leaves an open session; the verifier must say incomplete
+    run_crash = f"meta18-crash-{stamp}"
+    summary["scenarios"]["crash_abandoned_session"] = scenario_crash("rom18-b", run_crash, "lab-rom18-b")
+    summary["scenarios"]["crash_abandoned_session"]["verdict"] = verify(
+        "rom18-b", run_crash, ["incomplete"])
 
     # 5) control lab without the audit mod: fixture behavior is unchanged
     summary["scenarios"]["control_no_mod"] = scenario_control(mc_dir, java)
@@ -601,15 +638,22 @@ def main() -> int:
     )
     summary["checks"]["sessions_after_restart"] = len(positive["verdict"]["sessions"]) >= 2
     source = summary["scenarios"]["source_world"]
-    summary["checks"]["source_world_loads_mod"] = bool(
-        source.get("skipped")
-    ) or (
-        source.get("server_loaded_source_world")
-        and source.get("audit_ready")
-        and source.get("no_mixin_or_audit_errors")
-        and source.get("verdict", {}).get("verdict") == "pass"
+    if source.get("skipped"):
+        summary["checks"]["source_world_loads_mod"] = bool(args.allow_missing_source_world)
+        summary["checks"]["source_world_reason"] = str(source.get("skipped"))
+    else:
+        summary["checks"]["source_world_loads_mod"] = (
+            source.get("server_loaded_source_world")
+            and source.get("audit_ready")
+            and source.get("no_mixin_or_audit_errors")
+            and source.get("verdict", {}).get("verdict") == "pass"
+        )
+    summary["checks"]["crash_marks_incomplete"] = (
+        summary["scenarios"]["crash_abandoned_session"]["verdict"]["verdict"] == "incomplete"
     )
-    summary["all_passed"] = all(summary["checks"].values())
+    summary["all_passed"] = all(
+        value for key, value in summary["checks"].items() if key != "source_world_reason"
+    )
 
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     (EVIDENCE / "summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")

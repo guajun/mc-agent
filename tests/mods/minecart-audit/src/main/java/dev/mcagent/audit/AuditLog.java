@@ -59,6 +59,9 @@ public final class AuditLog {
         this.initialSeq = lastSeq(file);
         this.bytesBeforeSession = Files.isRegularFile(file) ? Files.size(file) : 0L;
         this.seq = initialSeq;
+        // maxBytes caps the whole file: a run restarted several times must not
+        // reset the budget on every session.
+        this.bytes = bytesBeforeSession;
         this.statusFile = dir.resolve("status-" + AuditConfig.safeName(runId) + ".json");
         this.latestFile = dir.resolve("latest.json");
         this.writer = Files.newBufferedWriter(
