@@ -1,6 +1,6 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T00:56:46+0800",
+  "checked_at": "2026-09-26T01:06:11+0800",
   "verdict": "PREMATURE_OUTPUT",
   "ok": false,
   "problems": [
@@ -11,7 +11,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "4ba80e62-e1e8-4828-b6bd-1756638531b0",
+      "uuid": "d72960a3-2ef2-4bd0-8581-28c69b23ec81",
       "motion": [
         0.0,
         1.0,
@@ -20,7 +20,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "fea95757-1ca9-4c96-b81d-6bbfe08243e4",
+      "uuid": "4f8266b6-bc5f-4fdb-b9b2-37ee7b9f5d46",
       "motion": [
         0.0,
         1.0,
@@ -29,7 +29,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "3cfef551-06c5-4987-aa1c-4d8249b1aa99",
+      "uuid": "684aec25-64ac-4659-a301-6b7057bd7d97",
       "motion": [
         0.0,
         1.0,

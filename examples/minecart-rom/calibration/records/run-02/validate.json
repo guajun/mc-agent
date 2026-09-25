@@ -1,20 +1,20 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T00:54:31+0800",
+  "checked_at": "2026-09-26T01:03:46+0800",
   "verdict": "READY",
   "ok": true,
   "problems": [],
   "snapshot": {
     "format": "mc-agent/minecart-rom-record@1",
-    "captured_at": "2026-09-26T00:54:29+0800",
+    "captured_at": "2026-09-26T01:03:43+0800",
     "tick_frozen": true,
     "lab": "rom15b",
     "server": {
       "lab": "rom15b",
       "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15b",
       "running": true,
-      "pid": 92524,
-      "startedAt": 1790355210.8705447,
+      "pid": 73068,
+      "startedAt": 1790355766.5369782,
       "rcon_host": "127.0.0.1",
       "rcon_port": 27152,
       "world": "new world",
@@ -26,13 +26,13 @@
       "loader": "0.19.5"
     },
     "spawn_order": [
-      "6f4405c0-3cf0-4159-9c6a-03b421bf20ac",
-      "a8f5ec8f-0b76-4d54-bca3-f5816132d644",
-      "1628e47a-2d80-4070-923a-65039b1f8c3c"
+      "95243465-9355-42de-b89e-736891bdca96",
+      "8f3409bb-ee77-47b7-b34c-b475816b60ec",
+      "14afd22d-b4f5-4fb1-97cb-68d32f6c7607"
     ],
     "carts": [
       {
-        "uuid": "6f4405c0-3cf0-4159-9c6a-03b421bf20ac",
+        "uuid": "95243465-9355-42de-b89e-736891bdca96",
         "pos": [
           14.5,
           -51.9375,
@@ -50,10 +50,11 @@
             "id": "minecraft:stone"
           }
         ],
+        "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Slot: 0b, id: \"minecraft:stone\"}], UUID: [I; -1792789403, -1823128866, -1197575320, -1849832810], FlippedRotation: 0b, HasTicked: 0b}",
         "spawn_index": 0
       },
       {
-        "uuid": "a8f5ec8f-0b76-4d54-bca3-f5816132d644",
+        "uuid": "8f3409bb-ee77-47b7-b34c-b475816b60ec",
         "pos": [
           14.5,
           -51.9375,
@@ -71,10 +72,11 @@
             "id": "minecraft:dirt"
           }
         ],
+        "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 2, Slot: 1b, id: \"minecraft:dirt\"}], UUID: [I; -1892415045, -294172745, -1286818699, -2123669268], FlippedRotation: 0b, HasTicked: 0b}",
         "spawn_index": 1
       },
       {
-        "uuid": "1628e47a-2d80-4070-923a-65039b1f8c3c",
+        "uuid": "14afd22d-b4f5-4fb1-97cb-68d32f6c7607",
         "pos": [
           14.5,
           -51.9375,
@@ -92,6 +94,7 @@
             "id": "minecraft:gold_ingot"
           }
         ],
+        "nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 3, Slot: 2b, id: \"minecraft:gold_ingot\"}], UUID: [I; 347066925, -1258991695, -1748277037, 795637255], FlippedRotation: 0b, HasTicked: 0b}",
         "spawn_index": 2
       }
     ],
@@ -269,9 +272,9 @@
       "playerGameType": "1"
     },
     "entity_order": [
-      "6f4405c0-3cf0-4159-9c6a-03b421bf20ac",
-      "a8f5ec8f-0b76-4d54-bca3-f5816132d644",
-      "1628e47a-2d80-4070-923a-65039b1f8c3c"
+      "95243465-9355-42de-b89e-736891bdca96",
+      "8f3409bb-ee77-47b7-b34c-b475816b60ec",
+      "14afd22d-b4f5-4fb1-97cb-68d32f6c7607"
     ],
     "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be"
   },

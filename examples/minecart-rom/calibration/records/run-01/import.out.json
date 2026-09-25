@@ -7,12 +7,12 @@
   "manifest_version": "1.0.0",
   "download": {
     "path": "labs\\_scratch\\mapcache\\minecart-rom-base-1.0.0.zip",
-    "url": "http://127.0.0.1:27158/minecart-rom-base-1.0.0.zip",
-    "http_status": 200,
+    "url": "(cache)",
+    "http_status": 0,
     "bytes": 748718,
     "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
-    "cache_hit": false,
-    "seconds": 0.064
+    "cache_hit": true,
+    "seconds": 0.0
   },
   "extract": {
     "entries": 32,

@@ -763,6 +763,10 @@ def take_snapshot(
     fixture = spec["fixture"]
     checks = spec["machine"].get("checks") or DEFAULT_MACHINE_CHECKS
     carts = cart_records(console)
+    for record in carts:
+        # the full entity NBT dump, unsanitized, is part of the ready record
+        dump = console.cmd(f"data get entity {record['uuid']}")
+        record["nbt"] = after_mark(dump, " has the following entity data: ")
     spawn_order = spawn_order or []
     for record in carts:
         record["spawn_index"] = (

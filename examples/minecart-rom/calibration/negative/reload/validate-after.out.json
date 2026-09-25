@@ -1,13 +1,13 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T00:58:12+0800",
+  "checked_at": "2026-09-26T01:07:37+0800",
   "verdict": "FIXTURE_INVALID:RELOAD",
   "ok": false,
   "problems": [
     {
       "check": "server-restarted",
-      "pid_at_ready": 32600,
-      "pid_now": 108540
+      "pid_at_ready": 102168,
+      "pid_now": 64536
     },
     {
       "check": "user-missing"

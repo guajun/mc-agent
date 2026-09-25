@@ -2,11 +2,11 @@
   "lab": "rom15c",
   "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15c",
   "running": true,
-  "pid": 100428,
-  "startedAt": 1790355572.6035662,
+  "pid": 47204,
+  "startedAt": 1790356100.062194,
   "rcon_host": "127.0.0.1",
   "rcon_port": 27154,
-  "world": "copied save",
+  "world": "new world",
   "mods": [
     "fabric-api-0.161.0+26.2.jar",
     "fabric-carpet-26.2+v260616.jar"

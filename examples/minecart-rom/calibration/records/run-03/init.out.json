@@ -2,15 +2,15 @@
   "records": "examples\\minecart-rom\\calibration\\records\\run-03",
   "cart_count": 3,
   "spawn_order": [
-    "2d61bd94-256a-4108-8e06-e4cb0f39d492",
-    "73944723-d631-4955-a1ab-6cca680f228b",
-    "3a6d889c-1712-42c7-8400-e8329463d588"
+    "1085e799-7ee2-4647-9f9f-44f95403f06e",
+    "f8d4c869-5930-4a79-871b-bb8977182b48",
+    "990f7231-fd74-40cd-b006-aa02665f7877"
   ],
   "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
   "entity_order": [
-    "2d61bd94-256a-4108-8e06-e4cb0f39d492",
-    "73944723-d631-4955-a1ab-6cca680f228b",
-    "3a6d889c-1712-42c7-8400-e8329463d588"
+    "1085e799-7ee2-4647-9f9f-44f95403f06e",
+    "f8d4c869-5930-4a79-871b-bb8977182b48",
+    "990f7231-fd74-40cd-b006-aa02665f7877"
   ],
   "machine": {
     "ok": true,
