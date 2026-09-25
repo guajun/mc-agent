@@ -41,6 +41,7 @@ nav:
       - Installing the Toolkit Skill: toolkit-skill.md
       - "Unattended Hermes: webhook + Skill": hermes-unattended.md
       - Headless lab servers: lab-server.md
+      - Building a mod for a lab: mod-building.md
       - Checking a fork: fork-verify.md
   - Reference:
       - Tools: tools.md
@@ -78,6 +79,7 @@ plugins:
             Installing the Toolkit Skill: 安装 Toolkit Skill
             "Unattended Hermes: webhook + Skill": "Hermes 无人值守：webhook + Skill"
             Headless lab servers: 无头实验室服务器
+            Building a mod for a lab: 为实验室构建 mod
             Checking a fork: 校验一次分叉
             Reference: 参考
             Tools: 工具

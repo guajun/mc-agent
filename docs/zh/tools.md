@@ -74,7 +74,8 @@ mc-agent-loop/             智能体 loop 与它的后端
 | --- | --- |
 | `smoke_offline.py` | 对着假 mod 跑整套链路，可带模型也可不带 |
 | `launch_instance.py` | 直接启动游戏实例，不需要图形启动器；支持 `--world`、`--username`、`--jvm-property mcagent.autoConnect=host:port` |
-| `lab_server.py` | 供给、启动、停止、`exec` 一个无头 Fabric 实验室（RCON 控制台，纯标准库） |
+| `lab_server.py` | 供给、启动、停止、`exec`、`identity`、`verify` 一个无头 Fabric 实验室（RCON 控制台，纯标准库） |
+| `build_mod.py` | 对着实验室自己的服务端/依赖库/API jar 编译 Fabric mod，输出确定性 jar 与构建元数据 |
 | `fork_verify.py` | `inspect` 录制、按顺序 `restore`、`check` 实验室是否复现、`diff` 两次录制逐实体对比 |
 | `fake_player.py` | 生成、驱动、查询 Carpet 假人——不需要第二个客户端就有身体 |
 | `game_cmd.py` | 执行一条游戏命令并打印它产生的反馈 |
@@ -90,6 +91,8 @@ python tools/fake_player.py status deepseek
 
 python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
 python tools/lab_server.py exec --name lab-01 "tick freeze"
+python tools/lab_server.py identity --name lab-01 --json
+python tools/build_mod.py --source examples/smoke-mod --lab lab-01 --out labs/build/smoke-mod.jar
 
 python tools/fork_verify.py diff "<录制 A>" "<录制 B>"
 ```
