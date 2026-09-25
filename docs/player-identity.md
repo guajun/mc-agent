@@ -124,6 +124,80 @@ exists: scripts run inside the server, can read entity NBT and schedule work,
 and are installed as files. An agent can manage those scripts through the same
 two primitives it already has (write a file, run a command).
 
+## 3. The task user: identity and view target (verified live)
+
+The server vantage is also the *identity* vantage. When a task names its user -
+normally by UUID - the agent resolves that user with `mc_player` (MCP) or
+`mc-bridge call player` (CLI) and gets the **live** server record of exactly
+that player: identity, dimension, position, yaw/pitch, eye, and
+`player.view.target`, the server-side ray from that player's own eye and look
+direction. It never falls back to the host client or to the first entry of the
+player list.
+
+Verified combination (2026-09-25), dedicated Fabric 26.2 server, two Carpet
+fake players, no player client attached:
+
+| Component | Version / commit | Note |
+| --- | --- | --- |
+| interface mod | 0.6.0, `3b93ceb` | server-vantage `PLAYER`/`CONTEXT` (PR #4 + #5) |
+| bridge | 0.4.1, [`#8`](https://github.com/guajun/mc-agent-bridge/pull/8) | 0.4.0 dropped the mod's split `view`; 0.4.1 keeps it under `player.view` |
+| Minecraft / Fabric loader | 26.2 / 0.19.5 | Carpet 26.2+v260616, Fabric API 0.161.0+26.2 |
+| Java | 25.0.1 | the lab server's java |
+
+The lab scene: Alice at `(0.5, 100.0, 0.5)` facing a dispenser at
+`(0, 101, 4)`, Bob at `(4.5, 100.0, 0.5)` facing an armor stand. The calls were
+made with `tools/mcp_probe.py` against the bridge's MCP server, exactly as an
+agent runtime would.
+
+| Call | Result |
+| --- | --- |
+| `mc_player` with Alice's UUID | `found: true`, `name: Alice`, `view.target.type: block`, `block.id: minecraft:dispenser`, `distance: 3.5` |
+| `mc_player` with Bob's UUID (Alice is first in `state.playerList`) | `found: true`, `name: Bob`, `view.target.type: entity`, `entity.type: minecraft:armor_stand` |
+| Bob looking straight up (pitch -90) | `view.target.type: miss`, `distance: 5.0` |
+| an unknown UUID, or an unknown name | `found: false` - no substitution of the other or first player |
+| task-start call, then `tp` Alice two blocks forward | same `uuid`/`name`; `z` 0.5 -> 2.5 and the dispenser distance 3.5 -> 1.5; each call is current, not a cached start record |
+
+A `mc_player` reply, abridged:
+
+```json
+"player": {
+  "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913", "name": "Alice",
+  "dimension": "minecraft:overworld", "x": 0.5, "y": 100.0, "z": 0.5,
+  "yaw": 0.0, "pitch": 0.0, "eye": [0.5, 101.62000000476837, 0.5],
+  "view": {
+    "blockRange": 5.0, "entityRange": 5.0,
+    "target": {"type": "block", "distance": 3.5,
+      "block": {"x": 0, "y": 101, "z": 4, "id": "minecraft:dispenser", "face": "north"}}
+  }
+}
+```
+
+### The cold-start entry
+
+The first cold start needs no webhook and no model backend: an external task
+entry carries the identity, and the agent then makes a **live** `mc_player`
+call. That is the path verified above.
+
+* **entry**: whatever produced the task - a CLI, a queue, a webhook, an
+  operator - passes the player. No game-side receipt is required.
+* **fields**: `{"player": "<uuid-or-name>"}`; prefer the dashed UUID. A
+  32-character undashed UUID also works, and a name is a convenience. The
+  reply's `uuid` is the stable value to carry forward, not the display name.
+* **`found: false` is an answer**: report it; never retry against another
+  player. `state.playerList` lists who is actually online.
+* **`context_id` only if the entry produced one.** A chat event carries
+  `contextId`; `mc_context` fetches the frozen bundle. Check `timing`:
+  `receipt` is a network chat packet, `broadcast` is a server-side `say` -
+  a Carpet fake player's `execute as <name> run say ...` is `broadcast`, so it
+  is a real, fetchable bundle but **not** packet-time history. Live network
+  chat from a real client was not exercised by this lab, and is not claimed.
+* **no Harness backend is added here.** The task entry and the live
+  `mc_player` call are the whole identity path; a model loop is a separate
+  deliverable.
+
+The full transcript, versions and the pre-fix comparison are in the
+[evidence bundle](evidence/rom13-meta16/live-identity.json).
+
 ## What "client view" means for measurements
 
 The client's entity positions and velocities are interpolated for rendering, so
