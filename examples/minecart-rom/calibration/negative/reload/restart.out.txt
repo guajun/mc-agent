@@ -1,7 +1,8 @@
-starting lab rom15b in labs\rom15b
+  cleared stale labs\rom15d\mc-agent-server\port.txt - the server-vantage mod rewrites it when it binds
+starting lab rom15d in labs\rom15d
   java C:\Users\MSI-NB\AppData\Roaming\.hmcl\java\windows-x86_64\mojang-java-runtime-epsilon\bin\java.exe
-  -Xmx3G -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dmcagent.serverDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15b\mc-agent-server -Dmcagent.serverPort=11819 -Dmcagent.labName=rom15b -Dmcagent.labInstance=c0c10c33b92045858cec2ecf2d6c64f1 -Dmcagent.auditDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15b\audit -Dmcagent.worldDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15b\world -jar fabric-server-mc.26.2-loader.0.19.5-launcher.1.1.2.jar nogui
-  pid 81452, log labs\rom15b\logs\console.log
+  -Xmx3G -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dmcagent.serverDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15d\mc-agent-server -Dmcagent.serverPort=27158 -Dmcagent.labName=rom15d -Dmcagent.labInstance=3b976c781f5f465c869ff5de94f1278f -Dmcagent.auditDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15d\audit -Dmcagent.worldDir=F:\mc-agent-worktrees\rom13\meta15\labs\rom15d\world -jar fabric-server-mc.26.2-loader.0.19.5-launcher.1.1.2.jar nogui
+  pid 80828, log labs\rom15d\logs\console.log
 waiting up to 300s for the server to say Done
-ready in 12.1s: [01:20:47] [Server thread/INFO]: Done (0.334s)! For help, type "help"
-  note: labs\rom15b\mc-agent-server\port.txt has not appeared; the server-vantage mod writes it when it binds
+ready in 10.0s: [01:53:52] [Server thread/INFO]: Done (0.372s)! For help, type "help"
+  server-vantage: 127.0.0.1:27158 (labs\rom15d\mc-agent-server\port.txt)

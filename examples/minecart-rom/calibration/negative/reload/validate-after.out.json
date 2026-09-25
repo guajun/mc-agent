@@ -1,16 +1,24 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T01:21:12+0800",
+  "checked_at": "2026-09-26T01:54:02+0800",
   "verdict": "FIXTURE_INVALID:RELOAD",
   "ok": false,
   "problems": [
     {
       "check": "server-restarted",
-      "pid_at_ready": 72600,
-      "pid_now": 81452
+      "pid_at_ready": 70844,
+      "pid_now": 80828
+    },
+    {
+      "check": "world-not-frozen",
+      "tick_frozen": false
     },
     {
       "check": "user-missing"
+    },
+    {
+      "check": "tick-order-unavailable",
+      "note": "no current interface snapshot; cannot prove the tick order"
     }
   ],
   "ready_snapshot": "examples\\minecart-rom\\calibration\\negative\\reload\\ready-snapshot.json",

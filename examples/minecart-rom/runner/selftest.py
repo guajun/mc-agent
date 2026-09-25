@@ -11,6 +11,7 @@ tree hash, the snapshot parser and the ready/reload/premature classifiers.
 from __future__ import annotations
 
 import copy
+import hashlib
 import http.server
 import json
 import shutil
@@ -279,26 +280,53 @@ def test_artifact_layout(tmp: Path) -> None:
     )
 
 
-def synthetic_snapshot(spec: dict, nbt: str = "{items:[{Slot:0b,id:\"minecraft:stone\",count:1b}]}") -> dict:
+def synthetic_snapshot(spec: dict, program: list[dict] | None = None) -> dict:
+    entries = program if program is not None else spec["program"]["entries"]
     carts = []
-    for index, entry in enumerate(spec["program"]["entries"]):
+    for index, entry in enumerate(entries):
+        items = [
+            {"Slot": item.get("slot", item.get("Slot", 0)), "id": item["id"], "count": item.get("count", 1)}
+            for item in entry["items"]
+        ]
+        nbt = "{" + ",".join(
+            f'count:{item["count"]},Slot:{item["Slot"]}b,id:"{item["id"]}"' for item in items
+        ) + "}"
         carts.append(
             {
                 "uuid": f"00000000-0000-0000-0000-{index:012d}",
                 "pos": list(spec["machine"]["stack"]["rest_pos"]),
                 "motion": [0.0, 0.0, 0.0],
-                "items": [
-                    {"Slot": item.get("slot", 0), "id": item["id"], "count": item.get("count", 1)}
-                    for item in entry["items"]
-                ],
+                "items": items,
+                "nbt": nbt,
+                "nbt_sha256": hashlib.sha256(nbt.encode("utf-8")).hexdigest(),
                 "spawn_index": index,
             }
         )
+    spawn_order = [record["uuid"] for record in carts]
+    tick_order = list(spawn_order)
+    interface = {
+        "name": "synthetic",
+        "dir": "/tmp/synthetic",
+        "entities": len(carts),
+        "order_hash": "0123456789abcdef",
+        "tick": 6000,
+        "mod_version": "0.6.0",
+        "tick_order": tick_order,
+        "cross_check_ok": True,
+        "cross_check": [
+            {"uuid": record["uuid"], "present": True, "items_match": True, "pos_match": True, "motion_match": True}
+            for record in carts
+        ],
+    }
     return {
         "format": fixture.RECORD_FORMAT,
         "tick_frozen": True,
-        "spawn_order": [record["uuid"] for record in carts],
-        "entity_order": [record["uuid"] for record in carts],
+        "program": entries,
+        "spawn_order": spawn_order,
+        "rcon_order": list(spawn_order),
+        "tick_order": tick_order,
+        "tick_order_hash": fixture.tick_order_hash(carts, tick_order),
+        "interface": interface,
         "carts": carts,
         "cart_count": len(carts),
         "machine": {"ok": True, "checks": [], "note": 20},
@@ -311,6 +339,21 @@ def test_validate_ready() -> None:
     spec = fixture.load_spec()
     good = synthetic_snapshot(spec)
     check(fixture.validate_ready(spec, good)["ok"], "valid ready snapshot passes")
+    no_tick = copy.deepcopy(good)
+    no_tick["tick_order"] = None
+    no_tick["interface"]["cross_check_ok"] = False
+    report = fixture.validate_ready(spec, no_tick)
+    check(
+        any(problem["check"] == "tick-order-missing" for problem in report["problems"])
+        and any(problem["check"] == "interface-cross-check" for problem in report["problems"]),
+        "missing tick order fails the ready contract",
+    )
+    custom = synthetic_snapshot(spec, program=spec["program"]["entries"][:2])
+    check(fixture.validate_ready(spec, custom)["ok"], "a custom program is validated against itself")
+    custom_bad = copy.deepcopy(custom)
+    custom_bad["program"] = spec["program"]["entries"]
+    report = fixture.validate_ready(spec, custom_bad)
+    check(not report["ok"], "a custom run with a mismatched program fails")
     off_stack = copy.deepcopy(good)
     off_stack["carts"][0]["pos"][1] += 1.0
     report = fixture.validate_ready(spec, off_stack)
@@ -385,27 +428,114 @@ def uuid_ints(uuid: str) -> str:
 
 
 def test_live_classifier() -> None:
+    """Every readiness invariant must fail closed on a modified current state.
+
+    This is the focused regression for the coordinator's P1: a broken machine,
+    an unfrozen world, mutated NBT, a changed tick order or a changed order hash
+    must all stop the fixture from being reported READY.
+    """
+    import copy as _copy
+
     spec = fixture.load_spec()
     ready = synthetic_snapshot(spec)
     ready["server"] = {"pid": 111}
-    console = FakeConsole("fake", spec, copy.deepcopy(ready))
-    # the fake console reports the same machine checks and the frozen state
-    original = fixture.lab_status
-    fixture.lab_status = lambda name: dict(console.status, lab=name)
+    console = FakeConsole("fake", spec, _copy.deepcopy(ready))
+    status = {"running": True, "pid": 111}
+    current = {"value": _copy.deepcopy(ready)}
+
+    original_status = fixture.lab_status
+    original_snapshot = fixture.take_snapshot
+    fixture.lab_status = lambda name: dict(status, lab=name)
+
+    def stub_snapshot(*_args, **_kwargs):
+        return _copy.deepcopy(current["value"])
+
+    fixture.take_snapshot = stub_snapshot
     try:
         report = fixture.check_live_state(console, spec, ready)
         check(report["ok"] and report["verdict"] == "READY", "classifier: ready")
-        console.status["pid"] = 999
+
+        status["pid"] = 999
         report = fixture.check_live_state(console, spec, ready)
         check(report["verdict"] == "FIXTURE_INVALID:RELOAD", "classifier: reload")
-        console.status["pid"] = 111
-        console.snapshot["carts"] = console.snapshot["carts"][:2]
-        console.snapshot["entity_order"] = [record["uuid"] for record in console.snapshot["carts"]]
-        console.snapshot["normalized_hash"] = fixture.normalized_entity_hash(console.snapshot["carts"])
+        status["pid"] = 111
+
+        def reset(**changes):
+            current["value"] = _copy.deepcopy(ready)
+            for key, value in changes.items():
+                current["value"][key] = value
+
+        reset(machine={"ok": False, "checks": [{"pos": [11, -53, -22], "block": "minecraft:slime_block", "ok": False}]})
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            not report["ok"] and any(p["check"] == "machine-state" for p in report["problems"]),
+            "classifier: broken machine is not ready",
+        )
+
+        reset(tick_frozen=False)
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            any(p["check"] == "world-not-frozen" for p in report["problems"]),
+            "classifier: unfrozen world is not ready",
+        )
+
+        corrupted = _copy.deepcopy(ready)
+        corrupted["carts"][0]["nbt"] = corrupted["carts"][0]["nbt"].replace("count:1", "count:9")
+        corrupted["carts"][0]["nbt_sha256"] = hashlib.sha256(
+            corrupted["carts"][0]["nbt"].encode("utf-8")
+        ).hexdigest()
+        reset(carts=corrupted["carts"], normalized_hash=fixture.normalized_entity_hash(corrupted["carts"]))
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            any(p["check"] == "cart-nbt-changed" for p in report["problems"]),
+            "classifier: mutated cart NBT is not ready",
+        )
+
+        reset(tick_order=list(reversed(ready["tick_order"])), tick_order_hash="deadbeefdeadbeef")
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            any(p["check"] == "tick-order-changed" for p in report["problems"]),
+            "classifier: changed tick order is not ready",
+        )
+
+        interface = _copy.deepcopy(ready["interface"])
+        interface["order_hash"] = "ffffffffffffffff"
+        reset(interface=interface)
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            any(p["check"] == "interface-order-hash-changed" for p in report["problems"]),
+            "classifier: changed interface order hash is not ready",
+        )
+
+        reset(rcon_order=list(reversed(ready["rcon_order"])))
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            any(p["check"] == "rcon-order-changed" for p in report["problems"]),
+            "classifier: changed selector observation is reported",
+        )
+
+        reset(tick_order=None, interface=None, tick_order_hash=None)
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            not report["ok"]
+            and any(p["check"] == "tick-order-unavailable" for p in report["problems"]),
+            "classifier: a missing current tick order is not ready",
+        )
+        ready_without_tick = copy.deepcopy(ready)
+        ready_without_tick["tick_order"] = None
+        current["value"] = copy.deepcopy(ready_without_tick)
+        report = fixture.check_live_state(console, spec, ready_without_tick)
+        check(
+            not report["ok"] and any(p["check"] == "tick-order-missing" for p in report["problems"]),
+            "classifier: a ready record without tick-order evidence is not ready",
+        )
+
+        reset(carts=list(ready["carts"][:2]), normalized_hash=fixture.normalized_entity_hash(ready["carts"][:2]))
         report = fixture.check_live_state(console, spec, ready)
         check(report["verdict"] == "PREMATURE_OUTPUT", "classifier: missing cart is premature output")
     finally:
-        fixture.lab_status = original
+        fixture.lab_status = original_status
+        fixture.take_snapshot = original_snapshot
 
 
 def test_evidence_helpers() -> None:
@@ -419,6 +549,8 @@ def test_evidence_helpers() -> None:
     rows = evidence.init_runs(runs, len(spec["program"]["entries"]))
     check(len({row["state_hash"] for row in rows}) == 1, "state hash equal across committed runs")
     check(len({row["order_hash"] for row in rows}) == 1, "order hash equal across committed runs")
+    check(all(row["order_source"] == "interface-snapshot" for row in rows), "committed runs carry the tick-order evidence")
+    check(all(len(row["tick_order"] or []) == 3 for row in rows), "tick order covers every cart")
     check(all(row["ready"] and not row["early_output"] for row in rows), "committed runs are ready")
     check(all(row["entity_count"] == 3 for row in rows), "three carts per run")
     check(all(row["inventory_total"] == 6 for row in rows), "inventory totals match the program")
@@ -434,6 +566,34 @@ def test_evidence_helpers() -> None:
     # fail closed when the source save was not provided
     rebuild = evidence.cleanup_rebuild(None)
     check(rebuild["source_world_untouched"] is False, "no source world means untouched=false")
+
+
+def test_challenge_generator(tmp: Path) -> None:
+    """A challenge is deterministic per seed, fresh per seed, and never an answer."""
+    import argparse
+    import contextlib
+    import io
+
+    import minecart_rom
+
+    def generate(seed: int, name: str):
+        out = tmp / name
+        with contextlib.redirect_stdout(io.StringIO()):
+            minecart_rom.cmd_challenge(
+                argparse.Namespace(
+                    seed=str(seed), out=str(out), carts=4, max_slots=3, max_count=4, pool=""
+                )
+            )
+        return json.loads(out.read_text("utf-8"))
+
+    first = generate(1234, "challenge-a.json")
+    again = generate(1234, "challenge-b.json")
+    other = generate(1235, "challenge-c.json")
+    check(first["program_sha256"] == again["program_sha256"], "challenge is deterministic per seed")
+    check(first["program_sha256"] != other["program_sha256"], "a fresh seed makes a fresh challenge")
+    check(len(first["carts"]) == 4, "challenge cart count honoured")
+    check(all(cart["items"] for cart in first["carts"]), "every challenge cart has items")
+    check("answer" not in json.dumps(first).lower(), "the generator never emits an answer")
 
 
 def test_import_helpers(tmp: Path) -> None:
@@ -467,6 +627,7 @@ def run(keep: bool = False, verbose: bool = False) -> int:
         ("validate-ready", test_validate_ready),
         ("live classifier", test_live_classifier),
         ("evidence helpers", test_evidence_helpers),
+        ("challenge", lambda: test_challenge_generator(tmp)),
         ("lab helpers", lambda: test_import_helpers(tmp)),
     ]
     failures = 0

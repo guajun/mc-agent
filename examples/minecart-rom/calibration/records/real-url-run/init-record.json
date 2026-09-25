@@ -1,9 +1,18 @@
 {
-  "started_at": "2026-09-26T01:23:26+0800",
-  "seconds": 38.969,
+  "started_at": "2026-09-26T01:55:39+0800",
+  "seconds": 39.341,
   "steps": [
     {
-      "at": "2026-09-26T01:22:52+0800",
+      "at": "2026-09-26T01:55:00+0800",
+      "step": "interface",
+      "detail": {
+        "port": 27158,
+        "protocol": "SNAPSHOT",
+        "snapshot_name": "ready-rom15d"
+      }
+    },
+    {
+      "at": "2026-09-26T01:55:05+0800",
       "step": "machine-base",
       "detail": {
         "forceload": "0 -3 2 -1",
@@ -150,7 +159,7 @@
       }
     },
     {
-      "at": "2026-09-26T01:23:03+0800",
+      "at": "2026-09-26T01:55:16+0800",
       "step": "user",
       "detail": {
         "name": "Romuser",
@@ -177,16 +186,16 @@
       }
     },
     {
-      "at": "2026-09-26T01:23:03+0800",
+      "at": "2026-09-26T01:55:16+0800",
       "step": "note-block-reset",
       "detail": 20
     },
     {
-      "at": "2026-09-26T01:23:07+0800",
+      "at": "2026-09-26T01:55:20+0800",
       "step": "cart",
       "detail": {
         "index": 0,
-        "uuid": "71599393-2b92-4d25-8170-15e587eb3612",
+        "uuid": "3d7ca782-172e-4bd6-b6c5-ca9ee8912e07",
         "items": [
           {
             "slot": 0,
@@ -197,11 +206,11 @@
       }
     },
     {
-      "at": "2026-09-26T01:23:11+0800",
+      "at": "2026-09-26T01:55:24+0800",
       "step": "cart",
       "detail": {
         "index": 1,
-        "uuid": "caeb360f-af96-48c3-a66d-c946fa179178",
+        "uuid": "805eb65e-9b77-4494-959d-72c351fece07",
         "items": [
           {
             "slot": 1,
@@ -212,11 +221,11 @@
       }
     },
     {
-      "at": "2026-09-26T01:23:15+0800",
+      "at": "2026-09-26T01:55:28+0800",
       "step": "cart",
       "detail": {
         "index": 2,
-        "uuid": "830b5a58-bf6d-4e6d-95ff-ccae8a4fe1fc",
+        "uuid": "02165c72-f94d-458a-801e-103d1a1065f0",
         "items": [
           {
             "slot": 2,
@@ -228,6 +237,8 @@
     }
   ],
   "program_entries": 3,
+  "program_name": "calibration-default-v1",
   "user": "romuser",
-  "spec_version": "1.0.0"
+  "spec_version": "1.0.0",
+  "order_source": "interface-snapshot"
 }

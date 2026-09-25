@@ -1,0 +1,9 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "checked_at": "2026-09-26T01:58:30+0800",
+  "verdict": "READY",
+  "ok": true,
+  "problems": [],
+  "ready_snapshot": "examples\\minecart-rom\\calibration\\records-challenge\\run-01\\ready-snapshot.json",
+  "records_dir": "examples\\minecart-rom\\calibration\\records-challenge\\run-01"
+}

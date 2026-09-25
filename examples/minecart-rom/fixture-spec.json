@@ -279,12 +279,19 @@
           }
         ]
       }
-    ]
+    ],
+    "role": "calibration-public",
+    "notes": "This is the public calibration program used by the committed evidence. It is NOT the grading challenge: generate a fresh sealed program with `minecart_rom.py challenge` for evaluation runs and keep it out of the repository."
   },
   "validation": {
     "position_tolerance": 0.05,
     "require_frozen": true,
     "expected_carts": 3,
-    "notes": "The ready contract: N carts, same UUIDs, same in-memory order, at rest on the stack rail, inventories matching the program, machine at its base state, world frozen."
+    "notes": "The ready contract: N carts, same UUIDs, same authoritative EntityTickList order, at rest on the stack rail, same full entity NBT (inventory and components), machine at its base state, world frozen. Any of these failing on re-check means the fixture is not ready.",
+    "require_tick_order": true
+  },
+  "challenge": {
+    "generator": "python examples/minecart-rom/runner/minecart_rom.py challenge --seed <int> --out <file>",
+    "notes": "Fresh sealed cart program for evaluation runs; the pop order is observed live and sealed evaluator-side, never committed."
   }
 }

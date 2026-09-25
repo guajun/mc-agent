@@ -10,7 +10,8 @@ Measured on 2026-09-26 on this machine:
 | Java | Microsoft OpenJDK 25.0.1 (HMCL runtime `mojang-java-runtime-epsilon`) |
 | Fabric API | `0.161.0+26.2` (`e5b858ce…e216a`) |
 | Carpet | `26.2+v260616` (`f6ada912…1311c`) |
-| Lab | `labs/rom15b`, RCON `27152`, game `27153`, heap 3G |
+| mc-agent-interface | `0.6.0` (`45f12e16…f4404f`, built from `3b93ceb`) |
+| Lab | `labs/rom15d`, RCON `27156`, game `27157`, server-vantage `27158`, bridge `27159`, heap 3G |
 | Source save | `D:\MC\MC_Game\.minecraft\versions\26.2-Fabric\saves\Minecart ROM test` (read only) |
 
 The machine was found and calibrated live, with `tick freeze` / `tick sprint`
@@ -27,67 +28,83 @@ tick control. No command block was placed at any point.
 | cycle time | the machine is back at its base state 4 ticks after the press; presses 10 ticks apart also work | `logs/cycle_window.log` |
 | output boundary | the popped cart crosses `x = 15.0` on cycle tick 3, then drifts east to `x ≈ 23.5`, apex near `y = -44.6` | `logs/cycle_window.log` |
 | void window | entities are removed below `y = -128`; a popped cart was removed 5.7–8.0 s (≈110–160 ticks) after the press | `logs/void_window.log`, `logs/cycle_window.log` |
+| tick order source | the interface mod's `SNAPSHOT` reads `ServerLevel.entityTickList`; the cart order in `entities.jsonl` is the authoritative tick order, and `orderHash` is the mod's first-16-hex sha256 over the raw UUID sequence | `records/*/ready-snapshot.json`, `records/*/init.out.json` |
 | reload behaviour | a graceful server restart preserves cart UUIDs, inventories, positions and the query order, but the fixture treats any restart as a reload and refuses the fixture | `logs/reload_test.log` |
 
 ## Reproducibility
 
-Three independent runs, each on a fresh import of the artifact (`import --reset`),
-each with new cart UUIDs. The normalized hash (spawn index + position + motion +
-items, UUIDs excluded) was identical:
+Each run used a fresh import of the artifact (`import --reset`), a real Carpet
+fake player, the pinned interface mod, and new cart UUIDs. The normalized state
+hash (spawn index + position + motion + items) and the normalized **tick-order**
+hash were identical:
 
 ```
-run-01            READY  hash 86215e40a0d3d9ba…  carts 3
-run-02            READY  hash 86215e40a0d3d9ba…  carts 3
-run-03            READY  hash 86215e40a0d3d9ba…  carts 3
-real-url-run      READY  hash 86215e40a0d3d9ba…  carts 3
+run-01            READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28  mod 0.6.0  cross-check true
+run-02            READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28  mod 0.6.0  cross-check true
+run-03            READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28  mod 0.6.0  cross-check true
+real-url-run      READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28  mod 0.6.0  cross-check true
 ```
 
-`real-url-run` is the acceptance run for this issue: it starts from an empty
-map cache and downloads the ZIP over HTTPS from the URL pinned in
+`real-url-run` is the acceptance run for this issue: it starts from an empty map
+cache and downloads the ZIP over HTTPS from the URL pinned in
 `map-manifest.json` (HTTP 200, 748,718 bytes, SHA-256 match), imports the world,
-starts a fresh lab, initializes, and validates `READY` – all in one sequence.
-`records/cold-download/` holds the download-only record from the same URL.
+starts a fresh lab with the interface mod, initializes, and validates `READY` –
+all in one sequence. `records/cold-download/` holds the download-only record
+from the same URL.
 
-The full records are in `records/run-01` … `records/run-03`: `download.json`/
-`import.out.json`, `init-record.json`, `init-commands.jsonl`, `ready-snapshot.json`,
-`validate.json`.
+A custom-program run is recorded separately in `records-challenge/run-01`: a
+sealed 4-cart challenge (seed 20260926, program SHA-256 `9f97d515…`) was
+initialized and validated end to end (`READY`, cross-check true), which proves
+the runner validates a run against its own program instead of the public
+calibration default. The challenge program is input, not the answer; the pop
+order was not produced by that run.
+
+The full records are in `records/run-01` … `records/run-03` and
+`records/real-url-run`: `import.out.json` (download + import + world hash),
+`init-record.json`, `init-commands.jsonl`, `ready-snapshot.json` (full NBT,
+`rcon_order` and authoritative `tick_order` + mod cross-check) and
+`validate.json` / `validate.out.json`.
 
 ## Negative evidence
 
+Every readiness invariant fails closed. Each case starts from a fresh copy and
+a validated ready state, then modifies it:
+
 | Case | Result | Record |
 | --- | --- | --- |
-| premature output (a cart was pressed and launched before hand-off) | `PREMATURE_OUTPUT`, `premature-motion` + `normalized-state-changed` | `negative/premature-output/` |
-| server restart after ready | `FIXTURE_INVALID:RELOAD`, `server-restarted` (pid change) + `user-missing` | `negative/reload/` |
-| dirty machine (one slime block removed before init) | init aborts: `machine is not in its calibrated base state`, exact broken positions listed | `negative/init-failure/` |
-| wrong artifact SHA-256, corrupt/absolute/zip-slip/symlink archives | explicit failures, nothing written outside the target | `runner/selftest.py` (offline) |
+| machine broken after ready (one slime block removed) | `FIXTURE_INVALID`, `machine-state` | `negative/machine-broken/` |
+| world unfrozen after ready (`tick unfreeze`) | `FIXTURE_INVALID`, `world-not-frozen` | `negative/unfrozen/` |
+| inventory/NBT tampered after ready (`data merge` changes an item) | `FIXTURE_INVALID`, `cart-nbt-changed` + `normalized-state-changed` | `negative/nbt-tampered/` |
+| tick order / full order hash changed (seat replaced) | `FIXTURE_INVALID`, `interface-order-hash-changed` (+ `user-pos-changed`) | `negative/tick-order/` |
+| premature output (a cart pressed and launched before hand-off) | `PREMATURE_OUTPUT`, plus `machine-state`/`cart-nbt-changed`/`premature-motion` | `negative/premature-output/` |
+| server restart after ready | `FIXTURE_INVALID:RELOAD`, `server-restarted` | `negative/reload/` |
+| dirty machine before init | init aborts: `machine is not in its calibrated base state`, exact broken positions listed | `negative/init-failure/` |
+| wrong artifact SHA-256, corrupt/absolute/zip-slip/symlink archives | explicit failures, nothing written outside the target | `runner/selftest.py` (offline, 75 checks) |
 
 ## Exact commands behind the evidence
 
 ```powershell
 # three fresh runs (run-01 shown; runs 02/03 identical)
-python examples/minecart-rom/runner/minecart_rom.py import --lab rom15b --reset `
-    --rcon-port 27152 --server-port 27153 --java $JAVA --memory 3G --url $MIRROR
-python examples/minecart-rom/runner/minecart_rom.py start --lab rom15b
-python examples/minecart-rom/runner/minecart_rom.py init --lab rom15b `
+python examples/minecart-rom/runner/minecart_rom.py import --lab rom15d --reset `
+    --rcon-port 27156 --server-port 27157 --vantage-port 27158 --bridge-port 27159 `
+    --interface-mod labs/_cache/mods/mc-agent-interface-0.6.0.jar `
+    --java $JAVA --memory 3G --cold
+python examples/minecart-rom/runner/minecart_rom.py start --lab rom15d
+python examples/minecart-rom/runner/minecart_rom.py init --lab rom15d `
     --records examples/minecart-rom/calibration/records/run-01
-python examples/minecart-rom/runner/minecart_rom.py validate --lab rom15b `
+python examples/minecart-rom/runner/minecart_rom.py validate --lab rom15d `
     --ready examples/minecart-rom/calibration/records/run-01/ready-snapshot.json
-python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15b
+python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15d
 ```
-
-`--url` pointed at a local mirror of the committed ZIP during the three runs so
-the runs did not depend on GitHub being reachable; the bytes, size and SHA-256
-are the ones in `map-manifest.json`, and a real-URL cold download is recorded
-separately in `records/cold-download/`.
 
 Machine-cycle measurement inside an initialized, ready world:
 
 ```text
-lab_server.py exec --name rom15b "tick query"                 # frozen
-lab_server.py exec --name rom15b "player Romuser use"          # the input
-lab_server.py exec --name rom15b "tick sprint 1"               # cycle tick 1..4
-lab_server.py exec --name rom15b "execute as @e[type=minecraft:chest_minecart] run data get entity @s Pos"
-lab_server.py exec --name rom15b "execute if block 14 -52 -22 minecraft:powered_rail run seed"
+lab_server.py exec --name rom15d "tick query"                 # frozen
+lab_server.py exec --name rom15d "player Romuser use"          # the input
+lab_server.py exec --name rom15d "tick sprint 1"               # cycle tick 1..4
+lab_server.py exec --name rom15d "execute as @e[type=minecraft:chest_minecart] run data get entity @s Pos"
+lab_server.py exec --name rom15d "execute if block 14 -52 -22 minecraft:powered_rail run seed"
 ```
 
 ## Stage-one gate slice
@@ -102,12 +119,17 @@ python examples/minecart-rom/runner/minecart_rom.py evidence `
 ```
 
 Result on 2026-09-26 against `tools/stage1_gate.py` (the merged #14 gate), with
-the four initialization runs bound to declared child runs:
+the four initialization runs bound to declared child runs and the world copies
+declared as instances:
 
 ```text
 [PASS] fixture_map  (Map fixture pinned and initialized deterministically)
 [PASS] evidence_integrity  (Bundle structure, artifact hashes, ports and source world)
 ```
+
+Every `init-runs.jsonl` row carries `order_source: interface-snapshot` and the
+normalized tick-order hash; `order_hash` is therefore the real tick order, not
+a renamed selector list.
 
 The full bundle still reports the other six checks as `blocked` because their
 prerequisites (bridge#6, #16, #17, #18, #19) have not contributed their own
@@ -122,11 +144,14 @@ which is what backs `source_world_untouched: true`.
 ## Limitations
 
 * The machine parameters above are calibrated for the shipped stack position and
-  the shipped program. A different cart count or stack placement needs a fresh
-  calibration before its pop order is trusted.
+  the shipped calibration program. A different cart count or stack placement
+  needs a fresh calibration before its pop order is trusted.
 * Wall-clock void windows were measured while polling over RCON, which lowers the
   effective tick rate; treat 5.7–8.0 s as the practical observation window and
   drive experiments with `tick sprint` when tick accuracy matters.
 * The source save's player vantage was 6.8 blocks from the note block (outside
   interaction range), so `user.spawn` in the spec is the operating position and
   the source vantage is recorded only as discovery context.
+* The public calibration program is not the grading challenge: evaluation runs
+  should generate a sealed `challenge` program and seal the observed pop order
+  separately.

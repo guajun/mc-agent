@@ -49,6 +49,16 @@ def time_stamp() -> str:
     return time.strftime("%Y%m%d-%H%M%S")
 
 
+def interface_client(status: dict, port: int | None = None, timeout: float = 20.0):
+    """The lab's server-vantage client, or None when the lab has no mod port."""
+    vantage = port or status.get("server_vantage_port")
+    if not vantage:
+        return None
+    import interface_mod
+
+    return interface_mod.InterfaceClient(port=int(vantage), timeout=timeout).connect()
+
+
 def cmd_manifest(args: argparse.Namespace) -> int:
     manifest = fixture.load_manifest(Path(args.manifest) if args.manifest else None)
     spec = fixture.load_spec(Path(args.spec) if args.spec else None)
@@ -97,6 +107,9 @@ def cmd_import(args: argparse.Namespace) -> int:
         memory=args.memory,
         rcon_port=args.rcon_port,
         server_port=args.server_port,
+        vantage_port=args.vantage_port,
+        bridge_port=args.bridge_port,
+        interface_mod=Path(args.interface_mod).expanduser() if args.interface_mod else None,
     )
     report["download"] = result.as_record()
     report["extract"] = {key: value for key, value in extract.items() if key != "export"}
@@ -130,17 +143,37 @@ def cmd_init(args: argparse.Namespace) -> int:
     spec = fixture.load_spec(Path(args.spec) if args.spec else None)
     program = fixture.load_program(Path(args.program)) if args.program else None
     records = record_dir(args)
+    status = fixture.lab_status(args.lab)
+    interface = interface_client(status, args.interface_port)
     console = fixture.Console(args.lab, verbose=args.verbose).connect()
     try:
-        ready = fixture.initialize(console, spec, program, record_dir=records)
+        ready = fixture.initialize(
+            console,
+            spec,
+            program,
+            record_dir=records,
+            interface=interface,
+            snapshot_name=args.snapshot_name or f"ready-{args.lab}",
+            allow_rcon_order=args.allow_rcon_order,
+        )
     finally:
+        if interface is not None:
+            interface.close()
         console.close()
     summary = {
         "records": str(records),
         "cart_count": ready["cart_count"],
         "spawn_order": ready["spawn_order"],
         "normalized_hash": ready["normalized_hash"],
-        "entity_order": ready["entity_order"],
+        "tick_order": ready.get("tick_order"),
+        "tick_order_hash": ready.get("tick_order_hash"),
+        "rcon_order": ready.get("rcon_order"),
+        "interface": {
+            "order_hash": (ready.get("interface") or {}).get("order_hash"),
+            "tick": (ready.get("interface") or {}).get("tick"),
+            "mod_version": (ready.get("interface") or {}).get("mod_version"),
+            "cross_check_ok": (ready.get("interface") or {}).get("cross_check_ok"),
+        },
         "machine": ready["machine"],
         "user": ready["user"],
         "validation": ready["validation"],
@@ -152,11 +185,21 @@ def cmd_init(args: argparse.Namespace) -> int:
 def cmd_snapshot(args: argparse.Namespace) -> int:
     spec = fixture.load_spec(Path(args.spec) if args.spec else None)
     records = record_dir(args)
+    status = fixture.lab_status(args.lab)
+    interface = interface_client(status, args.interface_port)
     console = fixture.Console(args.lab, verbose=args.verbose).connect()
     try:
-        snapshot = fixture.take_snapshot(console, spec, server=fixture.lab_status(args.lab))
+        snapshot = fixture.take_snapshot(
+            console,
+            spec,
+            server=status,
+            interface=interface,
+            snapshot_name=args.snapshot_name or f"snapshot-{args.lab}",
+        )
         result = fixture.validate_ready(spec, snapshot)
     finally:
+        if interface is not None:
+            interface.close()
         console.close()
     snapshot["validation"] = result
     out = Path(args.out).expanduser() if args.out else records / "snapshot.json"
@@ -173,10 +216,21 @@ def cmd_validate(args: argparse.Namespace) -> int:
             f"no ready snapshot at {ready_path}; run init first or pass --ready"
         )
     ready = fixture.read_json(ready_path)
+    status = fixture.lab_status(args.lab)
+    interface = interface_client(status, args.interface_port)
     console = fixture.Console(args.lab, verbose=args.verbose).connect()
     try:
-        result = fixture.check_live_state(console, spec, ready)
+        result = fixture.check_live_state(
+            console,
+            spec,
+            ready,
+            status=status,
+            interface=interface,
+            snapshot_name=args.snapshot_name or f"validate-{args.lab}",
+        )
     finally:
+        if interface is not None:
+            interface.close()
         console.close()
     result["ready_snapshot"] = str(ready_path)
     result["records_dir"] = str(ready_path.parent)
@@ -243,6 +297,87 @@ def cmd_evidence(args: argparse.Namespace) -> int:
     return 0
 
 
+DEFAULT_POOL = (
+    "minecraft:stone",
+    "minecraft:dirt",
+    "minecraft:gold_ingot",
+    "minecraft:iron_ingot",
+    "minecraft:redstone",
+    "minecraft:coal",
+    "minecraft:oak_planks",
+    "minecraft:glass",
+    "minecraft:sand",
+    "minecraft:copper_ingot",
+)
+
+
+def cmd_challenge(args: argparse.Namespace) -> int:
+    """Generate a fresh, sealed cart program for evaluation runs.
+
+    The committed ``fixture-spec.json`` program is the public calibration
+    program; it must not be used to grade a cold-start agent. This generator
+    produces a new program from a seed, records the seed and the program hash
+    for the audit trail, and deliberately does **not** produce the pop order:
+    that is observed live and sealed on the evaluation side.
+    """
+    import hashlib
+    import random
+
+    if args.seed:
+        seed = int(args.seed)
+    else:
+        seed = random.SystemRandom().getrandbits(63)
+    pool = [item.strip() for item in (args.pool or ",".join(DEFAULT_POOL)).split(",") if item.strip()]
+    if not pool:
+        raise fixture.FixtureError("the item pool is empty")
+    rng = random.Random(seed)
+    carts = []
+    seen: set[tuple] = set()
+    for index in range(max(1, args.carts)):
+        for _attempt in range(100):
+            slots = sorted(rng.sample(range(27), rng.randint(1, min(args.max_slots, 27))))
+            items = [
+                {
+                    "slot": slot,
+                    "id": rng.choice(pool),
+                    "count": rng.randint(1, max(1, args.max_count)),
+                }
+                for slot in slots
+            ]
+            signature = tuple(sorted((item["slot"], item["id"], item["count"]) for item in items))
+            if signature not in seen:
+                seen.add(signature)
+                break
+        else:  # pragma: no cover - only with a tiny pool/slots combination
+            raise fixture.FixtureError("could not generate distinct carts; widen the pool")
+        carts.append({"index": index, "items": items})
+    program = {"format": "mc-agent/challenge@1", "name": f"challenge-{seed}", "seed": seed, "carts": carts}
+    program["program_sha256"] = hashlib.sha256(
+        fixture.canonical_json(carts).encode("utf-8")
+    ).hexdigest()
+    program["notes"] = [
+        "sealed evaluator-side input; do not commit and do not hand to the Agent",
+        "the pop order is observed live and sealed separately; it is not generated here",
+    ]
+    out = Path(args.out).expanduser()
+    fixture.write_json(out, program)
+    print(
+        json.dumps(
+            {
+                "out": str(out),
+                "seed": seed,
+                "carts": len(carts),
+                "inventory_total": sum(
+                    item["count"] for cart in carts for item in cart["items"]
+                ),
+                "program_sha256": program["program_sha256"],
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 def cmd_selftest(args: argparse.Namespace) -> int:
     sys.path.insert(0, str(RUNNER))
     import selftest
@@ -282,6 +417,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--memory", default="")
     p.add_argument("--rcon-port", type=int)
     p.add_argument("--server-port", type=int)
+    p.add_argument("--vantage-port", type=int, help="server-vantage mod base port")
+    p.add_argument("--bridge-port", type=int, help="bridge loopback API port for this lab")
+    p.add_argument(
+        "--interface-mod",
+        default="",
+        help="the mc-agent-interface jar to deploy (pinned version/sha in the manifest)",
+    )
     p.set_defaults(handler=cmd_import)
 
     p = sub.add_parser("start", help="start a provisioned lab")
@@ -304,13 +446,23 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--memory", default="")
     p.add_argument("--rcon-port", type=int)
     p.add_argument("--server-port", type=int)
+    p.add_argument("--vantage-port", type=int, help="server-vantage mod base port")
+    p.add_argument("--bridge-port", type=int, help="bridge loopback API port for this lab")
+    p.add_argument("--interface-mod", default="", help="the mc-agent-interface jar to deploy")
     p.add_argument("--wait", type=float, default=300.0)
     p.set_defaults(handler=cmd_up)
 
     p = sub.add_parser("init", parents=[common], help="create the ready fixture")
     p.add_argument("--lab", required=True)
-    p.add_argument("--program", default="", help="JSON cart program override")
+    p.add_argument("--program", default="", help="JSON cart program override (sealed challenge)")
     p.add_argument("--run-id", default="")
+    p.add_argument("--interface-port", type=int, default=0, help="override the server-vantage port")
+    p.add_argument("--snapshot-name", default="", help="interface snapshot name to write")
+    p.add_argument(
+        "--allow-rcon-order",
+        action="store_true",
+        help="development only: accept the RCON selector order instead of the tick order",
+    )
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(handler=cmd_init)
 
@@ -318,6 +470,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lab", required=True)
     p.add_argument("--out", default="")
     p.add_argument("--run-id", default="")
+    p.add_argument("--interface-port", type=int, default=0)
+    p.add_argument("--snapshot-name", default="")
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(handler=cmd_snapshot)
 
@@ -325,6 +479,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lab", required=True)
     p.add_argument("--ready", default="", help="the ready-snapshot.json to compare against")
     p.add_argument("--run-id", default="")
+    p.add_argument("--interface-port", type=int, default=0)
+    p.add_argument("--snapshot-name", default="")
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(handler=cmd_validate)
 
@@ -337,6 +493,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lab", default="", help="lab name for the rebuild steps")
     p.add_argument("--run-map", action="append", default=[], help="OLD=NEW run id mapping (repeatable)")
     p.set_defaults(handler=cmd_evidence)
+
+    p = sub.add_parser("challenge", help="generate a fresh sealed cart program (evaluation side)")
+    p.add_argument("--seed", default="", help="deterministic seed (default: random)")
+    p.add_argument("--out", required=True, help="where to write the sealed program (not in the repo)")
+    p.add_argument("--carts", type=int, default=3)
+    p.add_argument("--max-slots", type=int, default=3)
+    p.add_argument("--max-count", type=int, default=4)
+    p.add_argument("--pool", default="", help="comma-separated item ids")
+    p.set_defaults(handler=cmd_challenge)
 
     p = sub.add_parser("selftest", help="offline tests (no game, no network required)")
     p.add_argument("--keep", action="store_true", help="keep the temporary files")

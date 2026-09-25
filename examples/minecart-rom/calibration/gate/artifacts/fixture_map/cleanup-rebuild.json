@@ -1,12 +1,12 @@
 {
   "steps": [
     "python examples/minecart-rom/runner/minecart_rom.py fetch --cold",
-    "python examples/minecart-rom/runner/minecart_rom.py import --lab rom15b --reset --rcon-port <rcon> --server-port <game> --java <jdk25>",
-    "python examples/minecart-rom/runner/minecart_rom.py start --lab rom15b",
-    "python examples/minecart-rom/runner/minecart_rom.py init --lab rom15b --records <records>",
-    "python examples/minecart-rom/runner/minecart_rom.py validate --lab rom15b --ready <records>/ready-snapshot.json",
-    "python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15b",
-    "rm -rf labs/rom15b/world   # discard the copy; the source save is never the world directory"
+    "python examples/minecart-rom/runner/minecart_rom.py import --lab rom15d --reset --rcon-port <rcon> --server-port <game> --java <jdk25>",
+    "python examples/minecart-rom/runner/minecart_rom.py start --lab rom15d",
+    "python examples/minecart-rom/runner/minecart_rom.py init --lab rom15d --records <records>",
+    "python examples/minecart-rom/runner/minecart_rom.py validate --lab rom15d --ready <records>/ready-snapshot.json",
+    "python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15d",
+    "rm -rf labs/rom15d/world   # discard the copy; the source save is never the world directory"
   ],
   "source_world_untouched": true,
   "rebuild_reproducible": true,

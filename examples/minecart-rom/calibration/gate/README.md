@@ -41,20 +41,34 @@ in `gate-check-output.txt`.
 
 | File | Content |
 | --- | --- |
-| `artifacts/fixture_map/fixture-manifest.json` | artifact URL/hash/size, game version, mod pins (including a `carpet` entry), world tree hash |
-| `artifacts/fixture_map/init-runs.jsonl` | four initialization runs: equal state/order hashes, entity count 3, inventory total 6, `early_output=false`, `ready=true`, `tick=6000` |
+| `artifacts/fixture_map/fixture-manifest.json` | artifact URL/hash/size, game version, mod pins (including `carpet` and `mc-agent-interface-mod`), world tree hash |
+| `artifacts/fixture_map/init-runs.jsonl` | four initialization runs: equal state hashes, equal 16-hex tick-order hashes with `order_source: interface-snapshot`, entity count 3, inventory total 6, `early_output=false`, `ready=true`, `tick=6000` |
 | `artifacts/fixture_map/player-identity.json` | `Romuser` UUID/name/dimension/position/yaw/pitch, `source=carpet`, `facing_target=true`, server-vantage UUID equal to the task UUID |
-| `artifacts/fixture_map/command-block-scan.json` | palette scan of the base world and both lab copies; `command_blocks=0`, `scanned=true`, `placed_by_init=false` |
+| `artifacts/fixture_map/command-block-scan.json` | palette scan of the base world and the lab copy; `command_blocks=0`, `scanned=true`, `placed_by_init=false` |
 | `artifacts/fixture_map/cleanup-rebuild.json` | ordered rebuild/cleanup steps; `source_world_untouched=true`; `rebuild_reproducible=true` |
 | `bundle-fragment.json` | the `checks.fixture_map.evidence` mapping to merge into `bundle.json` |
 | `evidence-summary.json` | one-line summary of the generated pack |
 
+## Order evidence
+
+The ready state is bound to a real `SNAPSHOT` of the interface mod's server
+vantage, which reads `ServerLevel.entityTickList` (`mc-agent-interface` 0.6.0,
+sha `45f12e16…`). Each `init-runs.jsonl` row carries:
+
+* `order_hash` — 16-hex hash over the **tick order** normalized by spawn index,
+  equal across runs;
+* `order_source: interface-snapshot`;
+* the raw `tick_order` and the RCON observation `rcon_order` in the full ready
+  records under `../records/`.
+
+The RCON `@e` selector order is never labelled as the tick order.
+
 ## Binding notes for the coordinator
 
 * `init-runs.jsonl` rows carry `run_id` = the record directory and
-  `instance_id` = the lab that produced the run (`rom15b` for runs 01–03,
-  `rom15c` for the real-URL run). Declare those in `run.child_runs`; the runner
-  can also rewrite them at build time with `--run-map OLD=NEW`.
+  `instance_id` = the lab that produced the run (`rom15d`). Declare those in
+  `run.child_runs`; the runner can also rewrite them at build time with
+  `--run-map OLD=NEW`.
 * `command-block-scan.world_dirs` must cover the fixture `world.directory` and
   every declared `run.instances[].world_dir`. Scan extra copies by passing
   `--world-dir` to the `evidence` command.

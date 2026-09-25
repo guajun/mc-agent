@@ -2,16 +2,28 @@
   "records": "examples\\minecart-rom\\calibration\\records\\run-01",
   "cart_count": 3,
   "spawn_order": [
-    "c788e20f-8225-422f-9666-ab941c6dabe4",
-    "ebfdbbf7-de9f-4bcb-91f8-f520943c0dbd",
-    "d70516cb-9a42-4517-92d6-a1d5935bd002"
+    "e741c74a-17c2-4e51-b901-f38686339b4d",
+    "30fd06b5-146c-4d98-bf15-f7d5b9f01458",
+    "5902d2a3-e06d-4963-acfc-45552cc9f0e6"
   ],
   "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
-  "entity_order": [
-    "c788e20f-8225-422f-9666-ab941c6dabe4",
-    "ebfdbbf7-de9f-4bcb-91f8-f520943c0dbd",
-    "d70516cb-9a42-4517-92d6-a1d5935bd002"
+  "tick_order": [
+    "e741c74a-17c2-4e51-b901-f38686339b4d",
+    "30fd06b5-146c-4d98-bf15-f7d5b9f01458",
+    "5902d2a3-e06d-4963-acfc-45552cc9f0e6"
   ],
+  "tick_order_hash": "a3ba375742d0de28",
+  "rcon_order": [
+    "e741c74a-17c2-4e51-b901-f38686339b4d",
+    "30fd06b5-146c-4d98-bf15-f7d5b9f01458",
+    "5902d2a3-e06d-4963-acfc-45552cc9f0e6"
+  ],
+  "interface": {
+    "order_hash": "74bc1f4ca56173fc",
+    "tick": 800,
+    "mod_version": "0.6.0",
+    "cross_check_ok": true
+  },
   "machine": {
     "ok": true,
     "checks": [
@@ -169,6 +181,7 @@
     "ok": true,
     "problems": [],
     "normalized_hash": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
+    "tick_order_hash": "a3ba375742d0de28",
     "cart_count": 3
   }
 }

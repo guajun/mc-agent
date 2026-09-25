@@ -3,8 +3,9 @@
 Test-side infrastructure for the [Minecart ROM use case](../../docs/issues/minecart-rom-e2e-use-case.md).
 It publishes the base map as a versioned, hash-checked artifact and turns a
 fresh copy of it into a deterministic, auditable *ready* state: a real Carpet
-fake player facing the machine, the world frozen, and a recorded stack of chest
-minecarts waiting on the rail.
+fake player facing the machine, the world frozen, a recorded stack of chest
+minecarts on the rail, and the authoritative entity tick order read from a real
+`SNAPSHOT` of the interface mod's `EntityTickList`.
 
 This is stage-one fixture work only. It does **not** solve the ROM, and it does
 not contain a research logger or an answer.
@@ -13,11 +14,13 @@ not contain a research logger or an answer.
 examples/minecart-rom/
   README.md                 this file
   map-manifest.json         the immutable artifact URL, SHA-256, size, versions
-  fixture-spec.json         machine geometry, user, program, scene parameters
+  fixture-spec.json         machine geometry, user, calibration program, scene parameters
   dist/                     the exported base world ZIP (committed)
   runner/
-    minecart_rom.py         the CLI: fetch / import / up / init / validate / ...
-    fixture.py              download, safe unpack, RCON snapshots, initialization
+    minecart_rom.py         the CLI: fetch / import / up / init / validate / evidence / challenge
+    fixture.py              download, safe unpack, RCON snapshots, initialization, validation
+    interface_mod.py        the server-vantage SNAPSHOT client (real EntityTickList order)
+    evidence.py             the stage-one gate fixture_map evidence pack
     export_world.py         maintainer tool that produced dist/*.zip
     selftest.py             offline tests (no game, no network)
   calibration/              measured parameters and the raw evidence records
@@ -29,12 +32,13 @@ examples/minecart-rom/
 # 1. download + hash-check + unpack the artifact into labs/_cache/maps/
 python examples/minecart-rom/runner/minecart_rom.py fetch --cold
 
-# 2. provision a fresh lab copy and start it on fixed ports
+# 2. provision a fresh lab copy with the pinned interface mod and fixed ports
 python examples/minecart-rom/runner/minecart_rom.py up --lab rom15 `
-    --rcon-port 27150 --server-port 27151 `
+    --rcon-port 27150 --server-port 27151 --vantage-port 27152 --bridge-port 27153 `
+    --interface-mod labs/_cache/mods/mc-agent-interface-0.6.0.jar `
     --java "$env:MC_AGENT_JAVA" --memory 3G
 
-# 3. create the ready fixture (fake player + cart stack), frozen
+# 3. create the ready fixture (fake player + cart stack + tick-order snapshot)
 python examples/minecart-rom/runner/minecart_rom.py init --lab rom15 `
     --records examples/minecart-rom/calibration/records/run-01
 
@@ -48,52 +52,17 @@ python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15
 
 `up` uses the shared `labs/_cache` for the Fabric launcher and the mods, exactly
 like [`tools/lab_server.py`](../../docs/lab-server.md); it pins the lab to
-Minecraft 26.2, Fabric loader 0.19.5 and Java 25. The base world itself is
-always downloaded into `labs/_cache/maps/` and verified before it is unpacked.
+Minecraft 26.2, Fabric loader 0.19.5 and Java 25, and the lab server passes the
+server-vantage port to the mod at start. The base world itself is always
+downloaded into `labs/_cache/maps/` and verified before it is unpacked.
 
 Offline checks for the runner (hash mismatch, corrupt/unsafe archives, snapshot
-parsers, ready/reload/premature classifiers, evidence helpers) run without a
-game or a network:
+parsers, ready/reload/premature/machine/tick-order classifiers, evidence and
+challenge helpers) run without a game or a network:
 
 ```powershell
 python examples/minecart-rom/runner/minecart_rom.py selftest
 ```
-
-## Stage-one gate integration
-
-The merged integration gate (`tools/stage1_gate.py`, issue #14) consumes a
-bundle of raw artifacts. `evidence` turns this fixture's records into the
-`fixture_map` slice of that bundle:
-
-```powershell
-python examples/minecart-rom/runner/minecart_rom.py evidence `
-    --records examples/minecart-rom/calibration/records `
-    --out labs/stage1-evidence `
-    --source-world "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test"
-```
-
-It writes `artifacts/fixture_map/{fixture-manifest,player-identity,command-block-scan,cleanup-rebuild}.json`
-and `init-runs.jsonl`, plus `bundle-fragment.json` with the evidence mapping.
-The builder verifies instead of asserting:
-
-* `map.download_verified` is true only when a cold download record hashes to
-  the manifest;
-* `map.bad_hash_rejected` re-runs the wrong-hash rejection against the artifact;
-* `world.tree_sha256` uses the gate's own `hash-tree` algorithm;
-* `source_world_untouched` is true only when the source save hashes to the
-  read-only baseline recorded in `docs/stage1-gate.md`;
-* `command-block-scan.json` scans every world copy passed with `--world-dir`
-  (and the lab copies referenced by the records);
-* `init-runs.jsonl` carries one row per valid initialization, with the
-  normalized state hash and a 16-hex order hash;
-* `player-identity.json` proves the user's view ray hits the note block.
-
-Before the gate check, bind the emitted `run_id`/`instance_id` values to the
-bundle's `run.child_runs` (the coordinator declares them; `--run-map OLD=NEW`
-can rewrite run ids at build time). A minimal bundle with only the
-`fixture_map` slice checked passes both `fixture_map` and `evidence_integrity`;
-the remaining checks stay blocked until the other prerequisites contribute
-their artifacts.
 
 ## The map artifact
 
@@ -107,17 +76,18 @@ their artifacts.
 | Minecraft | 26.2 (DataVersion 4903), flat void overworld |
 | Fabric loader / installer | 0.19.5 / 1.1.2 |
 | Java | 25 |
-| mods | Fabric API `0.161.0+26.2`, Carpet `26.2+v260616` (hashes pinned) |
+| mods | Fabric API `0.161.0+26.2`, Carpet `26.2+v260616`, mc-agent-interface `0.6.0` (hashes pinned) |
 
 The export keeps the datapack switches exactly as the source save had them;
 `minecart_improvements` **must stay disabled**, because the cart stack only
 forms under the classic minecart behaviour.
 
-`artifact.url` is a versioned, immutable URL. It is currently pinned to the
-commit in this branch that added the ZIP. A GitHub release asset
-(`minecart-rom-base-v1.0.0`) is the preferred long-term home; publishing one
-does not change the file or its hash. `--url`/`mirrors` can point at any mirror
-for a run, and the runner records the URL it actually used.
+`artifact.url` is a versioned URL pinned to commit `15173b6` of this branch.
+The SHA-256 in the manifest is the check that matters: a fresh cache downloads
+that exact file and verifies it. A GitHub release asset
+(`minecart-rom-base-v1.0.0`) is optional housekeeping and would not change the
+file or its hash. `--url`/`mirrors` can point at any mirror for a run, and the
+runner records the URL it actually used.
 
 The source save `D:\MC\MC_Game\.minecraft\versions\26.2-Fabric\saves\Minecart ROM test`
 is never modified. `runner/export_world.py` reads it, strips player data, the
@@ -147,54 +117,98 @@ produces the same SHA-256 for the same world.
 5. for every program entry, in order: summons a chest minecart at the rail
    spawn point, reads back its UUID, fills it with `data merge`, and records the
    spawn index — the carts overlap and form the stack;
-6. captures the full ready snapshot and the complete command transcript.
+6. takes a real `SNAPSHOT` through the interface mod's server vantage, which
+   reads `ServerLevel.entityTickList`; the cart order from `entities.jsonl` is
+   the **authoritative tick order**, and the mod's full NBT is cross-checked
+   against the RCON reads (items including components, position, motion);
+7. captures the full ready snapshot and the complete command transcript.
 
-No command block is placed anywhere; the exporter scans every chunk palette and refuses an export that contains one. Initialization is pure test-side command
-traffic (RCON). The note block is the only input; the fixture never presses it.
+No command block is placed anywhere. Initialization is pure test-side command
+traffic (RCON plus the read-only mod snapshot). The note block is the only
+input; the fixture never presses it.
+
+The RCON `@e` selector order is recorded separately as `rcon_order` — an
+observation, never labelled as the tick order. `tick_order` comes only from the
+mod snapshot, and `tick_order_hash` is a 16-hex hash over that order normalized
+by spawn index (so three independent runs produce the same value).
 
 The ready snapshot (`ready-snapshot.json`) is deliberately not sanitized: cart
-UUIDs, positions, motions, inventories, the full entity NBT dump of every
-cart, the in-memory entity order, the machine block states, the user identity
-and the frozen tick state. UUIDs are
-used for correlation only — no name, tag or scoreboard encodes an order or an
-answer.
+UUIDs, positions, motions, inventories, the full entity NBT dump of every cart,
+the in-memory tick order, the machine block states, the user identity and the
+frozen tick state. UUIDs are used for correlation only — no name, tag or
+scoreboard encodes an order or an answer.
 
 ## Ready contract and failure classification
 
-`validate` re-reads the live world and compares it with the ready snapshot:
+`validate` re-reads the live world and compares it with the ready snapshot on
+every invariant:
 
 * `READY` — same server process, same user UUID/position/rotation, same cart
-  UUIDs in the same in-memory order, at rest on the rail, same inventories,
-  machine at its base state, world frozen;
+  UUIDs, at rest on the rail, the same **full entity NBT** (inventory and item
+  components included), machine at its base state, world frozen, and the same
+  authoritative tick order plus the same mod full-level order hash;
 * `PREMATURE_OUTPUT` — a cart left the stack, is moving, or disappeared before
   the experiment started;
-* `FIXTURE_INVALID:RELOAD` — the server process restarted (or the user/order
-  changed) between ready and hand-off;
-* `FIXTURE_INVALID` — init failed, the machine is dirty, or anything else.
+* `FIXTURE_INVALID` — machine broken, world unfrozen, cart NBT changed, tick
+  order/order hash changed, user moved, or the interface evidence is missing;
+* `FIXTURE_INVALID:RELOAD` — the server process restarted between ready and
+  hand-off.
 
 A fixture that is not `READY` must not be handed to an agent.
 
-## Calibrated scene parameters
+## Challenge programs
 
-Measured on 2026-09-26 against Minecraft 26.2 / Fabric loader 0.19.5 / Carpet
-`26.2+v260616`; the machine values live in `fixture-spec.json` and the raw logs
-in `calibration/`.
+`fixture-spec.json` carries the **public calibration program** used by the
+committed evidence. It must not be used to grade a cold-start agent. Generate a
+fresh sealed program for evaluation runs and keep it out of the repository:
 
-| Parameter | Measured value |
-| --- | --- |
-| input | right-click the note block at `(11, -54, -23)`; it plays and advances `note` by 1 |
-| input semantics | `powered=true` for one tick; the adjacent up-facing sticky piston fires |
-| stack position | rail block `(14, -52, -22)`, spawn `(14.5, -52, -21.5)`, rest `(14.5, -51.9375, -21.5)` |
-| pop rate | one cart per press; pop order followed spawn order for the calibrated stack (recorded, not assumed) |
-| cycle | 4 ticks; a press every ≥4 ticks is safe |
-| output boundary | first tick with `x > 15.0` (crossed at cycle tick 3) |
-| pop trajectory | peaks near `y=-44.6`, drifts east to `x≈23.5` |
-| void window | entities are removed below `y=-128`; popped cart removed ~5.7–8 s after the press |
-| end condition | every cart popped and removed; fixture timeout 180 s |
-| user | fake player at the operating position, aimed at the note block's north face |
+```powershell
+python examples/minecart-rom/runner/minecart_rom.py challenge `
+    --seed 20260926 --carts 4 --out labs/challenges/challenge-20260926.json
+python examples/minecart-rom/runner/minecart_rom.py init --lab rom15 `
+    --program labs/challenges/challenge-20260926.json --records labs/runs/challenge-01
+```
 
-The machine returns to its base 16-block state after every cycle; the only
-persistent change is the note block's `note` value, which `init` resets.
+The generator records the seed and the program SHA-256 and deliberately does
+not produce the pop order: the order is observed live and sealed on the
+evaluation side. `init` records the program in the ready snapshot, so
+`validate` checks a custom run against its own program.
+
+## Stage-one gate integration
+
+The merged integration gate (`tools/stage1_gate.py`, issue #14) consumes a
+bundle of raw artifacts. `evidence` turns this fixture's records into the
+`fixture_map` slice of that bundle:
+
+```powershell
+python examples/minecart-rom/runner/minecart_rom.py evidence `
+    --records examples/minecart-rom/calibration/records `
+    --out labs/stage1-evidence `
+    --source-world "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test"
+```
+
+It writes `artifacts/fixture_map/{fixture-manifest,player-identity,command-block-scan,cleanup-rebuild}.json`
+and `init-runs.jsonl`, plus `bundle-fragment.json` with the evidence mapping.
+The builder verifies instead of asserting:
+
+* `map.download_verified` is true only when a cold download record hashes to
+  the manifest;
+* `map.bad_hash_rejected` re-runs the wrong-hash rejection against the artifact;
+* `world.tree_sha256` uses the gate's own `hash-tree` algorithm;
+* `source_world_untouched` is true only when the source save hashes to the
+  read-only baseline recorded in `docs/stage1-gate.md`;
+* `command-block-scan.json` scans every world copy passed with `--world-dir`
+  (and the lab copies referenced by the records);
+* every `init-runs.jsonl` row carries the interface-mod tick order
+  (`order_source: interface-snapshot`) and the normalized 16-hex order hash;
+* `player-identity.json` proves the user's view ray hits the note block.
+
+Before the gate check, bind the emitted `run_id`/`instance_id` values to the
+bundle's `run.child_runs` (the coordinator declares them; `--run-map OLD=NEW`
+can rewrite run ids at build time). A minimal bundle with only the
+`fixture_map` slice checked passes both `fixture_map` and `evidence_integrity`;
+the remaining checks stay blocked until the other prerequisites contribute
+their artifacts.
 
 ## Limitations
 
@@ -203,8 +217,11 @@ persistent change is the note block's `note` value, which `init` resets.
 * The fake player rides an invisible marker armor stand because the machine
   floats over the void and Carpet fake players cannot toggle creative flight.
   The seat is recorded in every snapshot and can be disabled in the spec.
-* The manifest URL is pinned to a commit of this branch; publish the release
-  asset and update `artifact.url` when the branch lands.
-* The calibrated stack uses three carts; other programs can be passed with
-  `init --program program.json` and must be re-calibrated before their answers
-  are trusted.
+* The interface mod is required for ready evidence: the fixture refuses to call
+  a fixture READY without the real `EntityTickList` order. `--allow-rcon-order`
+  exists for development only and marks the run non-authoritative.
+* The public calibration program is three carts; evaluation runs should use a
+  sealed `challenge` program, and any new program needs a live calibration of
+  its pop order before its answers are trusted.
+* The calibrator's ready state is intentionally *not* a solution: the pop order
+  is observed only when a real run presses the note block.

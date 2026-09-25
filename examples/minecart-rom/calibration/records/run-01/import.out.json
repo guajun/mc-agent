@@ -1,18 +1,18 @@
 {
-  "lab": "rom15b",
-  "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15b",
+  "lab": "rom15d",
+  "lab_dir": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\rom15d",
   "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
   "world_files": 31,
   "world_bytes": 11530857,
   "manifest_version": "1.0.0",
   "download": {
     "path": "labs\\_scratch\\mapcache\\minecart-rom-base-1.0.0.zip",
-    "url": "http://127.0.0.1:27158/minecart-rom-base-1.0.0.zip",
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
     "http_status": 200,
     "bytes": 748718,
     "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
     "cache_hit": false,
-    "seconds": 0.058
+    "seconds": 2.834
   },
   "extract": {
     "entries": 32,

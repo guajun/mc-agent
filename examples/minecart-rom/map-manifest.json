@@ -8,7 +8,8 @@
     "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
     "mirrors": [],
     "size": 748718,
-    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd"
+    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
+    "url_note": "commit-pinned immutable URL; verified by sha256, no release required"
   },
   "game": {
     "minecraft": "26.2",
@@ -63,6 +64,15 @@
       "source": "local client mods folder",
       "required": false,
       "notes": "Present in the source client; not needed by the fixture."
+    },
+    {
+      "name": "mc-agent-interface-mod",
+      "version": "0.6.0",
+      "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+      "artifact": "mc-agent-interface-0.6.0.jar",
+      "source": "github.com/guajun/mc-agent-interface-mod @ 3b93ceb, built with build.py",
+      "required": true,
+      "notes": "server vantage: real ServerLevel.entityTickList via SNAPSHOT; the fixture binds its ready evidence to it"
     }
   ],
   "world": {

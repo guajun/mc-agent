@@ -40,6 +40,9 @@ MAP_CACHE = LABS / "_cache" / "maps"
 sys.path.insert(0, str(TOOLS))
 import lab_server  # noqa: E402  (path set up above on purpose)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import interface_mod  # noqa: E402  (same directory)
+
 USER_AGENT = "mc-agent-minecart-rom/1.0 (https://github.com/guajun/mc-agent)"
 
 # An artifact bigger than this is not the map; refuse to unpack it. The shipped
@@ -482,6 +485,9 @@ def import_world(
     memory: str = "",
     rcon_port: int | None = None,
     server_port: int | None = None,
+    vantage_port: int | None = None,
+    bridge_port: int | None = None,
+    interface_mod: Path | None = None,
     extra_mods: Iterable[Path] = (),
 ) -> dict[str, Any]:
     """Provision (or reset) a lab around a verified world copy."""
@@ -498,6 +504,9 @@ def import_world(
         # below still fixes labs provisioned by an older tool
         *(["--rcon-port", str(rcon_port)] if rcon_port else []),
         *(["--server-port", str(server_port)] if server_port else []),
+        *(["--vantage-port", str(vantage_port)] if vantage_port else []),
+        *(["--bridge-port", str(bridge_port)] if bridge_port else []),
+        *(["--mod-jar", str(interface_mod)] if interface_mod else []),
     ]
     if reset and lab.exists():
         run_lab_server("stop", "--name", lab_name, "--timeout", "120")
@@ -548,6 +557,10 @@ def lab_status(lab_name: str) -> dict[str, Any]:
     pid = int(run.get("pid") or 0)
     alive = bool(pid) and lab_server.process_matches(pid, float(run.get("startedAt") or 0))
     rcon = read_json(lab / "rcon.json") if (lab / "rcon.json").is_file() else {}
+    mods = state.get("mods") or []
+    interface = next(
+        (mod for mod in mods if str(mod.get("name", "")).startswith("mc-agent-interface")), None
+    )
     return {
         "lab": lab_name,
         "lab_dir": str(lab),
@@ -557,9 +570,15 @@ def lab_status(lab_name: str) -> dict[str, Any]:
         "rcon_host": rcon.get("host"),
         "rcon_port": rcon.get("port"),
         "world": state.get("world"),
-        "mods": state.get("mods") or [],
+        "world_dir": state.get("worldDir"),
+        "mods": [mod.get("name") for mod in mods],
+        "mod_records": mods,
         "minecraft": state.get("minecraft"),
         "loader": state.get("loader"),
+        "server_vantage_port": state.get("serverVantagePort"),
+        "server_dir": state.get("serverDir"),
+        "bridge_api_port": state.get("bridgeApiPort"),
+        "interface_mod": interface,
     }
 
 
@@ -705,12 +724,15 @@ def cart_records(console: Console, tag: str = "") -> list[dict[str, Any]]:
     )
     records = []
     for index, chunk in enumerate(positions):
+        raw_items = items[index] if index < len(items) else ""
         records.append(
             {
                 "uuid": uuid_from_text(uuids[index]) if index < len(uuids) else "",
                 "pos": parse_vec(chunk),
                 "motion": parse_vec(motions[index]) if index < len(motions) else None,
-                "items": parse_items(items[index]) if index < len(items) else [],
+                "items": parse_items(raw_items),
+                # the raw ``Items`` fragment keeps item components comparable
+                "items_raw": raw_items,
             }
         )
     return records
@@ -762,14 +784,87 @@ def note_value(console: Console, pos: list[int], values: range = range(0, 25)) -
     return None
 
 
+def interface_binding(
+    interface: "interface_mod.InterfaceClient",
+    snapshot_name: str,
+    carts: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Bind the carts to an actual clean-mod SNAPSHOT (authoritative tick order)."""
+    ack = interface.snapshot(snapshot_name)
+    directory = Path(ack["dir"])
+    meta, entities = interface_mod.read_snapshot(directory)
+    order = interface_mod.tick_order(entities, "minecraft:chest_minecart")
+    known = {record["uuid"] for record in carts}
+    # keep only entities the fixture owns; the level also ticks the player seat
+    order = [uuid for uuid in order if uuid in known]
+    index = interface_mod.by_uuid(entities)
+    checks = []
+    for record in carts:
+        entity = index.get(record["uuid"])
+        entry: dict[str, Any] = {"uuid": record["uuid"], "present": entity is not None}
+        if entity is not None:
+            items = interface_mod.compare_items(
+                str(entity.get("nbt") or ""), record.get("items_raw") or ""
+            )
+            pos = [float(value) for value in (entity.get("pos") or [])]
+            vel = [float(value) for value in (entity.get("vel") or [])]
+            entry.update(
+                {
+                    "items_match": items["match"],
+                    "items": items,
+                    "pos_match": bool(record.get("pos"))
+                    and len(pos) == 3
+                    and all(abs(a - b) <= 1e-4 for a, b in zip(record["pos"], pos)),
+                    "motion_match": bool(record.get("motion"))
+                    and len(vel) == 3
+                    and all(abs(a - b) <= 1e-4 for a, b in zip(record["motion"], vel)),
+                    "nbt_sha256": hashlib.sha256(
+                        str(entity.get("nbt") or "").encode("utf-8")
+                    ).hexdigest(),
+                }
+            )
+        checks.append(entry)
+    return {
+        "name": ack.get("id"),
+        "dir": ack.get("dir"),
+        "entities": ack.get("entities"),
+        "order_hash": ack.get("orderHash"),
+        "tick": ack.get("tick"),
+        "dimension": ack.get("dimension"),
+        "bytes": ack.get("bytes"),
+        "mod": meta.get("mod"),
+        "mod_version": meta.get("modVersion"),
+        "protocol": meta.get("protocol"),
+        "players_skipped": meta.get("playersSkipped"),
+        "tick_order": order,
+        "cross_check": checks,
+        "cross_check_ok": all(
+            entry["present"]
+            and entry.get("items_match")
+            and entry.get("pos_match")
+            and entry.get("motion_match")
+            for entry in checks
+        ),
+    }
+
+
 def take_snapshot(
     console: Console,
     spec: dict[str, Any],
     *,
     spawn_order: list[str] | None = None,
     server: dict[str, Any] | None = None,
+    program: list[dict[str, Any]] | None = None,
+    interface: "interface_mod.InterfaceClient | None" = None,
+    snapshot_name: str | None = None,
 ) -> dict[str, Any]:
-    """Capture the full ready state: entities, machine, user, tick state."""
+    """Capture the full ready state: entities, machine, user, tick state.
+
+    The RCON ``@e`` query order is recorded separately as ``rcon_order``: it is
+    an observation, not the entity tick order. When an interface client is
+    given, ``tick_order`` comes from the mod's real ``EntityTickList`` snapshot
+    and the cart NBT/inventory is cross-checked against it.
+    """
     fixture = spec["fixture"]
     checks = spec["machine"].get("checks") or DEFAULT_MACHINE_CHECKS
     carts = cart_records(console)
@@ -777,6 +872,7 @@ def take_snapshot(
         # the full entity NBT dump, unsanitized, is part of the ready record
         dump = console.cmd(f"data get entity {record['uuid']}")
         record["nbt"] = after_mark(dump, " has the following entity data: ")
+        record["nbt_sha256"] = hashlib.sha256(record["nbt"].encode("utf-8")).hexdigest()
     spawn_order = spawn_order or []
     for record in carts:
         record["spawn_index"] = (
@@ -789,23 +885,69 @@ def take_snapshot(
         "note_block": spec["machine"]["input"]["block"],
     }
     machine.update(machine_state(console, checks))
-    snapshot = {
+    snapshot: dict[str, Any] = {
         "format": RECORD_FORMAT,
         "captured_at": iso_now(),
         "tick_frozen": "game is frozen" in console.cmd("tick query").lower(),
         "world_day_tick": world_day_ticks(console),
         "lab": console.lab_name,
         "server": server,
+        "program": program if program is not None else spec["program"]["entries"],
         "spawn_order": spawn_order,
         "carts": carts,
         "cart_count": len(carts),
         "stack": spec["machine"]["stack"],
         "machine": machine,
         "user": player_record(console, canonical_user(spec["user"]["name"])),
-        "entity_order": [record["uuid"] for record in carts],
+        "rcon_order": [record["uuid"] for record in carts],
         "normalized_hash": normalized_entity_hash(carts),
     }
+    if interface is not None:
+        name = snapshot_name or f"fixture-{console.lab_name}"
+        try:
+            binding = interface_binding(interface, name, carts)
+            snapshot["interface"] = binding
+            snapshot["tick_order"] = binding["tick_order"]
+            snapshot["tick_order_hash"] = tick_order_hash(carts, binding["tick_order"])
+        except (interface_mod.InterfaceError, OSError) as error:
+            # a validation caller must see this as missing evidence, not a crash
+            snapshot["interface"] = {"error": str(error), "name": name}
+            snapshot["tick_order"] = None
+            snapshot["tick_order_hash"] = None
+    else:
+        snapshot["interface"] = None
+        snapshot["tick_order"] = None
+        snapshot["tick_order_hash"] = None
     return snapshot
+
+
+def tick_order_hash(carts: list[dict[str, Any]], tick_order: list[str] | None) -> str | None:
+    """16-hex hash over the *tick order* of the carts, normalized by spawn index.
+
+    UUIDs are excluded, so three independent initializations with the same
+    program produce the same value; a different tick order produces a different
+    value. This is the fixture's order evidence; the mod's own ``orderHash``
+    over raw UUIDs is kept separately as ``interface.order_hash``.
+    """
+    if not tick_order:
+        return None
+    index = {record["uuid"]: record for record in carts}
+    sequence = []
+    for uuid in tick_order:
+        record = index.get(uuid)
+        if record is None:
+            continue
+        sequence.append(
+            {
+                "spawn_index": record.get("spawn_index"),
+                "items": sorted(
+                    (item_key(item) for item in (record.get("items") or [])),
+                    key=lambda value: (value[0], value[1]),
+                ),
+            }
+        )
+    digest = hashlib.sha256(canonical_json(sequence).encode("utf-8")).hexdigest()
+    return digest[:16]
 
 
 def canonical_user(name: str) -> str:
@@ -891,6 +1033,9 @@ def initialize(
     program: list[dict[str, Any]] | None = None,
     *,
     record_dir: Path | None = None,
+    interface: "interface_mod.InterfaceClient | None" = None,
+    snapshot_name: str | None = None,
+    allow_rcon_order: bool = False,
 ) -> dict[str, Any]:
     """Create the ready fixture and return the ready snapshot plus the log.
 
@@ -902,7 +1047,8 @@ def initialize(
     3. reset the note block to the calibrated start value;
     4. for every program entry: summon a chest minecart on the rail, fill it,
        stack it, and record its UUID / spawn index;
-    5. verify the ready state and capture the unsanitized snapshot.
+    5. verify the ready state, bind it to an interface-mod SNAPSHOT (the real
+       ``EntityTickList`` order) and capture the unsanitized snapshot.
     """
     fixture = spec["fixture"]
     user = spec["user"]
@@ -913,6 +1059,26 @@ def initialize(
 
     def note(step: str, detail: Any = None) -> None:
         steps.append({"at": iso_now(), "step": step, "detail": detail})
+
+    if interface is None and not allow_rcon_order:
+        raise FixtureError(
+            "the interface mod is required for authoritative tick-order evidence: "
+            "provision the lab with --interface-mod and pass the server-vantage port. "
+            "Pass --allow-rcon-order only for development; that order is not the tick order."
+        )
+    if interface is not None:
+        try:
+            interface.ping()
+        except (interface_mod.InterfaceError, OSError) as error:
+            raise FixtureError(f"the interface mod is not reachable: {error}") from error
+        note(
+            "interface",
+            {
+                "port": interface.port,
+                "protocol": "SNAPSHOT",
+                "snapshot_name": snapshot_name or f"fixture-{console.lab_name}",
+            },
+        )
 
     if "game is frozen" not in console.cmd("tick query").lower():
         console.cmd("tick freeze")
@@ -1005,16 +1171,29 @@ def initialize(
     sprint(console, 1)
 
     ready = take_snapshot(
-        console, spec, spawn_order=spawn_order, server=lab_status(console.lab_name)
+        console,
+        spec,
+        spawn_order=spawn_order,
+        server=lab_status(console.lab_name),
+        program=entries,
+        interface=interface,
+        snapshot_name=snapshot_name,
     )
     ready["initialization"] = {
         "started_at": iso_now(),
         "seconds": round(time.monotonic() - start, 3),
         "steps": steps,
         "program_entries": len(entries),
+        "program_name": (spec["program"].get("name") if program is None else "custom"),
         "user": user_name,
         "spec_version": spec.get("spec_version"),
+        "order_source": "interface-snapshot" if interface is not None else "rcon-selector",
     }
+    if not allow_rcon_order and not ready.get("tick_order"):
+        raise FixtureError(
+            "the interface SNAPSHOT produced no authoritative tick order: "
+            + json.dumps((ready.get("interface") or {}).get("error") or ready.get("interface"))
+        )
     report = validate_ready(spec, ready)
     ready["validation"] = report
     if record_dir is not None:
@@ -1047,7 +1226,8 @@ def validate_ready(spec: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, 
     validation = spec.get("validation") or {}
     rest = machine["stack"]["rest_pos"]
     tolerance = float(validation.get("position_tolerance", 0.05))
-    entries = spec["program"]["entries"]
+    # a custom run carries its own program; fall back to the calibrated default
+    entries = snapshot.get("program") or spec["program"]["entries"]
     carts = snapshot.get("carts") or []
 
     if len(carts) != len(entries):
@@ -1087,10 +1267,31 @@ def validate_ready(spec: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, 
         problems.append({"check": "world-not-frozen"})
     if not snapshot.get("user"):
         problems.append({"check": "user-missing"})
+    if validation.get("require_tick_order", True):
+        tick_order = snapshot.get("tick_order")
+        if not isinstance(tick_order, list) or len(tick_order) != len(carts):
+            problems.append(
+                {
+                    "check": "tick-order-missing",
+                    "note": "the ready record must carry the interface-mod EntityTickList order",
+                    "tick_order": tick_order,
+                    "cart_count": len(carts),
+                }
+            )
+        interface = snapshot.get("interface") or {}
+        if not interface.get("cross_check_ok", False):
+            problems.append(
+                {
+                    "check": "interface-cross-check",
+                    "note": "the mod snapshot must contain every cart with the same items/pose",
+                    "cross_check": interface.get("cross_check"),
+                }
+            )
     return {
         "ok": not problems,
         "problems": problems,
         "normalized_hash": snapshot.get("normalized_hash"),
+        "tick_order_hash": snapshot.get("tick_order_hash"),
         "cart_count": len(carts),
     }
 
@@ -1112,12 +1313,26 @@ def check_live_state(
     ready: dict[str, Any],
     *,
     status: dict[str, Any] | None = None,
+    interface: "interface_mod.InterfaceClient | None" = None,
+    snapshot_name: str | None = None,
 ) -> dict[str, Any]:
-    """Re-read the world and classify it as ready / premature / reloaded / broken."""
+    """Re-read the world and classify it as ready / premature / reloaded / broken.
+
+    Every readiness invariant is re-checked on the *current* state: server
+    process, user identity, machine base state, frozen world, cart set/order,
+    full entity NBT, and the authoritative tick order from an interface-mod
+    SNAPSHOT. Anything that cannot be proven is a problem, never a silent pass.
+    """
     problems: list[dict[str, Any]] = []
     status = status or lab_status(console.lab_name)
     current = take_snapshot(
-        console, spec, spawn_order=ready.get("spawn_order") or [], server=status
+        console,
+        spec,
+        spawn_order=ready.get("spawn_order") or [],
+        server=status,
+        program=ready.get("program"),
+        interface=interface,
+        snapshot_name=snapshot_name,
     )
 
     if not status.get("running"):
@@ -1128,6 +1343,20 @@ def check_live_state(
             problems.append(
                 {"check": "server-restarted", "pid_at_ready": ready_pid, "pid_now": status.get("pid")}
             )
+
+    # machine base state again: init is not a one-time check
+    if not (current.get("machine") or {}).get("ok", False):
+        problems.append(
+            {
+                "check": "machine-state",
+                "broken": [
+                    entry for entry in (current.get("machine") or {}).get("checks", []) if not entry["ok"]
+                ],
+            }
+        )
+    if not current.get("tick_frozen"):
+        problems.append({"check": "world-not-frozen", "tick_frozen": current.get("tick_frozen")})
+
     ready_user = ready.get("user") or {}
     current_user = current.get("user") or {}
     if not current_user:
@@ -1136,18 +1365,25 @@ def check_live_state(
         for key in ("UUID", "Pos", "Rotation"):
             if ready_user.get(key) != current_user.get(key):
                 problems.append(
-                    {"check": f"user-{key.lower()}-changed", "at_ready": ready_user.get(key), "now": current_user.get(key)}
+                    {
+                        "check": f"user-{key.lower()}-changed",
+                        "at_ready": ready_user.get(key),
+                        "now": current_user.get(key),
+                    }
                 )
+
     current_uuids = [record["uuid"] for record in current["carts"]]
     missing = [uuid for uuid in (ready.get("spawn_order") or []) if uuid not in current_uuids]
     if missing:
         problems.append({"check": "carts-missing", "uuids": missing})
-    if current.get("entity_order") != ready.get("entity_order"):
+
+    # the RCON selector order stays a separate observation
+    if current.get("rcon_order") != ready.get("rcon_order"):
         problems.append(
             {
-                "check": "entity-order-changed",
-                "at_ready": ready.get("entity_order"),
-                "now": current.get("entity_order"),
+                "check": "rcon-order-changed",
+                "at_ready": ready.get("rcon_order"),
+                "now": current.get("rcon_order"),
             }
         )
     if current.get("normalized_hash") != ready.get("normalized_hash"):
@@ -1158,6 +1394,69 @@ def check_live_state(
                 "now": current.get("normalized_hash"),
             }
         )
+
+    # full entity NBT per cart: inventory contents and components included
+    ready_carts = {record["uuid"]: record for record in (ready.get("carts") or [])}
+    for record in current["carts"]:
+        previous = ready_carts.get(record["uuid"])
+        if previous is None:
+            continue
+        if previous.get("nbt_sha256") != record.get("nbt_sha256") or (
+            previous.get("nbt") and previous["nbt"] != record.get("nbt")
+        ):
+            problems.append(
+                {
+                    "check": "cart-nbt-changed",
+                    "uuid": record["uuid"],
+                    "at_ready": previous.get("nbt_sha256"),
+                    "now": record.get("nbt_sha256"),
+                    "at_ready_nbt": (previous.get("nbt") or "")[:200],
+                    "now_nbt": (record.get("nbt") or "")[:200],
+                }
+            )
+
+    # authoritative tick order, from the mod snapshot
+    if not ready.get("tick_order"):
+        problems.append(
+            {
+                "check": "tick-order-missing",
+                "note": "the ready record has no interface-mod EntityTickList order",
+            }
+        )
+    elif not current.get("tick_order"):
+        problems.append(
+            {
+                "check": "tick-order-unavailable",
+                "note": "no current interface snapshot; cannot prove the tick order",
+            }
+        )
+    else:
+        if current.get("tick_order") != ready.get("tick_order"):
+            problems.append(
+                {
+                    "check": "tick-order-changed",
+                    "at_ready": ready.get("tick_order"),
+                    "now": current.get("tick_order"),
+                }
+            )
+        ready_interface = ready.get("interface") or {}
+        current_interface = current.get("interface") or {}
+        if ready_interface.get("order_hash") != current_interface.get("order_hash"):
+            problems.append(
+                {
+                    "check": "interface-order-hash-changed",
+                    "at_ready": ready_interface.get("order_hash"),
+                    "now": current_interface.get("order_hash"),
+                }
+            )
+        if not current_interface.get("cross_check_ok", False):
+            problems.append(
+                {
+                    "check": "interface-cross-check",
+                    "cross_check": current_interface.get("cross_check"),
+                }
+            )
+
     boundary = float(spec["machine"]["output_boundary"]["greater_than"])
     stack_z = float(spec["machine"]["stack"]["rest_pos"][2])
     for record in current["carts"]:

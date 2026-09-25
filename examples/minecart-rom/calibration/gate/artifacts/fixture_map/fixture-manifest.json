@@ -31,6 +31,11 @@
       "name": "carpet-tis-addition",
       "version": "1.81.0",
       "sha256": "d1a245cb4e5670b9908e2fed80c2ba024f611f7d26eb505448e01b9ce93dfbb3"
+    },
+    {
+      "name": "mc-agent-interface-mod",
+      "version": "0.6.0",
+      "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f"
     }
   ],
   "world": {

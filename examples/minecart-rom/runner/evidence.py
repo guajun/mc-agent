@@ -89,10 +89,12 @@ def uuid_string(text: Any) -> str:
 
 
 def stack_order_hash(records: list[dict[str, Any]]) -> str:
-    """16-hex order hash over the *normalized* stack order.
+    """Fallback 16-hex hash over the normalized order when no tick order exists.
 
     UUIDs are deliberately excluded: the fixture asks for a reproducible order,
-    not for the same random identities every run.
+    not for the same random identities every run. Records that carry an
+    interface-mod tick order use ``tick_order_hash`` instead; this fallback is
+    only for development runs that explicitly accepted the RCON selector order.
     """
     fields = [
         {
@@ -291,21 +293,29 @@ def init_runs(
         snapshot = run["snapshot"]
         carts = snapshot.get("carts") or []
         mapped = (run_map or {}).get(run["init_id"], run["init_id"])
+        program = snapshot.get("program") or []
+        expected = len(program) if program else expected_carts
+        tick_order = snapshot.get("tick_order")
+        interface = snapshot.get("interface") or {}
         rows.append(
             {
                 "init_id": run["init_id"],
                 "run_id": mapped,
                 "instance_id": instance_id or snapshot.get("lab") or "fixture",
                 "state_hash": snapshot["normalized_hash"],
-                "order_hash": stack_order_hash(carts),
+                # the authoritative order: the interface mod's EntityTickList
+                "order_hash": snapshot.get("tick_order_hash") or stack_order_hash(carts),
+                "order_source": "interface-snapshot" if tick_order else "rcon-selector",
+                "interface_order_hash": interface.get("order_hash"),
+                "tick_order": tick_order,
+                "rcon_order": snapshot.get("rcon_order"),
                 "entity_count": len(carts),
                 "inventory_total": inventory_total(carts),
-                "early_output": early_output(snapshot, expected_carts),
+                "early_output": early_output(snapshot, expected),
                 "ready": bool(snapshot.get("tick_frozen")) and (snapshot.get("validation") or {}).get("ok", False),
                 "tick": int(snapshot.get("world_day_tick") or 0),
                 "captured_at": snapshot.get("captured_at"),
                 "spawn_order": snapshot.get("spawn_order"),
-                "entity_order": snapshot.get("entity_order"),
             }
         )
     return rows
@@ -474,6 +484,7 @@ def build_pack(
         "init_runs": len(pack["init-runs.jsonl"]),
         "state_hashes": sorted({row["state_hash"] for row in pack["init-runs.jsonl"]}),
         "order_hashes": sorted({row["order_hash"] for row in pack["init-runs.jsonl"]}),
+        "order_sources": sorted({row["order_source"] for row in pack["init-runs.jsonl"]}),
         "download_verified": pack["fixture-manifest.json"]["map"]["download_verified"],
         "bad_hash_rejected": pack["fixture-manifest.json"]["map"]["bad_hash_rejected"],
         "command_blocks": pack["command-block-scan.json"]["command_blocks"],

@@ -1,0 +1,14 @@
+{
+  "format": "mc-agent/minecart-rom-record@1",
+  "checked_at": "2026-09-26T01:49:01+0800",
+  "verdict": "FIXTURE_INVALID",
+  "ok": false,
+  "problems": [
+    {
+      "check": "world-not-frozen",
+      "tick_frozen": false
+    }
+  ],
+  "ready_snapshot": "examples\\minecart-rom\\calibration\\negative\\unfrozen\\ready-snapshot.json",
+  "records_dir": "examples\\minecart-rom\\calibration\\negative\\unfrozen"
+}

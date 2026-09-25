@@ -1,12 +1,12 @@
 {
   "cache": {
-    "path": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\_cache\\maps\\minecart-rom-base-1.0.0.zip",
+    "path": "labs\\_cache\\maps\\minecart-rom-base-1.0.0.zip",
     "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
     "http_status": 200,
     "bytes": 748718,
     "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
     "cache_hit": false,
-    "seconds": 2.118
+    "seconds": 1.821
   },
   "extract": {
     "entries": 32,
@@ -15,8 +15,8 @@
       "EXPORT.json",
       "world"
     ],
-    "staging": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0",
-    "world": "F:\\mc-agent-worktrees\\rom13\\meta15\\labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0\\world",
+    "staging": "labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0",
+    "world": "labs\\_cache\\maps\\unpacked\\minecart-rom-base-1.0.0\\world",
     "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
     "world_files": 31,
     "world_bytes": 11530857,

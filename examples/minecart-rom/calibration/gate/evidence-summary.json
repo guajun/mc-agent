@@ -7,6 +7,9 @@
   "order_hashes": [
     "a3ba375742d0de28"
   ],
+  "order_sources": [
+    "interface-snapshot"
+  ],
   "download_verified": true,
   "bad_hash_rejected": true,
   "command_blocks": 0,
