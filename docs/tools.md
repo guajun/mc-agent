@@ -91,7 +91,8 @@ primitives above.
 | --- | --- |
 | `smoke_offline.py` | run the whole stack against a fake mod, with or without a model |
 | `launch_instance.py` | start a Minecraft instance directly, without a GUI launcher; `--world`, `--username`, `--jvm-property mcagent.autoConnect=host:port` |
-| `lab_server.py` | provision, start, stop, `exec` against a headless Fabric lab under `labs/` (RCON console, pure stdlib) |
+| `lab_server.py` | provision, start, stop, `exec`, `identity`, `verify` against a headless Fabric lab under `labs/` (RCON console, pure stdlib) |
+| `build_mod.py` | compile a Fabric mod against a lab's own server/libraries/API jars and write a deterministic jar plus build metadata |
 | `fork_verify.py` | `inspect` a recording, `restore` it in order, `check` that a lab reproduced it, `diff` two recordings entity by entity |
 | `fake_player.py` | spawn, drive, and query a Carpet fake player - the agent's body without a second client |
 | `game_cmd.py` | run a game command and print the feedback it produced |
@@ -107,6 +108,8 @@ python tools/fake_player.py status deepseek
 
 python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
 python tools/lab_server.py exec --name lab-01 "tick freeze"
+python tools/lab_server.py identity --name lab-01 --json
+python tools/build_mod.py --source examples/smoke-mod --lab lab-01 --out labs/build/smoke-mod.jar
 
 python tools/fork_verify.py diff "<recording A>" "<recording B>"
 ```
