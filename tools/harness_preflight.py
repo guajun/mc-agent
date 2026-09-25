@@ -302,8 +302,12 @@ def check_source_fetch(config: dict[str, Any], probe: Probe, out_dir: Path) -> d
         attempts += 1
         if result["exit_code"] == 0:
             successes += 1
-    ok = attempts > 0 and successes > 0
-    detail = f"{successes}/{attempts} source/dependency endpoint(s) reachable" if attempts else "no fetch URLs configured"
+    ok = attempts > 0 and successes == attempts
+    detail = (
+        f"{successes}/{attempts} source/dependency endpoint(s) reachable"
+        if attempts
+        else "no fetch URLs configured"
+    )
     return check_result("source_fetch", ok, detail, evidence)
 
 
@@ -539,7 +543,7 @@ def check_lab_management(config: dict[str, Any], probe: Probe, out_dir: Path) ->
     if listing["exit_code"] != 0:
         return check_result("lab_management", False, "lab_server.py list failed", evidence)
     if not lab.get("enabled", True):
-        return check_result("lab_management", True, "lab_server.py list works (provision/start disabled in config)", evidence)
+        return skipped("lab_management", "lab_server.py list works, but the live lab check is disabled in the config")
     name = str(lab.get("name") or "preflight")
     java = str(lab.get("java") or (config.get("build") or {}).get("java") or "")
     if not java:
@@ -571,7 +575,7 @@ def check_lab_management(config: dict[str, Any], probe: Probe, out_dir: Path) ->
             versions["serverPort"] = state.get("serverPort")
             versions["rconPort"] = state.get("rconPort")
     if not lab.get("start", False):
-        return check_result("lab_management", True, "lab provisioned; start disabled in config", evidence, versions)
+        return skipped("lab_management", "lab provisioned, but start is disabled: no live server was exercised")
     start = probe.command(
         "lab-start",
         [sys.executable, str(script), "start", "--name", name, "--wait", str(int(lab.get("wait") or 300))],
@@ -778,12 +782,18 @@ def skipped_result(check_id: str, reason: str) -> dict[str, Any]:
 
 
 def redact_config(config: dict[str, Any]) -> dict[str, Any]:
-    """Keep the config for the record; nothing here is expected to hold secrets."""
-    copy = json.loads(json.dumps(config, ensure_ascii=False, default=str))
-    for key in list(copy):
-        if "secret" in key.lower() or "token" in key.lower() or "key" in key.lower():
-            copy[key] = "<redacted>"
-    return copy
+    """Keep the config for the record; recursively drop anything secret-shaped."""
+    def walk(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: ("<redacted>" if any(word in str(key).lower() for word in ("secret", "token", "key", "password")) else walk(item))
+                for key, item in value.items()
+            }
+        if isinstance(value, list):
+            return [walk(item) for item in value]
+        return value
+
+    return walk(json.loads(json.dumps(config, ensure_ascii=False, default=str)))
 
 
 def repo_head(root: Path) -> str:
@@ -799,11 +809,19 @@ def append_mark(run_dir: Path, report: dict[str, Any], out_dir: Path) -> None:
     if not trajectory.exists():
         cs.say(f"note: {trajectory} does not exist; writing preflight as a standalone report")
         return
+    run_id: Any = None
+    run_path = run_dir / cs.RUN_FILE
+    if run_path.is_file():
+        try:
+            run_id = cs.read_json(run_path).get("run_id")
+        except (OSError, ValueError):
+            run_id = None
     cs.append_jsonl(
         trajectory,
         {
             "schema": cs.SCHEMA_TRAJECTORY,
             "record": "mark",
+            "run_id": run_id,
             "name": "harness_preflight",
             "actor": "operator",
             "at": cs.utc_now(),

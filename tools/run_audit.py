@@ -24,7 +24,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 import coldstart as cs
 
@@ -88,29 +88,80 @@ def load_agent_logger(run_dir: Path, declared: dict[str, Any] | None) -> tuple[l
     if not declared:
         return [], ["agent_logger: no evidence declared"]
     normalized = declared.get("normalized")
-    if normalized:
-        raw_path = cs.resolve_evidence(run_dir, declared)
-        raw_problems: list[str] = []
-        if raw_path is None or not raw_path.is_file():
-            raw_problems.append("agent_logger: raw logger file is missing")
-        else:
-            expected = declared.get("sha256")
-            if expected and cs.sha256_file(raw_path) != expected:
-                raw_problems.append("agent_logger: raw logger sha256 mismatch")
-        normalized_declared = dict(declared)
-        normalized_declared["path"] = normalized
-        records, problems = cs.load_declared_jsonl(run_dir, normalized_declared, "agent_logger (normalized)")
-        source_hashes = {
-            str(record.get("source_sha256"))
-            for record in records
-            if isinstance(record, dict) and record.get("source_sha256")
-        }
-        if raw_path is not None and raw_path.is_file() and source_hashes:
-            actual = cs.sha256_file(raw_path)
-            if actual not in source_hashes:
-                problems.append("agent_logger: normalized records do not name the current raw logger bytes")
-        return records, raw_problems + problems
-    return cs.load_declared_jsonl(run_dir, declared, "agent_logger")
+    if not normalized:
+        return cs.load_declared_jsonl(run_dir, declared, "agent_logger")
+    problems: list[str] = []
+    raw_path = cs.resolve_evidence(run_dir, declared)
+    raw_sha = ""
+    if raw_path is None or not raw_path.is_file():
+        problems.append("agent_logger: raw logger file is missing")
+    else:
+        raw_sha = cs.sha256_file(raw_path)
+        expected = declared.get("sha256")
+        if expected and raw_sha != expected:
+            problems.append("agent_logger: raw logger sha256 mismatch")
+    normalized_declared: dict[str, Any] = {"path": normalized}
+    if declared.get("normalized_sha256"):
+        normalized_declared["sha256"] = declared["normalized_sha256"]
+    records, more = cs.load_declared_jsonl(run_dir, normalized_declared, "agent_logger (normalized)")
+    problems.extend(more)
+    if raw_sha:
+        missing = [r for r in records if r.get("record") != "header" and not r.get("source_sha256")]
+        if missing:
+            problems.append(f"agent_logger: {len(missing)} normalized record(s) carry no source_sha256")
+        wrong = [r for r in records if r.get("source_sha256") and str(r["source_sha256"]) != raw_sha]
+        if wrong:
+            problems.append("agent_logger: normalized records do not name the current raw logger bytes")
+    return records, problems
+
+
+def event_scope(
+    records: Sequence[dict[str, Any]], names: Sequence[str]
+) -> tuple[set[str], set[str]]:
+    """Distinct instance/dimension values on the named events."""
+    instances: set[str] = set()
+    dimensions: set[str] = set()
+    for record in records:
+        if cs.event_name(record) not in names:
+            continue
+        instance = cs.get_field(record, "instance")
+        dimension = cs.get_field(record, "dimension")
+        if instance is not None:
+            instances.add(str(instance))
+        if dimension is not None:
+            dimensions.add(str(dimension))
+    return instances, dimensions
+
+
+def preflight_contract_problems(preflight: dict[str, Any] | None, run: dict[str, Any]) -> list[str]:
+    """Cross-check a declared preflight report against the run manifest."""
+    if not preflight:
+        return []
+    if str(preflight.get("overall") or "").upper() != "PASS":
+        return [f"declared preflight did not pass: overall={preflight.get('overall')!r}"]
+    problems: list[str] = []
+    harness = run.get("harness") or {}
+    report_harness = preflight.get("harness") or {}
+    for field in ("name", "model", "provider"):
+        expected, actual = harness.get(field), report_harness.get(field)
+        if expected and actual and str(expected) != str(actual):
+            problems.append(f"preflight {field} {actual!r} != run {field} {expected!r}")
+    repo = (run.get("repo") or {}).get("commit")
+    report_repo = (preflight.get("environment") or {}).get("repo")
+    if repo and report_repo and str(repo) != str(report_repo):
+        problems.append(f"preflight repo {report_repo!r} != run repo {repo!r}")
+    checks = {str(check.get("id")): check for check in preflight.get("checks") or []}
+    ports = checks.get("ports")
+    if not ports or ports.get("status") != "PASS":
+        problems.append("preflight has no passing ports check")
+    lab = checks.get("lab_management")
+    if not lab or lab.get("status") != "PASS":
+        problems.append("preflight has no passing live lab_management check")
+    else:
+        versions = lab.get("versions") or {}
+        if not (versions.get("serverPort") and versions.get("rconPort")):
+            problems.append("preflight lab_management did not start a live server (no ports recorded)")
+    return problems
 
 
 def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
@@ -137,6 +188,12 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
                     infra.append(f"artifact {entry.get('path')} is missing")
                 elif entry.get("sha256") and cs.sha256_file(artifact) != entry["sha256"]:
                     infra.append(f"artifact {entry.get('path')} hash changed")
+            for entry in run.get("imports") or []:
+                imported = run_dir / str(entry.get("path") or "")
+                if not imported.is_file():
+                    infra.append(f"import {entry.get('path')} is missing")
+                elif entry.get("sha256") and cs.sha256_file(imported) != entry["sha256"]:
+                    infra.append(f"import {entry.get('path')} hash changed")
 
     trajectory: list[dict[str, Any]] = []
     trajectory_path = run_dir / cs.TRAJECTORY_FILE
@@ -147,7 +204,7 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
             trajectory = cs.read_jsonl(trajectory_path)
         except ValueError as error:
             infra.append(str(error))
-        problems = cs.validate_trajectory(trajectory)
+        problems = cs.validate_trajectory(trajectory, run_id=run.get("run_id"))
         infra.extend(f"trajectory: {problem}" for problem in problems)
 
     evidence = load_evidence(run_dir, run)
@@ -157,6 +214,29 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
 
     logger_events, logger_problems = load_agent_logger(run_dir, evidence.get("agent_logger"))
     infra.extend(logger_problems)
+
+    test_instances, test_dimensions = event_scope(
+        test_events, ("instance_ready", "input_processed", "cart_ejected", "cart_removed", "end")
+    )
+    logger_instances, logger_dimensions = event_scope(
+        logger_events, ("logger_armed", "cart_observed", "logger_flushed", "logger_error")
+    )
+    if len(test_instances) > 1:
+        infra.append("test-mod events mix instances: " + ", ".join(sorted(test_instances)))
+    if len(test_dimensions) > 1:
+        infra.append("test-mod events mix dimensions: " + ", ".join(sorted(test_dimensions)))
+    stray_instances = logger_instances - test_instances
+    if test_instances and stray_instances:
+        infra.append(
+            "agent logger events name instance(s) outside the test-mod experiment: "
+            + ", ".join(sorted(stray_instances))
+        )
+    stray_dimensions = logger_dimensions - test_dimensions
+    if test_dimensions and stray_dimensions:
+        infra.append(
+            "agent logger events name dimension(s) outside the test-mod experiment: "
+            + ", ".join(sorted(stray_dimensions))
+        )
 
     declared_run_id = run.get("run_id")
     if declared_run_id:
@@ -197,15 +277,44 @@ def evaluate(args: argparse.Namespace) -> tuple[dict[str, Any], int]:
     preflight, preflight_problems = declared_or_override(run_dir, evidence, "preflight", None, "json")
     if preflight_problems and evidence.get("preflight"):
         infra.extend(preflight_problems)
-    if preflight and str(preflight.get("overall") or "").upper() != "PASS":
-        infra.append(f"declared preflight did not pass: overall={preflight.get('overall')!r}")
+    infra.extend(preflight_contract_problems(preflight, run))
+
+    ejected_uuids = {
+        str(cs.get_field(record, "uuid"))
+        for record in test_events
+        if cs.event_name(record) == "cart_ejected" and cs.get_field(record, "uuid") is not None
+    }
+    if oracle and str(oracle.get("status") or "").lower() == "verified":
+        oracle_uuids = {
+            str(cart.get("uuid"))
+            for cart in (oracle.get("carts") or [])
+            if isinstance(cart, Mapping)
+        }
+        missing_oracle = sorted(ejected_uuids - oracle_uuids)
+        if missing_oracle:
+            infra.append("verified oracle omits ejected cart(s): " + ", ".join(missing_oracle))
+    declared_evidence = {name: bool(evidence.get(name)) for name in ("test_mod", "fixture", "restore", "preflight", "agent_logger", "answer")}
+    available_seqs = {
+        "testmod": {
+            seq
+            for seq in (cs.as_int(cs.get_field(record, "seq")) for record in test_events)
+            if seq is not None
+        }
+    }
+    provenance_problems, independent_refs, _agent_refs = cs.oracle_provenance(
+        oracle, declared_evidence, available_seqs
+    )
 
     flags = {
         "machine_operated": cs.flag_machine_operated(test_events, trajectory),
-        "logger_armed_before_activation": cs.flag_logger_armed(test_events, logger_events, trajectory),
+        "logger_armed_before_activation": cs.flag_logger_armed(
+            test_events, logger_events, trajectory, evidence.get("agent_logger")
+        ),
         "transient_outputs_captured": cs.flag_transient_captured(test_events, logger_events),
         "agent_read_log": cs.flag_agent_read_log(logger_events, trajectory, evidence.get("agent_logger")),
-        "answer_correct": cs.flag_answer_correct(answer, oracle, oracle_problems),
+        "answer_correct": cs.flag_answer_correct(
+            answer, oracle, oracle_problems, provenance_problems, bool(independent_refs)
+        ),
     }
     reviews, review_problems = load_review_records(run_dir, evidence)
     infra.extend(review_problems)

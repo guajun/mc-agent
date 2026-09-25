@@ -52,12 +52,12 @@ python tools/harness_preflight.py run \
 | `terminal` | Harness 能运行 shell 命令 | shell 来自配置 |
 | `filesystem` | 写入、读回并哈希一个 nonce 文件 | 字节一致 |
 | `ports` | 预留的 API/mod 端口可用且在范围内 | 默认范围 27190–27199 |
-| `source_fetch` | 源码/依赖端点可达（Fabric meta、Modrinth） | 配置 `build.pip_packages` 可加 pip 探测 |
+| `source_fetch` | 所有配置的源码/依赖端点可达（Fabric meta、Modrinth） | 配置 `build.pip_packages` 可加 pip 探测；任一端点失败即检查失败 |
 | `build_install` | 满足 `build.min_java` 的 JDK 能编译并打包探测 jar，且安装后的字节哈希一致 | 26.2 需要 Java 25；PATH 上的 JDK 21 会按设计失败 |
 | `bridge_cli` | `mc-bridge --help` 可运行 | JSON CLI 是必需的调用面 |
 | `bridge_mcp` | `mc-bridge mcp --help` 可运行 | 可选；缺 `mcp` 附加依赖时 SKIP，因为 JSON CLI 是可接受的替代 |
 | `bridge_smoke` | `tools/smoke_offline.py` 以 echo 后端跑通 | 在保留端口上用假 mod 跑真实 bridge + loop 进程 |
-| `lab_management` | `lab_server.py list` 可用；配置实验室时，真实无头 Fabric 服务器被创建、固定到保留端口、启动、回应 RCON `list`，然后停止 | 记录 `lab.json` 与控制台哈希 |
+| `lab_management` | `lab_server.py list` 可用；配置实验室且启用 `start` 时，真实无头 Fabric 服务器被创建、固定到保留端口、启动、回应 RCON `list`，然后停止 | 记录 `lab.json` 与控制台哈希；start 被禁用时是 SKIP，审计的 preflight 交叉校验会拒绝它 |
 
 `--checks`/`--skip` 选择子集；`SKIP` 绝不算 `PASS`。退出码 0 表示总体 PASS，
 1 表示至少一项被选检查失败。探测本身崩溃算该检查失败，不会让 preflight 崩溃。
@@ -206,8 +206,10 @@ logger 怎么写由智能体决定。为了审计，其输出（或经校验的�
 | `cart_observed` | `uuid`、`at`、`tick`、`position`、`items` | 一辆被弹出的矿车在移除前被捕获 |
 | `logger_flushed` / `logger_error` | `at` | 输出持久化 / 失败 |
 
-如果声明了 `normalized` 视图，每条记录应带 `source_sha256`，等于原始 logger 的哈希；
-若视图记录没有指向当前字节，审计会拒绝。原始输出绝不被规范视图替换。
+如果声明了 `normalized` 视图，审计用声明的 `sha256` 核对原始文件，用 `normalized_sha256`
+（绝不用原始哈希）核对规范文件，并要求**每条**规范记录都带等于原始 logger 哈希的
+`source_sha256`；缺失或过期的 `source_sha256` 是 `INFRA_ERROR`。原始输出绝不被
+规范视图替换。
 
 ### 显式审查结论
 
@@ -238,6 +240,24 @@ logger 怎么写由智能体决定。为了审计，其输出（或经校验的�
 `answer_correct.oracle_independence`。机械检查通过但审查未完成的运行是 PENDING，
 绝不是 PASS。
 
+### 关联与来源
+
+在计算任何标志之前，审计先核对运行身份，不一致就失败关闭：
+
+- 每条记录都可以带 `run_id`；与运行清单不一致是 `INFRA_ERROR`，测试 mod、智能体
+  logger 文件以及轨迹都适用；
+- `imports/` 与 `artifacts/` 文件会按 `run.json` 重新哈希，被篡改的原始会话或构建
+  产物是 `INFRA_ERROR`；
+- 测试 mod 事件不得混用实例或维度；智能体 logger 事件必须命名与测试 mod 相同的
+  实验实例/维度（字段支持别名 `instance`/`instance_id`、`dimension`/`dim`）；
+- 声明的 preflight 必须与运行清单一致：Harness 名称/模型/提供方、仓库 commit、
+  通过的 `ports` 检查，以及真正启动过服务器的通过态 `lab_management`；SKIP 或
+  不同环境是 `INFRA_ERROR`；
+- oracle 的 `evidence_refs` 必须能对到已声明的测试 mod/fixture/restore 证据
+  （`testmod:seqN` 必须指向存在的记录）；`trajectory:`、`logger:`、`answer` 等
+  智能体侧引用不算独立；无法解析的引用是 PENDING，完全没有独立引用则失败。
+  答案必须恰好覆盖 oracle 的矿车：漏掉一辆就是 `AGENT_FAIL`。
+
 ## 6. 审计判定：`run_audit.py`
 
 ```bash
@@ -253,7 +273,7 @@ python tools/run_audit.py run --run-dir labs/coldstart/run-01
 | `logger_armed_before_activation` | `logger_armed` 按 时间→tick→同 tick 序号 排在首个 `input_processed` 之前（同实例/维度）；有智能体写入/构建/启动 logger 的调用 | `logger_armed_before_activation.running`；没有共同排序层时加 `.ordering` | `logger:seq…`、`testmod:seq…`、`trajectory:<call_id>` |
 | `transient_outputs_captured` | 每个 `cart_ejected` uuid 都有 `cart_observed`，且捕获排在弹出**之后**、移除**之前**（同实例/维度）；每条捕获带 items 列表 | 无移除证据或无法排序时 `.window`；捕获无 items 时 `.inventory` | `testmod:seq…`、`logger:seq…` |
 | `agent_read_log` | 最后一次捕获之后，有智能体调用既点名 logger、又返回被捕获的观测内容（uuid + 其物品，或完整有序物品表），且是合理的读取/执行调用 | 关联模糊时（只回显文件名、只有 uuid、有内容但没点名 logger、或无法排序）`.linkage` | `trajectory:<call_id>`、`logger:seq…` |
-| `answer_correct` | 答案逐车匹配**已验证** oracle，且 oracle 引用独立游戏侧证据 | `answer_correct.oracle_independence` | `oracle:<ref>`、`oracle` |
+| `answer_correct` | 答案逐车匹配**已验证** oracle、覆盖 oracle 的每一辆车，且 oracle 引用能解析到独立游戏侧证据 | `answer_correct.oracle_independence` | `oracle:<ref>`、`oracle` |
 
 审计刻意分成机械部分和语义部分。存在性、顺序、哈希和物品比较是机械的。因果（"这条
 轨迹调用正是测试 mod 处理的那次"）、logger 是否真的被游戏加载、捕获窗口是否被证明、
@@ -272,10 +292,11 @@ PASS。第一轮允许人工语义审查；不要求另一个模型来判分。`
 `logger_armed`、没有捕获、没有读取、没有 oracle，对应标志就失败或保持 pending——
 不存在通往 PASS 的捷径。
 
-**Oracle 规则。** `answer_correct` 要求 oracle 的 `status` 为 `verified`，且
-`evidence_refs` 指向测试 mod / fixture / restore 证据。把智能体答案复制成 oracle 会
-失败。fixture 全新或未核验时，oracle 保持 `pending`；审计报 PENDING，绝不提前宣称
-正确。
+**Oracle 规则。** `answer_correct` 要求 oracle 的 `status` 为 `verified`，
+`evidence_refs` 能解析到已声明的测试 mod / fixture / restore 证据，且至少有一条
+独立游戏侧引用。把智能体答案复制成 oracle 会失败；无法解析的引用是 PENDING。答案
+必须恰好覆盖 oracle 的矿车——漏车的部分答案即使其余车匹配也是 `AGENT_FAIL`。
+fixture 全新或未核验时，oracle 保持 `pending`；审计报 PENDING，绝不提前宣称正确。
 
 ## 7. 失败分类
 

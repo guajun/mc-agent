@@ -392,7 +392,8 @@ class AuditFlagTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             report = audit(valid_run(Path(tmp) / "run", mutate_logger=other_instance))
             self.assertEqual(flag(report, "logger_armed_before_activation")["status"], "FAIL")
-            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("outside the test-mod experiment" in item for item in report["infra_errors"]))
 
     def test_capture_before_ejection_is_fail(self) -> None:
         def pre_activation(logger: list[dict[str, Any]]) -> None:
@@ -430,6 +431,306 @@ class AuditFlagTests(unittest.TestCase):
             transient = flag(report, "transient_outputs_captured")
             self.assertEqual(transient["status"], "PENDING")
             self.assertIn("transient_outputs_captured.inventory", [item["id"] for item in transient["required_review"]])
+
+    def test_answer_omitting_oracle_cart_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            oracle = cs.read_json(run_dir / "oracle.json")
+            oracle["carts"].append({"uuid": "cart-2", "items": ["minecraft:diamond"]})
+            write_json(run_dir / "oracle.json", oracle)
+            evidence = cs.read_json(run_dir / cs.EVIDENCE_FILE)
+            evidence["oracle"]["sha256"] = cs.sha256_file(run_dir / "oracle.json")
+            write_json(run_dir / cs.EVIDENCE_FILE, evidence)
+            report = audit(run_dir)
+            self.assertEqual(flag(report, "answer_correct")["status"], "FAIL")
+            self.assertIn("omits cart", flag(report, "answer_correct")["summary"])
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+
+    def test_oracle_omitting_ejected_cart_is_infra(self) -> None:
+        def extra_ejection(events: list[dict[str, Any]]) -> None:
+            events.append(
+                {"event": "cart_ejected", "instance": "lab-a", "uuid": "cart-2", "tick": 230, "seq": 7, "at": ts(18)}
+            )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_events=extra_ejection))
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("omits ejected cart" in item for item in report["infra_errors"]))
+
+    def test_unresolved_oracle_ref_is_pending(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            oracle = cs.read_json(run_dir / "oracle.json")
+            oracle["evidence_refs"] = ["umbrella:not-a-real-ref"]
+            write_json(run_dir / "oracle.json", oracle)
+            evidence = cs.read_json(run_dir / cs.EVIDENCE_FILE)
+            evidence["oracle"]["sha256"] = cs.sha256_file(run_dir / "oracle.json")
+            write_json(run_dir / cs.EVIDENCE_FILE, evidence)
+            report = audit(run_dir)
+            self.assertEqual(flag(report, "answer_correct")["status"], "PENDING")
+            self.assertIn("do not resolve", flag(report, "answer_correct")["summary"])
+            self.assertNotEqual(report["overall"], "PASS")
+
+    def test_agent_only_oracle_refs_fail(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            oracle = cs.read_json(run_dir / "oracle.json")
+            oracle["evidence_refs"] = ["trajectory:c1-build-logger"]
+            write_json(run_dir / "oracle.json", oracle)
+            evidence = cs.read_json(run_dir / cs.EVIDENCE_FILE)
+            evidence["oracle"]["sha256"] = cs.sha256_file(run_dir / "oracle.json")
+            write_json(run_dir / cs.EVIDENCE_FILE, evidence)
+            report = audit(run_dir)
+            self.assertEqual(flag(report, "answer_correct")["status"], "FAIL")
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+
+    def test_agent_source_oracle_still_requires_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            oracle = cs.read_json(run_dir / "oracle.json")
+            oracle["source"] = "agent_observed_game_state"
+            write_json(run_dir / "oracle.json", oracle)
+            evidence = cs.read_json(run_dir / cs.EVIDENCE_FILE)
+            evidence["oracle"]["sha256"] = cs.sha256_file(run_dir / "oracle.json")
+            write_json(run_dir / cs.EVIDENCE_FILE, evidence)
+            report = audit(run_dir)
+            self.assertEqual(report["overall"], "PASS")
+            self.assertTrue(flag(report, "answer_correct")["review_resolutions"])
+
+    def test_normalized_logger_view_is_usable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+
+            def add_normalized(evidence: dict[str, Any]) -> None:
+                raw = cs.sha256_file(run_dir / "agent" / "logger.jsonl")
+                records = [dict(record, source_sha256=raw) for record in cs.read_jsonl(run_dir / "agent" / "logger.jsonl")]
+                write_jsonl(run_dir / "agent" / "logger.norm.jsonl", records)
+                evidence["agent_logger"]["normalized"] = "agent/logger.norm.jsonl"
+                evidence["agent_logger"]["normalized_sha256"] = cs.sha256_file(run_dir / "agent" / "logger.norm.jsonl")
+
+            report = audit(valid_run(run_dir, mutate_evidence=add_normalized))
+            self.assertEqual(report["overall"], "PASS")
+            read_flag = flag(report, "agent_read_log")
+            self.assertEqual(read_flag["status"], "PASS")
+
+    def test_normalized_logger_without_source_hash_is_infra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+
+            def add_bad_normalized(evidence: dict[str, Any]) -> None:
+                records = cs.read_jsonl(run_dir / "agent" / "logger.jsonl")
+                write_jsonl(run_dir / "agent" / "logger.norm.jsonl", records)
+                evidence["agent_logger"]["normalized"] = "agent/logger.norm.jsonl"
+                evidence["agent_logger"]["normalized_sha256"] = cs.sha256_file(run_dir / "agent" / "logger.norm.jsonl")
+
+            report = audit(valid_run(run_dir, mutate_evidence=add_bad_normalized))
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("source_sha256" in item for item in report["infra_errors"]))
+
+    def test_scope_mismatch_is_infra(self) -> None:
+        def other_scope(events: list[dict[str, Any]]) -> None:
+            for event in events:
+                event["instance"] = "lab-B"
+                event["dimension"] = "minecraft:the_nether"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_events=other_scope))
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("outside the test-mod experiment" in item for item in report["infra_errors"]))
+
+    def test_foreign_trajectory_run_id_is_infra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = valid_run(Path(tmp) / "run")
+            with (run_dir / cs.TRAJECTORY_FILE).open("a", encoding="utf-8", newline="\n") as handle:
+                handle.write(
+                    json.dumps(
+                        {
+                            "record": "call",
+                            "run_id": "someone-elses-run",
+                            "call_id": "foreign",
+                            "tool": "bash",
+                            "arguments": {},
+                            "phase": "agent",
+                            "actor": "agent",
+                            "seq": 100,
+                            "at": ts(31),
+                        }
+                    )
+                    + "\n"
+                )
+                handle.write(
+                    json.dumps(
+                        {
+                            "record": "result",
+                            "run_id": "someone-elses-run",
+                            "call_id": "foreign",
+                            "status": "ok",
+                            "actor": "agent",
+                            "seq": 101,
+                            "at": ts(31.1),
+                        }
+                    )
+                    + "\n"
+                )
+            report = audit(run_dir)
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("someone-elses-run" in item for item in report["infra_errors"]))
+
+    def test_foreign_run_id_append_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_trace.main(["init", "--run-dir", str(run_dir), "--run-id", "run-a", "--task-text", "t"])
+            with self.assertRaises(SystemExit):
+                run_trace.main(
+                    [
+                        "record",
+                        "--run-dir",
+                        str(run_dir),
+                        "--json-text",
+                        json.dumps(
+                            {
+                                "record": "call",
+                                "run_id": "run-b",
+                                "call_id": "c1",
+                                "tool": "bash",
+                                "arguments": {},
+                            }
+                        ),
+                    ]
+                )
+
+    def test_tampered_import_is_infra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            run_dir = base / "run"
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_trace.main(["init", "--run-dir", str(run_dir), "--run-id", "imp", "--task-text", "t"])
+            session = base / "s.jsonl"
+            now = dt.datetime.now(dt.timezone.utc)
+            timestamp = (now + dt.timedelta(seconds=1)).isoformat().replace("+00:00", "Z")
+            write_jsonl(
+                session,
+                [
+                    {"type": "session", "id": "s", "timestamp": timestamp},
+                    {
+                        "type": "message",
+                        "timestamp": timestamp,
+                        "message": {"role": "assistant", "content": [{"type": "toolCall", "id": "c1", "name": "bash", "arguments": {}}]},
+                    },
+                    {
+                        "type": "message",
+                        "timestamp": timestamp,
+                        "message": {"role": "toolResult", "toolCallId": "c1", "toolName": "bash", "content": [{"type": "text", "text": "ok"}], "isError": False},
+                    },
+                ],
+            )
+            with contextlib.redirect_stdout(io.StringIO()):
+                run_trace.main(["import-pi", "--run-dir", str(run_dir), "--session", str(session)])
+            (run_dir / "imports" / "s.jsonl").write_text("tampered\n", encoding="utf-8", newline="\n")
+            report = audit(run_dir)
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("import" in item and "hash changed" in item for item in report["infra_errors"]))
+
+    def test_bad_preflight_contract_is_infra(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+
+            def mutate(evidence: dict[str, Any]) -> None:
+                write_json(
+                    run_dir / "preflight" / "preflight.json",
+                    {
+                        "schema": cs.SCHEMA_PREFLIGHT,
+                        "overall": "PASS",
+                        "harness": {"name": "other-harness", "model": "other-model", "provider": "other"},
+                        "environment": {"repo": "deadbeef"},
+                        "checks": [{"id": "ports", "status": "PASS"}, {"id": "lab_management", "status": "SKIP"}],
+                    },
+                )
+                evidence["preflight"] = {
+                    "path": "preflight/preflight.json",
+                    "sha256": cs.sha256_file(run_dir / "preflight" / "preflight.json"),
+                }
+
+            report = audit(valid_run(run_dir, mutate_evidence=mutate))
+            self.assertEqual(report["failure_class"], "INFRA_ERROR")
+            self.assertTrue(any("preflight" in item for item in report["infra_errors"]))
+
+    def test_good_preflight_contract_does_not_block(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp) / "run"
+
+            def mutate(evidence: dict[str, Any]) -> None:
+                run = cs.read_json(run_dir / cs.RUN_FILE)
+                write_json(
+                    run_dir / "preflight" / "preflight.json",
+                    {
+                        "schema": cs.SCHEMA_PREFLIGHT,
+                        "overall": "PASS",
+                        "harness": run["harness"],
+                        "environment": {"repo": run.get("repo", {}).get("commit", "")},
+                        "checks": [
+                            {"id": "ports", "status": "PASS"},
+                            {
+                                "id": "lab_management",
+                                "status": "PASS",
+                                "versions": {"serverPort": 27192, "rconPort": 27193},
+                            },
+                        ],
+                    },
+                )
+                evidence["preflight"] = {
+                    "path": "preflight/preflight.json",
+                    "sha256": cs.sha256_file(run_dir / "preflight" / "preflight.json"),
+                }
+
+            report = audit(valid_run(run_dir, mutate_evidence=mutate))
+            self.assertEqual(report["overall"], "PASS")
+
+    def test_catalog_token_is_not_a_logger_call(self) -> None:
+        def catalog(records: list[dict[str, Any]]) -> None:
+            for record in records:
+                if record.get("call_id") == "c1-build-logger":
+                    record["arguments"] = {"command": "cat catalog.json"}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_trajectory=catalog))
+            self.assertEqual(flag(report, "logger_armed_before_activation")["status"], "FAIL")
+            self.assertEqual(report["failure_class"], "AGENT_FAIL")
+
+    def test_machine_ordering_missing_is_pending(self) -> None:
+        def strip_processed(events: list[dict[str, Any]]) -> None:
+            for event in events:
+                if event["event"] == "input_processed":
+                    event.pop("at")
+                    event.pop("tick")
+                    event.pop("seq", None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(valid_run(Path(tmp) / "run", mutate_events=strip_processed))
+            machine = flag(report, "machine_operated")
+            self.assertEqual(machine["status"], "PENDING")
+            self.assertIn("machine_operated.ordering", [item["id"] for item in machine["required_review"]])
+            self.assertNotEqual(report["overall"], "PASS")
+
+    def test_unorderable_capture_window_requires_review(self) -> None:
+        def strip_window(logger: list[dict[str, Any]]) -> None:
+            logger[1].pop("at", None)
+            logger[1].pop("tick", None)
+
+        def strip_removal(events: list[dict[str, Any]]) -> None:
+            for event in events:
+                if event["event"] == "cart_removed":
+                    event.pop("at", None)
+                    event.pop("tick", None)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            report = audit(
+                valid_run(Path(tmp) / "run", mutate_logger=strip_window, mutate_events=strip_removal)
+            )
+            transient = flag(report, "transient_outputs_captured")
+            self.assertEqual(transient["status"], "PENDING")
+            self.assertIn("transient_outputs_captured.window", [item["id"] for item in transient["required_review"]])
 
     def test_attempts_only_is_agent_fail(self) -> None:
         def only_attempts(events: list[dict[str, Any]]) -> None:
@@ -821,6 +1122,70 @@ class PreflightTests(unittest.TestCase):
             code = harness_preflight.main(["list"])
         self.assertEqual(code, 0)
         self.assertIn("lab_management", buffer.getvalue())
+
+    def test_source_fetch_requires_every_endpoint(self) -> None:
+        from unittest import mock
+
+        class FakeResponse:
+            status = 200
+
+            def read(self, size: int) -> bytes:
+                return b"{}"
+
+            def __enter__(self) -> "FakeResponse":
+                return self
+
+            def __exit__(self, *args: Any) -> bool:
+                return False
+
+        def fake_urlopen(request: Any, timeout: float = 0) -> FakeResponse:
+            if "bad" in request.full_url:
+                raise OSError("unreachable")
+            return FakeResponse()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            probe = harness_preflight.Probe(out)
+            with mock.patch.object(harness_preflight.urllib.request, "urlopen", fake_urlopen):
+                result = harness_preflight.check_source_fetch(
+                    {"fetch_urls": ["https://good/a", "https://bad/b"]}, probe, out
+                )
+            self.assertEqual(result["status"], "FAIL")
+            self.assertIn("1/2", result["detail"])
+
+    def test_redact_config_is_recursive(self) -> None:
+        redacted = harness_preflight.redact_config(
+            {"api_key": "x", "build": {"java": "y"}, "nested": [{"token": "z", "password": "p"}]}
+        )
+        self.assertEqual(redacted["api_key"], "<redacted>")
+        self.assertEqual(redacted["build"]["java"], "y")
+        self.assertEqual(redacted["nested"][0]["token"], "<redacted>")
+        self.assertEqual(redacted["nested"][0]["password"], "<redacted>")
+
+    def test_lab_start_disabled_is_skip(self) -> None:
+        class FakeProbe:
+            def command(self, check: str, argv: list[str], cwd: Any = None, timeout: float = 0, env: Any = None) -> dict[str, Any]:
+                return {
+                    "kind": "command",
+                    "command": " ".join(argv),
+                    "exit_code": 0,
+                    "seconds": 0.0,
+                    "stdout_path": "probe.txt",
+                    "stdout_sha256": "0",
+                    "stdout_excerpt": "",
+                }
+
+            def file(self, check: str, name: str, payload: bytes) -> dict[str, Any]:
+                return {"kind": "file", "path": name, "sha256": "0", "size": len(payload)}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            result = harness_preflight.check_lab_management(
+                {"lab": {"enabled": True, "start": False, "name": "unit-no-start"}},
+                FakeProbe(),
+                Path(tmp),
+            )
+        self.assertEqual(result["status"], "SKIP")
+        self.assertIn("start is disabled", result["detail"])
 
 
 if __name__ == "__main__":

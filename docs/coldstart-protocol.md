@@ -60,12 +60,12 @@ Each check writes its command, exit code, transcript and hash under
 | `terminal` | the harness can run a shell command | `shell` from the config |
 | `filesystem` | write, read-back and hash a nonce file | exact bytes preserved |
 | `ports` | the reserved API/mod ports are free and inside the range | default range 27190–27199 |
-| `source_fetch` | source/dependency endpoints answer (Fabric meta, Modrinth) | optional `build.pip_packages` adds a pip probe |
+| `source_fetch` | every configured source/dependency endpoint answers (Fabric meta, Modrinth) | optional `build.pip_packages` adds a pip probe; one failing endpoint fails the check |
 | `build_install` | a JDK >= `build.min_java` compiles and packages a probe jar, and the installed bytes hash-match | Java 25 is required for 26.2; a PATH JDK 21 fails this check on purpose |
 | `bridge_cli` | `mc-bridge --help` runs | the JSON CLI is the required call surface |
 | `bridge_mcp` | `mc-bridge mcp --help` runs | optional; skipped when the `mcp` extra is absent, because the JSON CLI is an accepted alternative |
 | `bridge_smoke` | `tools/smoke_offline.py` completes with the echo backend | real bridge + loop processes against a fake mod on the reserved ports |
-| `lab_management` | `lab_server.py list` works; with a lab configured, a real headless Fabric server is provisioned, pinned to the reserved ports, started, answers RCON `list`, and stops | records `lab.json` and the console hash |
+| `lab_management` | `lab_server.py list` works; with a lab configured and `start` enabled, a real headless Fabric server is provisioned, pinned to the reserved ports, started, answers RCON `list`, and stops | records `lab.json` and the console hash; a disabled start is SKIP, so the audit's preflight cross-check rejects it |
 
 `--checks`/`--skip` select a subset; `SKIP` never counts as `PASS`. Exit code 0
 means overall PASS, 1 means at least one selected check failed. A probe that
@@ -230,9 +230,11 @@ normalized view of it) contains:
 | `cart_observed` | `uuid`, `at`, `tick`, `position`, `items` | one ejected cart captured before removal |
 | `logger_flushed` / `logger_error` | `at` | output durability / failure |
 
-If a `normalized` view is declared, every record should carry
-`source_sha256` equal to the raw logger's hash; the audit rejects a view whose
-records do not name the current bytes. The raw output is never replaced by the
+If a `normalized` view is declared, the audit checks the raw file against the
+declaration's `sha256`, loads the normalized file against its own
+`normalized_sha256` (never the raw hash), and requires **every** normalized
+record to carry `source_sha256` equal to the raw logger's hash; a missing or
+stale `source_sha256` is `INFRA_ERROR`. The raw output is never replaced by the
 normalized view.
 
 ### Explicit review resolutions
@@ -266,6 +268,28 @@ The required-review ids in this revision are `machine_operated.causality`,
 `answer_correct.oracle_independence`. A run whose mechanical checks pass but
 whose required reviews are unresolved is PENDING, never PASS.
 
+### Correlation and provenance
+
+Before any flag is computed, the audit correlates the run's identities and
+fails closed on mismatches:
+
+- every record may carry `run_id`; a mismatch with the run manifest is
+  `INFRA_ERROR`, in the test-mod/agent-logger files **and** in the trajectory;
+- `imports/` and `artifacts/` files are re-hashed against `run.json`, so a
+  tampered raw session or build output is `INFRA_ERROR`;
+- test-mod events must not mix instances or dimensions, and agent logger events
+  must name the same experiment instance/dimension as the test mod - the record
+  fields are aliases (`instance`/`instance_id`, `dimension`/`dim`);
+- a declared preflight must match the run manifest: harness name/model/provider,
+  the repo commit, a passing `ports` check and a passing live `lab_management`
+  check that actually started a server; a SKIP or a different environment is
+  `INFRA_ERROR`;
+- oracle `evidence_refs` must resolve against declared test-mod/fixture/restore
+  evidence (a `testmod:seqN` ref must name an existing record); agent-side refs
+  (`trajectory:`, `logger:`, `answer`) never count as independent, and an
+  unresolved ref is PENDING while no independent ref fails the flag. The answer
+  must cover exactly the oracle's carts: an omitted cart is `AGENT_FAIL`.
+
 ## 6. What the audit decides: `run_audit.py`
 
 ```bash
@@ -282,7 +306,7 @@ and writes `audit/audit.json` plus `audit/audit.md`. Exit codes: `0` PASS,
 | `logger_armed_before_activation` | a `logger_armed` record ordered before the first `input_processed` event (time, then tick, then same-tick sequence; same instance/dimension); an agent call showing the logger being written/built/started | `logger_armed_before_activation.running`; `.ordering` when no shared ordering layer exists | `logger:seq…`, `testmod:seq…`, `trajectory:<call_id>` |
 | `transient_outputs_captured` | every `cart_ejected` uuid has a `cart_observed` record ordered **after** ejection and **before** removal (same instance/dimension); each capture carries an items list | `.window` when there is no removal evidence or no shared ordering layer; `.inventory` when a capture has no items list | `testmod:seq…`, `logger:seq…` |
 | `agent_read_log` | an agent call after the last capture that both names the logger and returns captured observation content (a cart uuid plus its items, or the full ordered item list), with a plausible read/exec call | `agent_read_log.linkage` when the linkage is ambiguous (filename echoed, uuid alone, content without a logger reference, or unorderable) | `trajectory:<call_id>`, `logger:seq…` |
-| `answer_correct` | the answer matches a **verified** oracle cart by cart, and the oracle references independent game-side evidence | `answer_correct.oracle_independence` | `oracle:<ref>`, `oracle` |
+| `answer_correct` | the answer matches a **verified** oracle cart by cart, covers every oracle cart, and the oracle's refs resolve to independent game-side evidence | `answer_correct.oracle_independence` | `oracle:<ref>`, `oracle` |
 
 The audit is deliberately split into mechanical and semantic parts. Presence,
 ordering, hashes and item comparison are mechanical. Causality ("this traced
@@ -308,8 +332,11 @@ ejected (for example a pre-activation inventory read) fails outright, and an
 corresponding flag fails or stays pending - there is no path to PASS.
 
 **The oracle rule.** `answer_correct` requires an oracle whose `status` is
-`verified` and whose `evidence_refs` point at test-mod / fixture / restore
-evidence. An oracle copied from the agent's answer fails. When the fixture is
+`verified`, whose `evidence_refs` resolve against declared test-mod / fixture /
+restore evidence, and that carries at least one independent game-side ref. An
+oracle copied from the agent's answer fails; an unresolved ref is PENDING. The
+answer must cover exactly the oracle's carts - a partial answer that omits a
+cart is `AGENT_FAIL` even when the remaining carts match. When the fixture is
 new or unverified, the oracle stays `pending`; the audit reports PENDING and
 never claims correctness early.
 

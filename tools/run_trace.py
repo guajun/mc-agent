@@ -347,6 +347,10 @@ def approve(run_dir: Path, record: dict[str, Any]) -> dict[str, Any]:
     record.setdefault("schema", cs.SCHEMA_TRAJECTORY)
     record.setdefault("run_id", run.get("run_id"))
     record.setdefault("at", cs.utc_now())
+    if str(record.get("run_id")) != str(run.get("run_id")):
+        raise SystemExit(
+            f"error: record run_id {record.get('run_id')!r} does not belong to run {run.get('run_id')!r}"
+        )
     kind = record.get("record")
     if kind == "call":
         problem = cs.validate_call_shape(record)
@@ -608,6 +612,7 @@ def cmd_review(args: argparse.Namespace) -> int:
         {
             "schema": cs.SCHEMA_TRAJECTORY,
             "record": "mark",
+            "run_id": run.get("run_id"),
             "name": "review",
             "actor": "reviewer",
             "at": record["at"],
@@ -644,7 +649,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
             if visibility.get("schema") != cs.SCHEMA_VISIBILITY:
                 problems.append("visibility schema mismatch")
         trajectory = cs.read_jsonl(trajectory_path(run_dir))
-        problems.extend(cs.validate_trajectory(trajectory))
+        problems.extend(cs.validate_trajectory(trajectory, run_id=run.get("run_id")))
         for entry in run.get("imports") or []:
             raw = run_dir / entry["path"]
             if not raw.is_file():

@@ -273,12 +273,14 @@ class ValidationError(ValueError):
     pass
 
 
-def validate_trajectory(records: Sequence[Mapping[str, Any]]) -> list[str]:
+def validate_trajectory(records: Sequence[Mapping[str, Any]], run_id: str | None = None) -> list[str]:
     """Structural checks on a trajectory; returns a list of problems.
 
     The rules are deliberately mechanical: unique call ids, one result per
     call, results after their call, monotonic ``seq`` and non-decreasing
-    timestamps, known phases/actors/statuses.
+    timestamps, known phases/actors/statuses.  When ``run_id`` is given, every
+    record that carries one must belong to that run; a present ``at`` must
+    parse as a timestamp instead of being silently ignored.
     """
     problems: list[str] = []
     if not records:
@@ -300,9 +302,15 @@ def validate_trajectory(records: Sequence[Mapping[str, Any]]) -> list[str]:
                 problems.append(f"line {index + 1}: seq is not an integer")
             else:
                 seqs.append(record["seq"])
-        at = as_time(record.get("at"))
-        if at is not None:
-            times.append(at)
+        if record.get("at") is not None:
+            at = as_time(record.get("at"))
+            if at is None:
+                problems.append(f"line {index + 1}: at is not a valid timestamp: {record.get('at')!r}")
+            else:
+                times.append(at)
+        record_run = get_field(record, "run_id")
+        if run_id is not None and record_run is not None and str(record_run) != str(run_id):
+            problems.append(f"line {index + 1}: run_id {record_run!r} does not belong to run {run_id!r}")
         if record.get("phase") is not None and record["phase"] not in PHASES:
             problems.append(f"line {index + 1}: unknown phase {record['phase']!r}")
         if record.get("actor") is not None and record["actor"] not in ACTORS:
@@ -748,10 +756,37 @@ def flag_machine_operated(
     return result
 
 
+LOGGER_ARM_TOKENS = ("logger", "logging", "trace", "record_start", "gradle", "javac", "fabric")
+
+
+def logger_arm_call(
+    trajectory: Sequence[Mapping[str, Any]], logger_declared: Mapping[str, Any] | None
+) -> Mapping[str, Any] | None:
+    """A successful agent-phase call that writes, builds or starts the logger."""
+    logger_paths = {
+        Path(str((logger_declared or {}).get(key) or "")).name.lower() for key in ("path", "normalized")
+    }
+    logger_paths.discard("")
+    results = paired_results(trajectory)
+    for call in agent_calls(trajectory):
+        if call.get("phase") not in (None, "agent"):
+            continue
+        result_record = results.get(str(call.get("call_id")))
+        if result_record is not None and result_record.get("status") != "ok":
+            continue
+        text = json.dumps(call.get("arguments"), ensure_ascii=False, default=str).lower()
+        if logger_paths and any(path in text for path in logger_paths):
+            return call
+        if any(token in text for token in LOGGER_ARM_TOKENS):
+            return call
+    return None
+
+
 def flag_logger_armed(
     test_events: Sequence[Mapping[str, Any]],
     logger_events: Sequence[Mapping[str, Any]],
     trajectory: Sequence[Mapping[str, Any]],
+    logger_declared: Mapping[str, Any] | None = None,
 ) -> FlagResult:
     result = FlagResult("logger_armed_before_activation")
     processed = [r for r in test_events if event_name(r) == "input_processed"]
@@ -774,14 +809,10 @@ def flag_logger_armed(
         return result.fail(
             "logger_armed is ordered after the first input_processed event (time/tick/sequence)"
         )
-    arm_calls = [
-        c
-        for c in agent_calls(trajectory)
-        if any(token in call_text(c, None).lower() for token in ("log", "logger", "trace", "record"))
-    ]
+    arm_calls = [call for call in (logger_arm_call(trajectory, logger_declared),) if call is not None]
     if not arm_calls:
         return result.fail(
-            "logger_armed exists, but no agent call in the trajectory shows the logger being written, built or started",
+            "logger_armed exists, but no successful agent-phase call shows the logger being written, built or started",
             ["trajectory:logger-arm-call"],
         )
     witness = arm_calls[0]
@@ -1016,10 +1047,61 @@ def flag_agent_read_log(
     )
 
 
+ORACLE_INDEPENDENT_PREFIXES = ("testmod", "test_mod", "auditmod", "test", "fixture", "restore", "preflight")
+ORACLE_AGENT_PREFIXES = ("trajectory", "logger", "agent_logger", "answer")
+
+
+def oracle_provenance(
+    oracle: Mapping[str, Any] | None,
+    declared: Mapping[str, bool],
+    available_seqs: Mapping[str, set[int]],
+) -> tuple[list[str], list[str], list[str]]:
+    """Resolve oracle evidence_refs against declared evidence.
+
+    Returns ``(problems, independent_refs, agent_side_refs)``.  A ref is
+    independent when it resolves to declared test-mod/fixture/restore/preflight
+    evidence (and, for ``seqN`` refs, to a record that exists); agent-side refs
+    (``trajectory:``/``logger:``/``answer``) never count as independent.  An
+    unknown prefix or an unresolvable seq is a problem the caller turns into
+    PENDING.
+    """
+    problems: list[str] = []
+    independent: list[str] = []
+    agent_side: list[str] = []
+    if not oracle:
+        return problems, independent, agent_side
+    for raw in oracle.get("evidence_refs") or []:
+        ref = str(raw)
+        prefix, _, suffix = ref.partition(":")
+        prefix = prefix.lower()
+        if prefix in ("testmod", "test_mod", "auditmod", "test"):
+            if not declared.get("test_mod"):
+                problems.append(f"oracle ref {ref!r} points at a test-mod file that is not declared")
+                continue
+            if suffix.startswith("seq"):
+                seq_value = as_int(suffix[3:])
+                if seq_value is None or seq_value not in available_seqs.get("testmod", set()):
+                    problems.append(f"oracle ref {ref!r} does not match a test-mod record")
+                    continue
+            independent.append(ref)
+        elif prefix in ("fixture", "restore", "preflight"):
+            if not declared.get(prefix):
+                problems.append(f"oracle ref {ref!r} points at evidence that is not declared")
+                continue
+            independent.append(ref)
+        elif prefix in ORACLE_AGENT_PREFIXES:
+            agent_side.append(ref)
+        else:
+            problems.append(f"oracle ref {ref!r} has no resolvable evidence source")
+    return problems, independent, agent_side
+
+
 def flag_answer_correct(
     answer: Mapping[str, Any] | None,
     oracle: Mapping[str, Any] | None,
     oracle_problems: Sequence[str],
+    provenance_problems: Sequence[str] = (),
+    has_independent_ref: bool = True,
 ) -> FlagResult:
     result = FlagResult("answer_correct")
     if answer is None:
@@ -1041,32 +1123,46 @@ def flag_answer_correct(
     source = str(oracle.get("source") or "").lower()
     if not refs:
         return result.fail("the oracle is marked verified but carries no evidence references", ["oracle:evidence_refs"])
-    if "agent" in source and "answer" in source:
-        return result.fail("the oracle copies the agent answer instead of independent game evidence", ["oracle:source"])
-    if any(ref.startswith("trajectory:") or ref.startswith("answer") for ref in refs):
-        result.review("oracle references include agent-side records; confirm at least one independent game-side reference grounds it")
+    if provenance_problems:
+        return result.pending("the oracle's evidence references do not resolve: " + "; ".join(provenance_problems), ["oracle:evidence_refs"])
+    if not has_independent_ref:
+        return result.fail(
+            "the verified oracle has no independent game-side evidence reference (agent-side refs do not count)",
+            ["oracle:evidence_refs"],
+        )
+    if "answer" in source:
+        return result.fail("the oracle claims to be the agent answer")
+    if "agent" in source:
+        result.review("the oracle source names the agent; the independent refs and explicit review still have to hold")
     oracle_carts = {
         str(cart.get("uuid")): cart for cart in (oracle.get("carts") or []) if isinstance(cart, Mapping)
     }
     if not oracle_carts:
         return result.fail("verified oracle has no carts", ["oracle:carts"])
+    answer_uuids = {str(cart.get("uuid")) for cart in carts if isinstance(cart, Mapping)}
+    missing = sorted(set(oracle_carts) - answer_uuids)
+    if missing:
+        return result.fail(
+            "the answer omits cart(s) present in the oracle: " + ", ".join(missing),
+            [f"answer:missing:{uuid}" for uuid in missing],
+        )
+    extra = sorted(answer_uuids - set(oracle_carts))
+    if extra:
+        return result.fail("the answer has cart(s) absent from the oracle: " + ", ".join(extra))
     mismatches: list[str] = []
     for cart in carts:
         if not isinstance(cart, Mapping):
             mismatches.append("answer entry is not an object")
             continue
         uuid = str(cart.get("uuid"))
-        expected = oracle_carts.get(uuid)
-        if expected is None:
-            mismatches.append(f"cart {uuid} absent from the oracle")
-            continue
+        expected = oracle_carts[uuid]
         got = normalize_items(cart.get("items"))
         want = normalize_items(expected.get("items"))
         if got != want:
             mismatches.append(f"cart {uuid}: answer {got} != oracle {want}")
     if mismatches:
         return result.fail("answer disagrees with the verified oracle: " + "; ".join(mismatches[:6]))
-    result.ok(f"answer matches the verified oracle for {len(carts)} cart(s)")
+    result.ok(f"answer matches the verified oracle for {len(carts)} cart(s) and covers every oracle cart")
     result.ref("oracle", *(f"oracle:{ref}" for ref in refs[:6]))
     result.require_review(
         "answer_correct.oracle_independence",
