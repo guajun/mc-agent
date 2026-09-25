@@ -75,6 +75,7 @@ python tools/smoke_offline.py --backend hermes    # 真模型驱动真工具
 * [安装 Toolkit Skill](toolkit-skill.md) —— 每个运行时共用的一份可移植 Skill
 * [Hermes 无人值守](hermes-unattended.md) —— webhook 触发、加载同一份 Skill
 * [无头实验室服务器](lab-server.md) —— 供给、启停与控制
+* [可审计的冷启动运行](coldstart-protocol.md) —— 环境契约、轨迹落盘与基于证据的判定
 * [工具](tools.md) —— 全部 CLI 与 MCP 工具
 * [疑难排查](troubleshooting.md) —— 那些坑，大多是真机上撞出来的
 * [RFC 提案](rfc/0001-agent-interface.md) —— 已经定了什么、什么还开放
