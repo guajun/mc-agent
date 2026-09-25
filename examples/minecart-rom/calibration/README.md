@@ -4,6 +4,7 @@ Measured on 2026-09-26 on this machine:
 
 | Item | Value |
 | --- | --- |
+| Artifact | `minecart-rom-base-1.0.0.zip`, 748,718 bytes, SHA-256 `11d45a85…157bd`, world hash `c766c971…14361` |
 | Minecraft | 26.2 (`DataVersion 4903`) |
 | Fabric loader / installer | 0.19.5 / 1.1.2 |
 | Java | Microsoft OpenJDK 25.0.1 (HMCL runtime `mojang-java-runtime-epsilon`) |
@@ -35,10 +36,17 @@ each with new cart UUIDs. The normalized hash (spawn index + position + motion +
 items, UUIDs excluded) was identical:
 
 ```
-run-01  READY  hash 86215e40a0d3d9ba…  carts 3
-run-02  READY  hash 86215e40a0d3d9ba…  carts 3
-run-03  READY  hash 86215e40a0d3d9ba…  carts 3
+run-01            READY  hash 86215e40a0d3d9ba…  carts 3
+run-02            READY  hash 86215e40a0d3d9ba…  carts 3
+run-03            READY  hash 86215e40a0d3d9ba…  carts 3
+real-url-run      READY  hash 86215e40a0d3d9ba…  carts 3
 ```
+
+`real-url-run` is the acceptance run for this issue: it starts from an empty
+map cache and downloads the ZIP over HTTPS from the URL pinned in
+`map-manifest.json` (HTTP 200, 748,718 bytes, SHA-256 match), imports the world,
+starts a fresh lab, initializes, and validates `READY` – all in one sequence.
+`records/cold-download/` holds the download-only record from the same URL.
 
 The full records are in `records/run-01` … `records/run-03`: `download.json`/
 `import.out.json`, `init-record.json`, `init-commands.jsonl`, `ready-snapshot.json`,

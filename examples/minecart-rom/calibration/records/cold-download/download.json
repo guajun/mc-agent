@@ -1,0 +1,88 @@
+{
+  "cache": {
+    "path": "labs\\_scratch\\coldcache\\minecart-rom-base-1.0.0.zip",
+    "url": "https://raw.githubusercontent.com/guajun/mc-agent/15173b6393264fdd527f348e6857bc6c44d5141a/examples/minecart-rom/dist/minecart-rom-base-1.0.0.zip",
+    "http_status": 200,
+    "bytes": 748718,
+    "sha256": "11d45a8530f7146086f7eed7e3ebaa2064dd1efdacc57d92afdcd745c27157bd",
+    "cache_hit": false,
+    "seconds": 2.208
+  },
+  "extract": {
+    "entries": 32,
+    "uncompressed_bytes": 11532405,
+    "roots": [
+      "EXPORT.json",
+      "world"
+    ],
+    "staging": "labs\\_scratch\\coldcache\\unpacked\\minecart-rom-base-1.0.0",
+    "world": "labs\\_scratch\\coldcache\\unpacked\\minecart-rom-base-1.0.0\\world",
+    "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+    "world_files": 31,
+    "world_bytes": 11530857,
+    "export": {
+      "format": "mc-agent/minecart-rom-export@1",
+      "version": "1.0.0",
+      "source": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
+      "level_name": "Minecart ROM base",
+      "world_sha256": "c766c971a302b012baef402f19ac6d5d6bb116ff0ff4da09ccc67ad4daf14361",
+      "world_files": 31,
+      "world_uncompressed_bytes": 11530857,
+      "level_dat": {
+        "changed": [
+          "singleplayer_uuid",
+          "LevelName",
+          "LastPlayed"
+        ]
+      },
+      "copy": {
+        "files": 32,
+        "entity_regions_removed": 1
+      },
+      "removed_entities": [
+        {
+          "region": "dimensions/minecraft/overworld/entities/r.0.-1.mca",
+          "chunk": [
+            0,
+            30
+          ],
+          "type": "minecraft:item",
+          "pos": [
+            10.453924520331922,
+            -113.00564677200062,
+            -24.063298572430508
+          ]
+        },
+        {
+          "region": "dimensions/minecraft/overworld/entities/r.0.-1.mca",
+          "chunk": [
+            0,
+            30
+          ],
+          "type": "minecraft:item",
+          "pos": [
+            15.786817765233828,
+            -108.36176415817827,
+            -25.34616718900339
+          ]
+        },
+        {
+          "region": "dimensions/minecraft/overworld/entities/r.0.-1.mca",
+          "chunk": [
+            0,
+            30
+          ],
+          "type": "minecraft:item",
+          "pos": [
+            12.13010254209009,
+            -95.60491217640337,
+            -31.716173247761795
+          ]
+        }
+      ],
+      "command_blocks": [],
+      "tool": "examples/minecart-rom/runner/export_world.py",
+      "exported_at": "2026-09-25T16:52:09Z"
+    }
+  }
+}
