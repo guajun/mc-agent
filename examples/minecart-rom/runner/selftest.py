@@ -134,6 +134,17 @@ def test_item_and_vec_parsers() -> None:
         fixture.CART_MARK,
     )
     check_equal(len(records), 2, "concatenated data get answers split")
+    component_items = fixture.parse_items(
+        '[{components: {"minecraft:custom_name": "A B"}, count: 1, Slot: 0b, id: "minecraft:stone"}]'
+    )
+    check_equal(len(component_items), 1, "component item parses")
+    check_equal(component_items[0]["id"], "minecraft:stone", "component item id")
+    check_equal(component_items[0]["count"], 1, "component item count")
+    check(
+        "minecraft:custom_name" in component_items[0].get("components", ""),
+        "component compound is kept",
+    )
+    check_equal(fixture.parse_items("[]"), [], "empty items parse")
 
 
 def test_manifest_validation(tmp: Path) -> None:
@@ -398,6 +409,7 @@ def synthetic_snapshot(spec: dict, program: list[dict] | None = None) -> dict:
     return {
         "format": fixture.RECORD_FORMAT,
         "tick_frozen": True,
+        "world_day_tick": 6000,
         "program": entries,
         "spawn_order": spawn_order,
         "rcon_order": list(spawn_order),
@@ -432,6 +444,26 @@ def test_validate_ready() -> None:
         and any(problem["check"] == "interface-cross-check" for problem in report["problems"]),
         "missing tick order fails the ready contract",
     )
+    bad_note = copy.deepcopy(good)
+    bad_note["machine"]["note"] = 7
+    report = fixture.validate_ready(spec, bad_note)
+    check(
+        any(problem["check"] == "machine-note" for problem in report["problems"]),
+        "a changed note value fails the ready contract",
+    )
+    bad_day = copy.deepcopy(good)
+    bad_day["world_day_tick"] = 6007
+    report = fixture.validate_ready(spec, bad_day)
+    check(
+        any(problem["check"] == "day-tick" for problem in report["problems"]),
+        "a changed ready day tick fails the ready contract",
+    )
+    dev = copy.deepcopy(good)
+    dev["tick_order"] = None
+    dev["interface"]["cross_check_ok"] = False
+    dev["interface"]["seat_present"] = False
+    report = fixture.validate_ready(spec, dev, require_interface=False)
+    check(report["ok"], "require_interface=False skips only interface-only checks")
     no_seat = copy.deepcopy(good)
     no_seat["seat"] = []
     report = fixture.validate_ready(spec, no_seat)
@@ -651,6 +683,22 @@ def test_live_classifier() -> None:
             "classifier: a changed hover seat is not ready",
         )
 
+        changed_note = copy.deepcopy(ready["machine"])
+        changed_note["note"] = 21
+        reset(machine=changed_note)
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            not report["ok"] and any(p["check"] == "machine-note-changed" for p in report["problems"]),
+            "classifier: a changed note value is not ready",
+        )
+
+        reset(world_day_tick=6007)
+        report = fixture.check_live_state(console, spec, ready)
+        check(
+            not report["ok"] and any(p["check"] == "day-tick-changed" for p in report["problems"]),
+            "classifier: a changed day tick is not ready",
+        )
+
         reset(carts=list(ready["carts"][:2]), normalized_hash=fixture.normalized_entity_hash(ready["carts"][:2]))
         report = fixture.check_live_state(console, spec, ready)
         check(report["verdict"] == "PREMATURE_OUTPUT", "classifier: missing cart is premature output")
@@ -699,6 +747,69 @@ def test_evidence_helpers() -> None:
     # fail closed when the source save was not provided
     rebuild = evidence.cleanup_rebuild(None)
     check(rebuild["source_world_untouched"] is False, "no source world means untouched=false")
+
+
+def test_interface_mod_units(tmp: Path) -> None:
+    """SNBT comparison semantics and snapshot error/read helpers."""
+    import interface_mod
+
+    rcon = '[{components: {"minecraft:custom_name": "A B"}, count: 1, Slot: 0b, id: "minecraft:stone"}]'
+    mod = (
+        '{"Motion":[0.0d,0.0d,0.0d],"Items":[{"components":{"minecraft:custom_name":"A B"},'
+        '"count":1,"Slot":0b,"id":"minecraft:stone"}]}'
+    )
+    cases = [
+        (mod, rcon, True, "real mod/rcon component forms match"),
+        ('{"Items":[{"b":2,"a":1}]}', '[{a: 1, b: 2}]', True, "key order is irrelevant"),
+        (
+            '{"Items":[{"components":{"minecraft:custom_name":"AB"},"count":1,"id":"x"}]}',
+            '[{components: {minecraft:custom_name: "A B"}, count: 1, id: "x"}]',
+            False,
+            "spacing inside a quoted string is data",
+        ),
+        ('{"Items":[]}', "[]", True, "empty items match"),
+        ('{"Items":[]}', '[{count:1,id:"x"}]', False, "empty vs non-empty differ"),
+        ('{"Items":[{"x":[I;1,2,3]}]}', "[{x: [I; 1, 2, 3]}]", True, "int arrays compare"),
+        ('{"Items":[{"minecraft:custom_name":"x"}]}', '[{"minecraft:custom_name": "x"}]', True, "quoted keys compare"),
+        ('{"Items":[{"count":1b}]}', "[{count: 1b}]", True, "type suffixes compare"),
+        ('{"Items":[{"count":1}]}', "[{count: 2}]", False, "different values differ"),
+    ]
+    for mod_text, rcon_text, expected, label in cases:
+        check_equal(interface_mod.compare_items(mod_text, rcon_text)["match"], expected, label)
+    check_equal(interface_mod.canonical_items("no items here"), "", "unparseable fragment fails closed")
+
+    client = interface_mod.InterfaceClient(port=1)
+    client.request = lambda *_args, **_kwargs: {"type": "error", "detail": "boom"}
+    check_raises(
+        interface_mod.InterfaceError,
+        lambda: client.snapshot("unit"),
+        "a mod error reply raises immediately",
+    )
+
+    snap = tmp / "snap"
+    snap.mkdir()
+    (snap / "meta.json").write_text(
+        json.dumps({"protocol": 1, "dimension": "minecraft:overworld", "mod": "mc-agent-interface"}),
+        "utf-8",
+    )
+    (snap / "entities.jsonl").write_text(
+        "\n".join(
+            json.dumps(entry)
+            for entry in (
+                {"order": 0, "uuid": "a", "type": "minecraft:chest_minecart"},
+                {"order": 1, "uuid": "b", "type": "minecraft:armor_stand"},
+            )
+        )
+        + "\n",
+        "utf-8",
+    )
+    meta, entities = interface_mod.read_snapshot(snap)
+    check_equal(meta["dimension"], "minecraft:overworld", "snapshot meta reads")
+    check_equal(
+        interface_mod.tick_order(entities, "minecraft:chest_minecart"),
+        ["a"],
+        "tick order filters by type",
+    )
 
 
 def test_export_reproducible(tmp: Path) -> None:
@@ -870,6 +981,7 @@ def run(keep: bool = False, verbose: bool = False) -> int:
         ("evidence helpers", test_evidence_helpers),
         ("challenge", lambda: test_challenge_generator(tmp)),
         ("export reproducible", lambda: test_export_reproducible(tmp)),
+        ("interface mod units", lambda: test_interface_mod_units(tmp)),
         ("mod pins", lambda: test_mod_pins(tmp)),
         ("lab helpers", lambda: test_import_helpers(tmp)),
     ]

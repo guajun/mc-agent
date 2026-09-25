@@ -155,7 +155,6 @@ def cmd_init(args: argparse.Namespace) -> int:
             record_dir=records,
             interface=interface,
             snapshot_name=args.snapshot_name or f"ready-{args.lab}",
-            allow_rcon_order=args.allow_rcon_order,
             manifest=manifest,
         )
     finally:
@@ -460,11 +459,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--run-id", default="")
     p.add_argument("--interface-port", type=int, default=0, help="override the server-vantage port")
     p.add_argument("--snapshot-name", default="", help="interface snapshot name to write")
-    p.add_argument(
-        "--allow-rcon-order",
-        action="store_true",
-        help="development only: accept the RCON selector order instead of the tick order",
-    )
     p.add_argument("--verbose", action="store_true")
     p.set_defaults(handler=cmd_init)
 

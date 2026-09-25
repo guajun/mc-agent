@@ -1,6 +1,6 @@
 {
   "format": "mc-agent/minecart-rom-record@1",
-  "checked_at": "2026-09-26T02:20:57+0800",
+  "checked_at": "2026-09-26T02:42:23+0800",
   "verdict": "PREMATURE_OUTPUT",
   "ok": false,
   "problems": [
@@ -91,37 +91,42 @@
       ]
     },
     {
+      "check": "machine-note-changed",
+      "at_ready": 20,
+      "now": 21
+    },
+    {
       "check": "normalized-state-changed",
       "at_ready": "86215e40a0d3d9bad6231fb5583912e616f1208ffaa50f8f3fb22e1f5e3f01be",
       "now": "8eb92c99429e9cf810fd1c33cb874a6e65d8c93d29a84109fce6eb5d51d784b5"
     },
     {
       "check": "cart-nbt-changed",
-      "uuid": "e8183b4b-7b5d-4e63-b616-fb23a7bc415a",
-      "at_ready": "720ffee9a5657ebc8ef9b1ddc2755abf80a27948515049fa82e540d35c3798d4",
-      "now": "105011a0bf33cf0a9208c31e68887d862ddacf9cea72523fd74a2bbb12698821",
+      "uuid": "ddc96326-115a-44ae-ab44-c631d28bfd2e",
+      "at_ready": "e32f0ee976a274548a2bd86a9fe9457e40de4e64245532163bdfc638dc735fe3",
+      "now": "9a77c6e8165de9240d3da3bdd5fe01a68dfe0574007241186e193931908b3361",
       "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 1, Sl",
       "now_nbt": "{Motion: [0.0d, 1.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.03999999910593033d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.49d, -21.5d], Fire: 0s, Items: "
     },
     {
       "check": "cart-nbt-changed",
-      "uuid": "91e7acc8-5d15-42c8-a832-c5b09596622d",
-      "at_ready": "322f7ef547d0d057fb910bc3c0a90028e5cd0f0eb3a71d8f298d06f5c2b1d4e3",
-      "now": "a7ae776272c7dc09a31d66cc948ea6226136c9875e4b83dce70830345c9bf0c8",
+      "uuid": "4daef00d-bd5d-4ab0-85ba-3f8347bb129a",
+      "at_ready": "277c5d3e3292f932bb385e6d29f953acffb78650224aa94aa7ddb30a586a9d52",
+      "now": "0a489b5a7609abe33a64583aa98670d00fa5eef528968371786654bcdf69fa66",
       "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 2, Sl",
       "now_nbt": "{Motion: [0.0d, 1.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.03999999910593033d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.49d, -21.5d], Fire: 0s, Items: "
     },
     {
       "check": "cart-nbt-changed",
-      "uuid": "9d9ef5a0-c364-4227-8460-5e97ee80b143",
-      "at_ready": "79fce923b49c53fa21187b32c9fd826936aded63ce6d24a0371e978e7954df4b",
-      "now": "4d9eb05258192fcdc2044faf439be482fc18c35ec79acf444b5193bedaa19300",
+      "uuid": "f082ac9a-034d-4e42-ad19-5aaa8f068344",
+      "at_ready": "912910da2efd3d7759850bc210e974897a0c0b9f89761257ebb89ea1dd86b156",
+      "now": "903408a0aeff76f0a90a721bbc2b997b2c4f521a4306587bf316d8988d76bcf2",
       "at_ready_nbt": "{Motion: [0.0d, 0.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.0d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.9375d, -21.5d], Fire: 0s, Items: [{count: 3, Sl",
       "now_nbt": "{Motion: [0.0d, 1.0d, 0.0d], Invulnerable: 0b, fall_distance: 0.03999999910593033d, Air: 300s, OnGround: 0b, PortalCooldown: 0, Rotation: [0.0f, 0.0f], Pos: [14.5d, -51.49d, -21.5d], Fire: 0s, Items: "
     },
     {
       "check": "premature-motion",
-      "uuid": "e8183b4b-7b5d-4e63-b616-fb23a7bc415a",
+      "uuid": "ddc96326-115a-44ae-ab44-c631d28bfd2e",
       "motion": [
         0.0,
         1.0,
@@ -130,7 +135,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "91e7acc8-5d15-42c8-a832-c5b09596622d",
+      "uuid": "4daef00d-bd5d-4ab0-85ba-3f8347bb129a",
       "motion": [
         0.0,
         1.0,
@@ -139,7 +144,7 @@
     },
     {
       "check": "premature-motion",
-      "uuid": "9d9ef5a0-c364-4227-8460-5e97ee80b143",
+      "uuid": "f082ac9a-034d-4e42-ad19-5aaa8f068344",
       "motion": [
         0.0,
         1.0,

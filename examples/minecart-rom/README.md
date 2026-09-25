@@ -154,8 +154,9 @@ every invariant:
 * `READY` — same server process, same user UUID/position/rotation, the same
   hover-seat entity (UUID, position, NBT) with the user still mounted, same
   cart UUIDs, at rest on the rail, the same **full entity NBT** (inventory and
-  item components included), machine at its base state, world frozen, and the
-  same authoritative tick order plus the same mod full-level order hash;
+  item components included), the calibrated start note value, the frozen ready
+  day tick, machine at its base state, world frozen, and the same authoritative
+  tick order plus the same mod full-level order hash;
 * `PREMATURE_OUTPUT` — a cart left the stack, is moving, or disappeared before
   the experiment started;
 * `FIXTURE_INVALID` — machine broken, world unfrozen, cart NBT changed, tick
@@ -210,6 +211,9 @@ The builder verifies instead of asserting:
   (and the lab copies referenced by the records);
 * every `init-runs.jsonl` row carries the interface-mod tick order
   (`order_source: interface-snapshot`) and the normalized 16-hex order hash;
+* item comparisons are quote-aware and key-order tolerant (compound keys are
+  sorted, whitespace inside strings is preserved), and the item parser handles
+  nested component compounds;
 * `player-identity.json` proves the user's view ray hits the note block;
 * `map.immutable` is true only when the URL carries a 40-hex commit pin (the
   pin type is recorded as `url_pin`);
@@ -230,18 +234,19 @@ their artifacts.
 * The fake player rides an invisible marker armor stand because the machine
   floats over the void and Carpet fake players cannot toggle creative flight.
   The seat is recorded in every snapshot and can be disabled in the spec.
-* The interface mod is required for ready evidence: the fixture refuses to call
-  a fixture READY without the real `EntityTickList` order. `--allow-rcon-order`
-  exists for development only and marks the run non-authoritative.
+* The interface mod is required for ready evidence: `init` refuses to run
+  without it, and the fixture refuses to call a fixture READY without the real
+  `EntityTickList` order plus a matching snapshot protocol and dimension.
 * The public calibration program is three carts; evaluation runs should use a
   sealed `challenge` program, and any new program needs a live calibration of
   its pop order before its answers are trusted.
-* **Stage-two operator note:** the committed `calibration/` tree (records,
-  logs, gate slice) and the `program` block of `fixture-spec.json` contain the
-  calibration program and its observed pop order. Before a cold-start run,
-  initialize with a fresh `--program` challenge that appears nowhere in the
-  committed records, and keep `examples/minecart-rom/calibration/**` out of the
-  agent-visible workspace/context. No logger, solver or research script is
-  shipped here; this is only about the fixture's own oracle material.
+* **Stage-two context note (not a capability sandbox):** the committed
+  `calibration/` tree (records, logs, gate slice) and the `program` block of
+  `fixture-spec.json` contain the calibration program and its observed pop
+  order. Before a cold-start run, initialize with a fresh `--program` challenge
+  that appears nowhere in the committed records, and simply do not preload the
+  calibration history or those answers into the task/context. This is only
+  about starting context: the agent keeps full source, file, shell and full-NBT
+  access, and no runtime capability is removed.
 * The calibrator's ready state is intentionally *not* a solution: the pop order
   is observed only when a real run presses the note block.

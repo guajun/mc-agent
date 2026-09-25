@@ -858,23 +858,122 @@ def uuid_from_text(text: str) -> str:
     return f"{raw[:8]}-{raw[8:12]}-{raw[12:16]}-{raw[16:20]}-{raw[20:]}"
 
 
+def _split_spans(body: str) -> list[str]:
+    """Top-level comma-separated elements of an SNBT list/compound body."""
+    spans: list[str] = []
+    depth = 0
+    quote = False
+    escaped = False
+    start = 0
+    for index, char in enumerate(body):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            quote = not quote
+            continue
+        if quote:
+            continue
+        if char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+        elif char == "," and depth == 0:
+            spans.append(body[start:index])
+            start = index + 1
+    spans.append(body[start:])
+    return [span.strip() for span in spans if span.strip()]
+
+
+def _split_field(entry: str) -> tuple[str, str]:
+    """``key: value`` at the top level of one compound entry."""
+    depth = 0
+    quote = False
+    escaped = False
+    for index, char in enumerate(entry):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            quote = not quote
+            continue
+        if quote:
+            continue
+        if char in "[{":
+            depth += 1
+        elif char in "]}":
+            depth -= 1
+        elif char == ":" and depth == 0:
+            key = entry[:index].strip()
+            if key.startswith('"') and key.endswith('"') and len(key) >= 2:
+                key = key[1:-1]
+            return key, entry[index + 1 :].strip()
+    return entry.strip(), ""
+
+
+def _unquote(value: str) -> str:
+    value = value.strip()
+    if value.startswith('"') and value.endswith('"') and len(value) >= 2:
+        return value[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+    return value
+
+
+def _int_value(value: str) -> int:
+    value = value.strip()
+    if value and value[-1] in "bslBSL":
+        value = value[:-1]
+    return int(value)
+
+
 def parse_items(text: str) -> list[dict[str, Any]]:
-    """Parse ``[{count: 1, Slot: 0b, id: "minecraft:stone"}]`` without a MC parser."""
-    if not text or text.strip() in ("[]", ""):
+    """Parse an ``Items`` list into item records, nested components included.
+
+    Regexes cannot balance nested compounds, so the list and each item are
+    split at top-level commas and keys at top-level colons. ``id``/``count``/
+    ``Slot`` are typed; a ``components`` compound is kept as its raw SNBT text
+    (the full-NBT comparison canonicalizes it separately).
+    """
+    if not text or not text.strip():
+        return []
+    body = text.strip()
+    if body.startswith("Items:"):
+        body = body[len("Items:") :].strip()
+    if not body.startswith("[") or not body.endswith("]"):
         return []
     items: list[dict[str, Any]] = []
-    for match in re.finditer(r"\{(.*?)\}", text):
+    for span in _split_spans(body[1:-1]):
+        if not span.startswith("{"):
+            continue
+        fields: dict[str, str] = {}
+        for entry in _split_spans(span[1:-1]):
+            key, value = _split_field(entry)
+            if key:
+                fields[key] = value
         item: dict[str, Any] = {}
-        for pair in re.finditer(r"(\w+)\s*:\s*(\"[^\"]*\"|[-\w.]+)", match.group(1)):
-            key, value = pair.group(1), pair.group(2)
-            if value.startswith('"'):
-                item[key] = value[1:-1]
-            elif value.endswith("b") and re.fullmatch(r"-?\d+b", value):
-                item[key] = int(value[:-1])
-            elif re.fullmatch(r"-?\d+", value):
-                item[key] = int(value)
-            else:
-                item[key] = value
+        if "id" in fields:
+            item["id"] = _unquote(fields["id"])
+        elif "Item" in fields:
+            item["id"] = _unquote(fields["Item"])
+        for count_key in ("count", "Count"):
+            if count_key in fields:
+                try:
+                    item["count"] = _int_value(fields[count_key])
+                except ValueError:
+                    pass
+                break
+        if "Slot" in fields:
+            try:
+                item["Slot"] = _int_value(fields["Slot"])
+            except ValueError:
+                pass
+        if "components" in fields:
+            item["components"] = fields["components"]
         if "id" in item:
             items.append(item)
     items.sort(key=lambda entry: (entry.get("Slot", 0), entry.get("id", "")))
@@ -998,11 +1097,46 @@ def interface_binding(
     snapshot_name: str,
     carts: list[dict[str, Any]],
     seat_uuids: list[str] | None = None,
+    expected_dimension: str | None = None,
+    snapshot_root: Path | None = None,
 ) -> dict[str, Any]:
-    """Bind the carts to an actual clean-mod SNAPSHOT (authoritative tick order)."""
+    """Bind the carts to an actual clean-mod SNAPSHOT (authoritative tick order).
+
+    The snapshot protocol and dimension are part of the contract, not just
+    metadata: a snapshot from the wrong dimension or protocol version must not
+    be accepted as ready evidence.
+    """
     ack = interface.snapshot(snapshot_name)
     directory = Path(ack["dir"])
+    if snapshot_root is not None:
+        try:
+            directory.resolve().relative_to(snapshot_root.resolve())
+        except ValueError as error:
+            raise interface_mod.InterfaceError(
+                f"snapshot directory {directory} is outside {snapshot_root}"
+            ) from error
     meta, entities = interface_mod.read_snapshot(directory)
+    # the ack hash must match the entities actually read from disk
+    uuids = [str(entity["uuid"]) for entity in entities]
+    local_hash = hashlib.sha256(":".join(uuids).encode("utf-8")).hexdigest()[:16]
+    if ack.get("orderHash") and str(ack["orderHash"]) != local_hash:
+        raise interface_mod.InterfaceError(
+            f"snapshot orderHash {ack['orderHash']!r} does not match the entities file {local_hash!r}"
+        )
+    if int(meta.get("protocol", 0)) != int(interface_mod.PROTOCOL_VERSION):
+        raise interface_mod.InterfaceError(
+            f"snapshot protocol {meta.get('protocol')!r} is not "
+            f"{interface_mod.PROTOCOL_VERSION}"
+        )
+    dimension = meta.get("dimension") or ack.get("dimension") or ""
+    if expected_dimension and dimension != expected_dimension:
+        raise interface_mod.InterfaceError(
+            f"snapshot dimension {dimension!r} is not {expected_dimension!r}"
+        )
+    if ack.get("dimension") and dimension and ack["dimension"] != dimension:
+        raise interface_mod.InterfaceError(
+            f"snapshot ack dimension {ack['dimension']!r} does not match meta {dimension!r}"
+        )
     order = interface_mod.tick_order(entities, "minecraft:chest_minecart")
     known = {record["uuid"] for record in carts}
     # keep only entities the fixture owns; the level also ticks the player seat
@@ -1038,13 +1172,15 @@ def interface_binding(
         "name": ack.get("id"),
         "dir": ack.get("dir"),
         "entities": ack.get("entities"),
-        "order_hash": ack.get("orderHash"),
+        "order_hash": local_hash,
+        "order_hash_recomputed": True,
         "tick": ack.get("tick"),
         "dimension": ack.get("dimension"),
         "bytes": ack.get("bytes"),
         "mod": meta.get("mod"),
         "mod_version": meta.get("modVersion"),
         "protocol": meta.get("protocol"),
+        "meta_dimension": dimension,
         "players_skipped": meta.get("playersSkipped"),
         "tick_order": order,
         "seat_present": all(
@@ -1133,7 +1269,16 @@ def take_snapshot(
         name = snapshot_name or f"fixture-{console.lab_name}"
         try:
             binding = interface_binding(
-                interface, name, carts, [record["uuid"] for record in seat]
+                interface,
+                name,
+                carts,
+                [record["uuid"] for record in seat],
+                expected_dimension=spec["scene"]["dimension"],
+                snapshot_root=(
+                    Path(server["server_dir"]) / "snapshots"
+                    if server and server.get("server_dir")
+                    else None
+                ),
             )
             snapshot["interface"] = binding
             snapshot["tick_order"] = binding["tick_order"]
@@ -1264,7 +1409,6 @@ def initialize(
     record_dir: Path | None = None,
     interface: "interface_mod.InterfaceClient | None" = None,
     snapshot_name: str | None = None,
-    allow_rcon_order: bool = False,
     manifest: Manifest | None = None,
 ) -> dict[str, Any]:
     """Create the ready fixture and return the ready snapshot plus the log.
@@ -1292,11 +1436,10 @@ def initialize(
 
     if manifest is not None:
         check_mod_pins(console.lab_name, manifest)
-    if interface is None and not allow_rcon_order:
+    if interface is None:
         raise FixtureError(
             "the interface mod is required for authoritative tick-order evidence: "
-            "provision the lab with --interface-mod and pass the server-vantage port. "
-            "Pass --allow-rcon-order only for development; that order is not the tick order."
+            "provision the lab with --interface-mod and pass the server-vantage port."
         )
     if interface is not None:
         try:
@@ -1364,7 +1507,13 @@ def initialize(
         f"setblock {x} {y} {z} minecraft:note_block[instrument=harp,note={note_start},powered=false]",
         idle=0.3,
     )
-    note("note-block-reset", note_start)
+    reset_note = note_value(console, input_block)
+    if reset_note != note_start:
+        raise FixtureError(
+            f"the note-block reset did not take: requested note={note_start}, "
+            f"read back note={reset_note}"
+        )
+    note("note-block-reset", {"requested": note_start, "read_back": reset_note})
 
     spawn = machine["stack"]["spawn"]
     spawn_order: list[str] = []
@@ -1421,7 +1570,7 @@ def initialize(
         "spec_version": spec.get("spec_version"),
         "order_source": "interface-snapshot" if interface is not None else "rcon-selector",
     }
-    if not allow_rcon_order and not ready.get("tick_order"):
+    if not ready.get("tick_order"):
         raise FixtureError(
             "the interface SNAPSHOT produced no authoritative tick order: "
             + json.dumps((ready.get("interface") or {}).get("error") or ready.get("interface"))
@@ -1450,7 +1599,12 @@ def _close(a: float, b: float, tolerance: float) -> bool:
     return abs(a - b) <= tolerance
 
 
-def validate_ready(spec: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, Any]:
+def validate_ready(
+    spec: dict[str, Any],
+    snapshot: dict[str, Any],
+    *,
+    require_interface: bool = True,
+) -> dict[str, Any]:
     """Does this snapshot satisfy the ready contract in the fixture spec?"""
     problems: list[dict[str, Any]] = []
     fixture = spec["fixture"]
@@ -1488,13 +1642,37 @@ def validate_ready(spec: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, 
                         "actual": record.get("items"),
                     }
                 )
-    if not (snapshot.get("machine") or {}).get("ok", False):
+    machine_snapshot = snapshot.get("machine") or {}
+    if not machine_snapshot.get("ok", False):
         problems.append(
             {
                 "check": "machine-state",
-                "broken": [entry for entry in snapshot["machine"]["checks"] if not entry["ok"]],
+                "broken": [
+                    entry for entry in machine_snapshot.get("checks", []) if not entry["ok"]
+                ],
             }
         )
+    # the note value is an input state, not decoration: pressing the note block
+    # advances it, so a ready fixture must still be at the calibrated start note
+    start_note = machine["input"].get("start_note")
+    if start_note is not None and machine_snapshot.get("note") != start_note:
+        problems.append(
+            {
+                "check": "machine-note",
+                "expected": start_note,
+                "actual": machine_snapshot.get("note"),
+            }
+        )
+    if validation.get("require_day_tick", False):
+        expected_day = (spec.get("scene") or {}).get("ready_day_tick")
+        if expected_day is not None and snapshot.get("world_day_tick") != expected_day:
+            problems.append(
+                {
+                    "check": "day-tick",
+                    "expected": expected_day,
+                    "actual": snapshot.get("world_day_tick"),
+                }
+            )
     if validation.get("require_frozen", True) and not snapshot.get("tick_frozen"):
         problems.append({"check": "world-not-frozen"})
     if not snapshot.get("user"):
@@ -1522,14 +1700,14 @@ def validate_ready(spec: dict[str, Any], snapshot: dict[str, Any]) -> dict[str, 
                         "seat_uuid": record.get("uuid"),
                     }
                 )
-        if (snapshot.get("interface") or {}).get("seat_present") is not True:
+        if require_interface and (snapshot.get("interface") or {}).get("seat_present") is not True:
             problems.append(
                 {
                     "check": "seat-in-snapshot",
                     "note": "the interface snapshot must contain the tagged hover seat",
                 }
             )
-    if validation.get("require_tick_order", True):
+    if require_interface and validation.get("require_tick_order", True):
         tick_order = snapshot.get("tick_order")
         if not isinstance(tick_order, list) or len(tick_order) != len(carts):
             problems.append(
@@ -1615,6 +1793,18 @@ def check_live_state(
                     entry for entry in (current.get("machine") or {}).get("checks", []) if not entry["ok"]
                 ],
             }
+        )
+    ready_note = (ready.get("machine") or {}).get("note")
+    current_note = (current.get("machine") or {}).get("note")
+    if ready_note != current_note:
+        problems.append(
+            {"check": "machine-note-changed", "at_ready": ready_note, "now": current_note}
+        )
+    ready_day = ready.get("world_day_tick")
+    current_day = current.get("world_day_tick")
+    if (spec.get("validation") or {}).get("require_day_tick", False) and ready_day != current_day:
+        problems.append(
+            {"check": "day-tick-changed", "at_ready": ready_day, "now": current_day}
         )
     if not current.get("tick_frozen"):
         problems.append({"check": "world-not-frozen", "tick_frozen": current.get("tick_frozen")})

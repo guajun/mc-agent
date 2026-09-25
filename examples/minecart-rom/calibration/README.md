@@ -28,7 +28,8 @@ tick control. No command block was placed at any point.
 | cycle time | the machine is back at its base state 4 ticks after the press; presses 10 ticks apart also work | `logs/cycle_window.log` |
 | output boundary | the popped cart crosses `x = 15.0` on cycle tick 3, then drifts east to `x ≈ 23.5`, apex near `y = -44.6` | `logs/cycle_window.log` |
 | void window | entities are removed below `y = -128`; a popped cart was removed 5.7–8.0 s (≈110–160 ticks) after the press | `logs/void_window.log`, `logs/cycle_window.log` |
-| tick order source | the interface mod's `SNAPSHOT` reads `ServerLevel.entityTickList`; the cart order in `entities.jsonl` is the authoritative tick order, and `orderHash` is the mod's first-16-hex sha256 over the raw UUID sequence | `records/*/ready-snapshot.json`, `records/*/init.out.json` |
+| tick order source | the interface mod's `SNAPSHOT` reads `ServerLevel.entityTickList`; the cart order in `entities.jsonl` is the authoritative tick order, and `orderHash` is the mod's first-16-hex sha256 over the raw UUID sequence, recomputed locally from the entities file before it is accepted | `records/*/ready-snapshot.json`, `records/*/init.out.json` |
+| input note | the note block is reset to `start_note=20` and read back; a READY fixture must still be at 20, and `validate` reports `machine-note-changed` otherwise | `negative/note-changed/`, `records/*/ready-snapshot.json` |
 | reload behaviour | a graceful server restart preserves cart UUIDs, inventories, positions and the query order, but the fixture treats any restart as a reload and refuses the fixture | `logs/reload_test.log` |
 
 ## Reproducibility
@@ -44,6 +45,10 @@ run-02            READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28 
 run-03            READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28  mod 0.6.0  cross-check true
 real-url-run      READY  state 86215e40a0d3d9ba…  tick-order a3ba375742d0de28  mod 0.6.0  cross-check true
 ```
+
+Every ready snapshot also binds the snapshot protocol (`protocol=1`) and
+dimension (`minecraft:overworld`) and constrains the snapshot directory to the
+lab's `mc-agent-server/snapshots` root.
 
 `real-url-run` is the acceptance run for this issue: it starts from an empty map
 cache and downloads the ZIP over HTTPS from the URL pinned in
@@ -81,10 +86,11 @@ a validated ready state, then modifies it:
 | Case | Result | Record |
 | --- | --- | --- |
 | machine broken after ready (one slime block removed) | `FIXTURE_INVALID`, `machine-state` | `negative/machine-broken/` |
+| note value changed after ready (`setblock` note=7) | `FIXTURE_INVALID`, `machine-note-changed` (20 → 7) | `negative/note-changed/` |
 | world unfrozen after ready (`tick unfreeze`) | `FIXTURE_INVALID`, `world-not-frozen` | `negative/unfrozen/` |
 | inventory/NBT tampered after ready (`data merge` changes an item) | `FIXTURE_INVALID`, `cart-nbt-changed` + `normalized-state-changed` | `negative/nbt-tampered/` |
 | tick order / full order hash changed (seat replaced) | `FIXTURE_INVALID`, `interface-order-hash-changed`, `seat-unexpected`, `user-vehicle-changed` (+ `user-pos-changed`) | `negative/tick-order/` |
-| premature output (a cart pressed and launched before hand-off) | `PREMATURE_OUTPUT`, plus `machine-state`/`cart-nbt-changed`/`premature-motion` | `negative/premature-output/` |
+| premature output (a cart pressed and launched before hand-off) | `PREMATURE_OUTPUT`, plus `machine-state`/`machine-note-changed` (the press advanced 20 → 21)/`cart-nbt-changed`/`premature-motion` | `negative/premature-output/` |
 | server restart after ready | `FIXTURE_INVALID:RELOAD`, `server-restarted`, `seat-count`, `tick-order-unavailable` | `negative/reload/` |
 | dirty machine before init | init aborts: `machine is not in its calibrated base state`, exact broken positions listed | `negative/init-failure/` |
 | wrong artifact SHA-256, corrupt/absolute/zip-slip/symlink archives | explicit failures, nothing written outside the target | `runner/selftest.py` (offline, 75 checks) |

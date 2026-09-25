@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 DEFAULT_SERVER_PORT = 25581
+PROTOCOL_VERSION = 1  # snapshot protocol version asserted against meta.json
 SNAPSHOT_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
@@ -144,13 +145,19 @@ class InterfaceClient:
 
     def snapshot(self, name: str, radius: float = 0.0) -> dict[str, Any]:
         safe = SNAPSHOT_NAME_RE.sub("-", name or "fixture")
+        # An error reply must surface immediately instead of being skipped
+        # until the timeout: match on it alongside the ack.
         reply = self.request(
             f"SNAPSHOT {radius:g} {safe}",
-            match=lambda message: message.get("type") == "snapshot_ack" and message.get("id") == safe,
+            match=lambda message: (
+                (message.get("type") == "snapshot_ack" and message.get("id") == safe)
+                or message.get("type") == "error"
+            ),
             timeout_seconds=max(self.timeout, 60.0),
         )
         if reply.get("type") == "error":
-            raise InterfaceError(f"SNAPSHOT failed: {reply.get('message') or reply}")
+            detail = reply.get("detail") or reply.get("message") or reply
+            raise InterfaceError(f"SNAPSHOT {safe} failed: {detail}")
         return reply
 
 
@@ -239,29 +246,158 @@ def _extract_items(text: str) -> str:
     return ""
 
 
-def canonical_items(text: str) -> str:
-    """Whitespace/key-quote-insensitive form of an ``Items`` list.
+class _CanonicalSnbt:
+    """A small canonicalizer for the SNBT subset in entity item lists.
 
-    Both writers emit the same NBT types for the same item, so the only
-    differences are layout: ``{"count":1,"Slot":0b}`` (mod SNBT) versus
-    ``{count: 1, Slot: 0b}`` (``/data get``). Normalizing both makes the
-    comparison component-aware without a full NBT parser.
+    It is quote-aware (whitespace inside a string is data), key-order
+    tolerant (compound keys are sorted) and keeps NBT type suffixes/arrays
+    intact. Anything it cannot parse canonicalizes to the empty string, which
+    makes a comparison fail closed instead of silently passing.
+    """
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.pos = 0
+
+    def parse(self) -> str:
+        self._ws()
+        value = self._value()
+        self._ws()
+        if self.pos != len(self.text):
+            raise ValueError(f"trailing SNBT at {self.pos}")
+        return value
+
+    def _ws(self) -> None:
+        while self.pos < len(self.text) and self.text[self.pos] in " \t\r\n":
+            self.pos += 1
+
+    def _value(self) -> str:
+        if self.pos >= len(self.text):
+            raise ValueError("unexpected end of SNBT")
+        char = self.text[self.pos]
+        if char == "[":
+            return self._bracket()
+        if char == "{":
+            return self._brace()
+        if char == '"':
+            return self._string()
+        return self._bare()
+
+    def _bracket(self) -> str:
+        self.pos += 1  # '['
+        self._ws()
+        array_type = ""
+        if self.pos < len(self.text) and self.text[self.pos] in "IL":
+            if self.pos + 1 < len(self.text) and self.text[self.pos + 1] == ";":
+                array_type = self.text[self.pos]
+                self.pos += 2
+        parts: list[str] = []
+        while True:
+            self._ws()
+            if self.pos < len(self.text) and self.text[self.pos] == "]":
+                self.pos += 1
+                break
+            before = self.pos
+            parts.append(self._value())
+            if self.pos == before:
+                raise ValueError("SNBT parser made no progress in a list")
+            self._ws()
+            if self.pos < len(self.text) and self.text[self.pos] == ",":
+                self.pos += 1
+        if array_type:
+            return f"[{array_type};" + ",".join(parts) + "]"
+        return "[" + ",".join(parts) + "]"
+
+    def _brace(self) -> str:
+        self.pos += 1  # '{'
+        entries: dict[str, str] = {}
+        while True:
+            self._ws()
+            if self.pos < len(self.text) and self.text[self.pos] == "}":
+                self.pos += 1
+                break
+            before = self.pos
+            key = self._key()
+            self._ws()
+            if self.pos < len(self.text) and self.text[self.pos] == ":":
+                self.pos += 1
+            self._ws()
+            entries[key] = self._value()
+            if self.pos == before:
+                raise ValueError("SNBT parser made no progress in a compound")
+            self._ws()
+            if self.pos < len(self.text) and self.text[self.pos] == ",":
+                self.pos += 1
+        return "{" + ",".join(f"{key}={entries[key]}" for key in sorted(entries)) + "}"
+
+    def _key(self) -> str:
+        if self.pos < len(self.text) and self.text[self.pos] == '"':
+            raw = self._string()
+            # keys compare by name, not by whether the writer quoted them
+            return raw[1:-1].replace('\\"', '"').replace("\\\\", "\\")
+        start = self.pos
+        while (
+            self.pos < len(self.text)
+            and self.text[self.pos] not in ":,}] \t\r\n"
+        ):
+            self.pos += 1
+        return self.text[start : self.pos]
+
+    def _bare(self) -> str:
+        start = self.pos
+        while (
+            self.pos < len(self.text)
+            and self.text[self.pos] not in ",]}{ \t\r\n"
+        ):
+            self.pos += 1
+        return self.text[start : self.pos]
+
+    def _string(self) -> str:
+        self.pos += 1  # '"'
+        out = ['"']
+        while self.pos < len(self.text):
+            char = self.text[self.pos]
+            if char == "\\" and self.pos + 1 < len(self.text):
+                out.append(self.text[self.pos : self.pos + 2])
+                self.pos += 2
+                continue
+            out.append(char)
+            self.pos += 1
+            if char == '"':
+                break
+        return "".join(out)
+
+
+def canonical_items(text: str) -> str:
+    """Canonical, comparable form of an ``Items`` list.
+
+    Whitespace outside strings, key quoting and compound key order are
+    normalized; whitespace inside a quoted value and every type suffix stay
+    significant, so component values are compared for real. An unparseable
+    fragment returns ``""`` (never a match).
     """
     fragment = _extract_items(text)
     if not fragment:
         return ""
-    canonical = re.sub(r'"\s*([A-Za-z0-9_:.\-]+)\s*"\s*:', r"\1:", fragment)
-    canonical = re.sub(r"[\s]+", "", canonical)
-    return canonical
+    try:
+        return _CanonicalSnbt(fragment).parse()
+    except (ValueError, IndexError):
+        return ""
+
+
+_ITEMS_KEY_RE = re.compile(r'"?Items"?\s*:')
 
 
 def compare_items(mod_nbt: str, rcon_items_text: str) -> dict[str, Any]:
     mod = canonical_items(mod_nbt)
-    rcon = canonical_items(rcon_items_text) if "Items:[" in rcon_items_text else canonical_items(
-        "Items:" + rcon_items_text
+    source = (
+        rcon_items_text
+        if _ITEMS_KEY_RE.search(rcon_items_text)
+        else "Items:" + rcon_items_text
     )
+    rcon = canonical_items(source)
     return {
-        "match": bool(mod) and mod == rcon,
+        "match": bool(mod) and bool(rcon) and mod == rcon,
         "mod_items": mod,
         "rcon_items": rcon,
     }

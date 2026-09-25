@@ -200,7 +200,8 @@
       160
     ],
     "end_condition": "every cart in the program has been popped and removed",
-    "timeout_seconds": 180
+    "timeout_seconds": 180,
+    "ready_day_tick": 6000
   },
   "user": {
     "name": "romuser",
@@ -287,8 +288,9 @@
     "position_tolerance": 0.05,
     "require_frozen": true,
     "expected_carts": 3,
-    "notes": "The ready contract: N carts, same UUIDs, same authoritative EntityTickList order, at rest on the stack rail, same full entity NBT (inventory and components), machine at its base state, world frozen. Any of these failing on re-check means the fixture is not ready.",
-    "require_tick_order": true
+    "notes": "The ready contract: N carts, same UUIDs, same authoritative EntityTickList order, at rest on the stack rail, same full entity NBT (inventory and components), the calibrated start note, the frozen ready day tick, machine at its base state, world frozen. Any of these failing on re-check means the fixture is not ready.",
+    "require_tick_order": true,
+    "require_day_tick": true
   },
   "challenge": {
     "generator": "python examples/minecart-rom/runner/minecart_rom.py challenge --seed <int> --out <file>",
