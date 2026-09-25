@@ -5,6 +5,11 @@
   "date": "2026-09-25T21:17:40Z",
   "repoHeadAtRun": "824c15d4cd1ac714cb738d166846377d710b07c7",
   "branch": "codex/rom13-fullgate",
+  "tooling": {
+    "driver": "tools/stage1_fullgate.py",
+    "driverCommittedAt": "bb20ad061065a07cc9946b572576f719aa241a13",
+    "note": "the live run used the same driver source from this worktree on top of repo head 824c15d; this commit lands that exact tool together with the versioned summary"
+  },
   "acceptance": "pending human review of this pull request; the gate pass is not a merge decision",
   "gate": {
     "overall": "pass",
