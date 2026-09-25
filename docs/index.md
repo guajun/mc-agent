@@ -84,6 +84,7 @@ python tools/smoke_offline.py --backend hermes    # the real model drives the to
 * [Installing the Toolkit Skill](toolkit-skill.md) - one portable skill for every harness
 * [Unattended Hermes](hermes-unattended.md) - webhook-triggered runs with the same skill
 * [Headless lab servers](lab-server.md) - provision, start and command a lab
+* [Auditable cold-start runs](coldstart-protocol.md) - the environment contract, trajectory sink and evidence-based judgement
 * [Tools](tools.md) - every CLI and MCP tool
 * [Troubleshooting](troubleshooting.md) - the traps, most of them found the hard way
 * [RFCs](rfc/0001-agent-interface.md) - what is decided, and what is still open

@@ -36,6 +36,7 @@ nav:
       - How it fits together: concepts.md
       - Who is the agent in game: player-identity.md
       - Forking a live world: protocol-snapshot.md
+      - Auditable cold-start runs: coldstart-protocol.md
   - Guides:
       - Running the agent on Hermes: hermes-setup.md
       - Installing the Toolkit Skill: toolkit-skill.md
@@ -45,6 +46,7 @@ nav:
       - "Audit test mod (read-only evidence)": minecart-audit.md
       - Checking a fork: fork-verify.md
       - Stage-one integration gate: stage1-gate.md
+      - Stage-one integration run: stage1-integration.md
   - Reference:
       - Tools: tools.md
       - Troubleshooting: troubleshooting.md
@@ -76,6 +78,7 @@ plugins:
             How it fits together: 整体结构
             Who is the agent in game: 智能体在游戏里是谁
             Forking a live world: 分叉一个活的世界
+            Auditable cold-start runs: 可审计的冷启动运行
             Guides: 指南
             Running the agent on Hermes: 用 Hermes 运行智能体
             Installing the Toolkit Skill: 安装 Toolkit Skill
@@ -85,6 +88,7 @@ plugins:
             "Audit test mod (read-only evidence)": "审计测试 mod（只读证据）"
             Checking a fork: 校验一次分叉
             Stage-one integration gate: 阶段一集成门禁
+            Stage-one integration run: 阶段一集成运行
             Reference: 参考
             Tools: 工具
             Troubleshooting: 疑难排查

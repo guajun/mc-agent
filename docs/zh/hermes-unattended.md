@@ -180,6 +180,12 @@ Bridge——且只能用 Bridge——给 route 设一份 `toolsets`。这是刻�
 computer-use。适配器会在下一次请求时热加载订阅文件，改完不用重启；但重新执行
 `hermes webhook subscribe` 会重建 route 并丢掉这个键，改完 route 后要重新加上。
 
+!!! note "这不是冷启动的开发 Harness"
+    受限 route 只有 Bridge MCP server——没有终端、文件、源码获取或构建工具。
+    需要自己写、编译、安装 logger 的智能体无法通过这条 route 完成。首轮
+    Minecart ROM 冷启动因此采用带普通开发工具、由用户手动启动的 Harness；
+    webhook 投递只是后续可选路径：见[可审计的冷启动运行](coldstart-protocol.md)。
+
 !!! tip "声明式替代方案"
     如果你希望所有配置都在一个文件里，可以在 `config.yaml` 的
     `platforms.webhook.extra.routes` 下声明同一条 route（`toolsets` 直接写进去，

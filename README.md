@@ -72,6 +72,9 @@ purpose.
   Carpet fake players, and when to want a server-side adapter
 - [Lab servers the agent raises itself](docs/lab-server.md) - `tools/lab_server.py`:
   a headless Fabric server per experiment, provisioned and commanded over RCON
+- [Auditable cold-start runs](docs/coldstart-protocol.md) - the environment
+  contract, tool-trajectory sink and evidence-based judgement for a real agent
+  run
 
 ## Quick start
 
