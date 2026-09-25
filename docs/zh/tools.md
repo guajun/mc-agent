@@ -23,7 +23,7 @@ mc-agent-loop/             智能体 loop 与它的后端
 | `mc-bridge watch --events chat,game` | 以 JSON 行流式输出事件 |
 | `mc-bridge mcp` | 以 MCP（stdio）暴露工具，供智能体运行时使用 |
 
-方法：`status`、`capabilities`、`state`、`entities`、`screen`、`command`、`chat`、`mark`、`wait`、`record_start`、`record_stop`、`connect`、`world`、`lan`、`snapshot`、`snapshots`、`fork`、`restore`、`order`、`events`、`stop`。
+方法：`status`、`capabilities`、`state`、`player`、`context`、`entities`、`screen`、`command`、`command_output`、`chat`、`mark`、`wait`、`record_start`、`record_stop`、`connect`、`world`、`lan`、`snapshot`、`snapshots`、`fork`、`restore`、`order`、`save`、`events`、`stop`。
 
 本地 API 是换行分隔的 JSON，所以任何能开 socket 的东西都能用它——见 [bridge README](https://github.com/guajun/mc-agent-bridge)。
 
@@ -35,6 +35,8 @@ mc-agent-loop/             智能体 loop 与它的后端
 | --- | --- |
 | `mc_status`、`mc_capabilities` | 连上了吗、这个实例会什么 |
 | `mc_state` | 玩家在哪、血量、维度、tick |
+| `mc_player` | 某个玩家的服务端上下文——身份、维度、位置、朝向、眼睛与视线目标（按 UUID） |
+| `mc_context` | 聊天事件 `context_id` 背后冻结的上下文包 |
 | `mc_entities` | **摘要版**实体列表：按类型计数 + 最近的 N 个 |
 | `mc_command` | 发一条命令 |
 | `mc_command_output` | 发一条命令**并读回它的回答**——关心回答时用这个 |
@@ -49,9 +51,11 @@ mc-agent-loop/             智能体 loop 与它的后端
 `mc_entities` 刻意返回摘要：真实世界里半径 64 格会回 256 KB 的 JSON，模型没法有效阅读。想看更多就传 `types=` 过滤并调大 `limit`。
 
 !!! info "服务端视角 Toolkit 与它的 Skill"
-    bridge 正在成为接收方中立的服务端视角 Toolkit：`player` 和 `context` 会加进
-    工具面，分别提供每个玩家的上下文和聊天瞬间的上下文包，而 `capabilities` 会
-    如实报告连接的 mod 支持哪些操作。智能体的工作流写在可移植的
+    bridge 就是接收方中立的服务端视角 Toolkit：`player` 和 `context` 已在工具面里，
+    分别提供每个玩家的上下文与聊天瞬间的上下文包；`capabilities` 会如实报告连接的
+    mod 支持哪些操作。接口 mod 0.6.0 已经发出这两个能力；bridge 0.4.1
+    （[PR #8](https://github.com/guajun/mc-agent-bridge/pull/8)）把视线射线保留在
+    `player.view`。智能体的工作流写在可移植的
     [Toolkit Skill](toolkit-skill.md) 里；某个具体连接能做什么，以
     `mc-bridge call capabilities`（或 `mc_capabilities`）为准。想让它由游戏事件
     无人值守地触发，见 [Hermes 无人值守](hermes-unattended.md)。

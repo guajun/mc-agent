@@ -86,6 +86,56 @@ mc-agent-loop run --backend hermes --trigger @codex --api-port 8766 --env-file .
 
 Scarpet（Carpet 的脚本语言，`/script`）是一个已经存在的中间方案：脚本跑在服务端内部，能读实体 NBT、能调度工作，以文件形式安装。智能体可以用它已有的两个原语管理这些脚本（写文件、执行命令）。
 
+## 3. 任务用户：身份与视线目标（已实测）
+
+服务端视角同时也是**身份**视角。任务一般用 UUID 指名它的用户，智能体用 `mc_player`（MCP）或 `mc-bridge call player`（CLI）解析，拿到的就是**该玩家此刻**的服务端记录：身份、维度、位置、yaw/pitch、眼睛，以及 `player.view.target`——从该玩家自己的眼睛和视线算出的服务端射线。它不会回退到宿主客户端，也不会回退到玩家列表里的第一个人。
+
+实测组合（2026-09-26）：专用 Fabric 26.2 服务器、两个 Carpet 假人、没有任何玩家客户端连着。
+
+| 组件 | 版本 / 提交 | 说明 |
+| --- | --- | --- |
+| 接口 mod | 0.6.0，`3b93ceb` | 服务端视角 `PLAYER`/`CONTEXT`（PR #4 + #5） |
+| bridge | 0.4.1，[`#8`](https://github.com/guajun/mc-agent-bridge/pull/8) | 0.4.0 会丢掉 mod 分离给出的 `view`；0.4.1 把它并进 `player.view` |
+| Minecraft / Fabric loader | 26.2 / 0.19.5 | Carpet 26.2+v260616、Fabric API 0.161.0+26.2 |
+| Java | 25.0.1 | 实验室服务器所用 |
+
+场景：Alice 在 `(0.5, 100.0, 0.5)` 面向 `(0, 101, 4)` 的发射器，Bob 在 `(4.5, 100.0, 0.5)` 面向盔甲架。完整的 26 步原始记录由身份矩阵 runner 经 bridge 的 loopback API 产生（`LocalApiClient`，即 `cli.*` 步骤）；MCP 抓取来自对同一 daemon 运行 `tools/mcp_probe.py`（`mc_player`、`mc_context`）。两个界面共用同一个 daemon 方法，所以信封一致；原始 mod 回复在证据包里作为对照权威。
+
+| 调用 | 结果 |
+| --- | --- |
+| `mc_player` 传 Alice 的 UUID | `found: true`、`name: Alice`、`view.target.type: block`、`block.id: minecraft:dispenser`、`distance: 3.5` |
+| `mc_player` 传 Bob 的 UUID（`state.playerList` 里 Alice 排第一） | `found: true`、`name: Bob`、`view.target.type: entity`、`entity.type: minecraft:armor_stand` |
+| Bob 抬头看天（pitch -90） | `view.target.type: miss`、`distance: 5.0` |
+| 未知 UUID 或未知名字 | `found: false`——不会替换成另一个玩家或列表第一人 |
+| 任务开始时先记录，然后把 Alice `tp` 前进两格 | `uuid`/`name` 不变；`z` 0.5 -> 2.5，发射器距离 3.5 -> 1.5；每次调用都是当前值，不是缓存的开场快照 |
+
+一条 `mc_player` 回复（节选）：
+
+```json
+"player": {
+  "uuid": "f0a8f4ba-99f5-412a-9189-db832c934913", "name": "Alice",
+  "dimension": "minecraft:overworld", "x": 0.5, "y": 100.0, "z": 0.5,
+  "yaw": 0.0, "pitch": 0.0, "eye": [0.5, 101.62000000476837, 0.5],
+  "view": {
+    "blockRange": 5.0, "entityRange": 5.0,
+    "target": {"type": "block", "distance": 3.5,
+      "block": {"x": 0, "y": 101, "z": 4, "id": "minecraft:dispenser", "face": "north"}}
+  }
+}
+```
+
+### 冷启动入口
+
+首轮冷启动不需要 webhook、也不需要模型后端：外部任务入口带上身份，智能体随后做一次**实时** `mc_player` 调用。上面实测的就是这条路径。
+
+* **入口**：产生任务的那一方——CLI、队列、webhook、操作员——把玩家传进来。不要求游戏侧有回执。
+* **字段**：`{"player": "<uuid-或-名字>"}`；优先带横线的 UUID。32 位不带横线的 UUID 也接受，传名字只是便利。后续要携带的稳定值是回复里的 `uuid`，不是显示名。
+* **`found: false` 就是答案**：如实报告，不要换成别的玩家重试。谁真的在线看 `state.playerList`。
+* **`context_id` 只在入口确实产生它时使用。** 聊天事件会带 `contextId`，`mc_context` 取回冻结的上下文包。先看 `timing`：`receipt` 是网络聊天包，`broadcast` 是服务端 `say`——Carpet 假人的 `execute as <名字> run say ...` 是 `broadcast`，它是真实可取回的上下文包，但**不是**收包时刻的历史。真实客户端的网络聊天路径本实验室没有覆盖，不做声明。
+* **这里不新增 Harness 模型后端。** 任务入口加实时 `mc_player` 调用就是完整的身份路径；模型循环是另一项交付。
+
+完整原始记录、版本和修复前后对比见[证据包](evidence/rom13-meta16/live-identity.json)。
+
 ## "客户端视角"对测量意味着什么
 
 客户端的实体位置和速度是为渲染插值过的，所以 `record_start` 采到的是 20 Hz 的**客户端视角**。对形状和时序够用；但要精确数值，优先用服务端自己的回答（`/data get`、Scarpet，或 25581 上的服务端视角）。上面测试里出现过：同一个跳起来的假人，客户端报 `vy = 0.333`，而服务端在同一时刻是 `-0.078`——同一个实体，不同的观察点与 tick。
