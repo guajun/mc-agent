@@ -60,7 +60,18 @@ The projection never reads a file that is still being appended to:
 
 `--bundle-only` re-reads `normalize-inputs.json`, re-verifies every pinned
 hash and reproduces `tool-trace.jsonl`, `audit-events.jsonl`, the mapping
-reports and `bundle.json` byte for byte (two consecutive runs were compared).
+reports and `bundle.json` byte for byte (three consecutive runs were compared).
+
+The driver summary records the projection phase explicitly: each mapping
+command's exit code and gap count, the gate's overall status, mapping gaps and
+**INFRA errors** in separate fields. A mapping command that exits 1 with a
+report full of gaps is an evidence gap and the gate is expected to stay
+`blocked`; a missing report, a usage exit, or exit 1 without gaps is an INFRA
+failure. This revision reused the frozen inputs from the live run (no live
+rerun): the only artifact deltas are the newly promoted
+`input_attempt.request_seq` from the raw event (seq 183 -> 182) and the
+evidence index that re-hashes it; every other artifact hash is unchanged and
+all mappings remain gap-free.
 
 ## Lossless evidence mapping
 
@@ -82,7 +93,8 @@ per-type fields. The adapter:
 | config dimension (or a checked event field) | `dimension` |
 | `phase` | `experiment -> agent`, `restore -> restore`, everything else `init`; the raw phase is kept |
 | `input_attempt` / `input_processed` | same names; `operator` becomes `actor_uuid` (object `{uuid, name}` read for `uuid`); a null actor is allowed only with a recorded `actor_provenance` |
-| `input_processed` links | `requestSeq`/`attemptSeq`/`agentOp` are **promoted** into the canonical record and validated: a dangling reference, a reused request/attempt, or `agentOp` without an attempt is a gap |
+| `input_processed` links | `requestSeq`/`attemptSeq`/`agentOp` are **promoted** into the canonical record and validated in their own clock domain: the referenced event must be in the same session/run/instance/dimension and strictly precede the referrer (seq and tick). Cross-session, foreign-identity, forward or dangling references, a second *processed* event reusing a request/attempt, or `agentOp` without an attempt are all gaps |
+| `input_attempt.requestSeq` | also promoted and validated with the same same-session/precedence rules (one request may be referenced by its attempt and by the processing that consumed it; a second attempt reusing it is a gap) |
 | `input_request` | kept verbatim (not a gate operation) |
 | `cart_exit` | `cart_emitted`; `captured_before_removal` requires the removal's recorded `capturedPath` to say `before_drop` (and an ordered inventory) |
 | `cart_remove` | `cart_removed`; `capturedPath` is required, `reason` becomes `removal_reason` |

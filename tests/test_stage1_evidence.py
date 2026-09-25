@@ -126,6 +126,60 @@ class AuditMappingTests(unittest.TestCase):
         self.assertTrue(any(gap.code == "request_reused" for gap in gaps))
         self.assertTrue(any(gap.code == "attempt_reused" for gap in gaps))
 
+    def test_cross_session_reference_is_a_scope_gap(self):
+        rows = [
+            {"seq": 1, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
+            {"seq": 2, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready"},
+            {"seq": 3, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}},
+            {"seq": 4, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+            {"seq": 5, "tick": 11, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete"},
+            {"seq": 6, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "ready", "type": "session_start"},
+            {"seq": 7, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "ready", "type": "audit_ready"},
+            {"seq": 8, "tick": 12, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "requestSeq": 4, "attemptSeq": 3, "agentOp": True},
+            {"seq": 9, "tick": 13, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "end", "type": "audit_end", "status": "complete"},
+        ]
+        _, gaps, _, _, _ = map_audit(rows)
+        self.assertTrue(any(gap.code == "request_scope" for gap in gaps))
+        self.assertTrue(any(gap.code == "attempt_scope" for gap in gaps))
+
+    def test_forward_reference_is_a_gap(self):
+        rows = audit_fixture() + [
+            {"seq": 12, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+            {"seq": 13, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "bbbb", "name": "Bot2"}},
+        ]
+        rows.append({"seq": 11, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "bbbb", "name": "Bot2"}, "requestSeq": 12, "attemptSeq": 13, "agentOp": True})
+        _, gaps, _, _, _ = map_audit(rows)
+        self.assertTrue(any(gap.code == "request_forward" for gap in gaps))
+        self.assertTrue(any(gap.code == "attempt_forward" for gap in gaps))
+
+    def test_tick_order_forward_reference_is_a_gap(self):
+        rows = audit_fixture()
+        next(row for row in rows if row["type"] == "input_request")["tick"] = 99
+        _, gaps, _, _, _ = map_audit(rows)
+        self.assertTrue(any(gap.code == "request_forward" for gap in gaps))
+
+    def test_referenced_identity_must_match(self):
+        rows = audit_fixture()
+        next(row for row in rows if row["type"] == "input_attempt")["inst"] = "other-lab"
+        _, gaps, _, _, _ = map_audit(rows)
+        self.assertTrue(any(gap.code == "attempt_scope" for gap in gaps))
+
+    def test_attempt_request_link_is_promoted_and_checked(self):
+        rows = audit_fixture() + [
+            {"seq": 11, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+            {"seq": 12, "tick": 22, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "bbbb", "name": "Bot2"}, "requestSeq": 11},
+        ]
+        mapped, gaps, _, _, _ = map_audit(rows)
+        self.assertEqual(gaps, [])
+        attempt_row = next(row for row in mapped if row["event"] == "input_attempt" and row["detail"]["raw"].get("requestSeq") == 11)
+        self.assertEqual(attempt_row.get("request_seq"), 11)
+        forward = audit_fixture() + [
+            {"seq": 12, "tick": 22, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "bbbb", "name": "Bot2"}, "requestSeq": 13},
+            {"seq": 13, "tick": 23, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+        ]
+        _, gaps, _, _, _ = map_audit(forward)
+        self.assertTrue(any(gap.code == "request_forward" for gap in gaps))
+
     def test_dangling_and_missing_attempt_are_gaps(self):
         dangling = audit_fixture()
         next(row for row in dangling if row["type"] == "input_processed")["attemptSeq"] = 999

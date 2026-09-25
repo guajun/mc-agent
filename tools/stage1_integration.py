@@ -465,6 +465,7 @@ class Driver:
                 summary["runDir"] = inputs["runDir"]
                 rec = Recorder(Path(inputs["runDir"]), inputs["runId"], trace=False)
                 self._normalize(rec, summary, inputs)
+                normalize_rec = rec
             else:
                 stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
                 run_id = f"{self.name}-run-{stamp}"
@@ -486,7 +487,8 @@ class Driver:
                 self._live(rec, summary)
                 inputs = self._finalize(rec, summary, before)
                 summary["finalized"] = inputs["trajectory"]
-                self._normalize(Recorder(run_dir, run_id, trace=False), summary, inputs)
+                normalize_rec = Recorder(run_dir, run_id, trace=False)
+                self._normalize(normalize_rec, summary, inputs)
         except Exception as error:  # noqa: BLE001 - the report must keep the failure
             summary["error"] = f"{type(error).__name__}: {error}"
             say(f"driver error: {summary['error']}")
@@ -500,6 +502,8 @@ class Driver:
                         timeout=180,
                     )
             summary["steps"] = [step.as_json() for step in rec.steps] if "rec" in locals() else []
+            if "normalize_rec" in locals():
+                summary["steps"] += [step.as_json() for step in normalize_rec.steps]
             summary["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             write_json(self.base / "summary.json", summary)
             (self.base / "summary.md").write_text(self._markdown(summary), encoding="utf-8")
@@ -1024,15 +1028,17 @@ class Driver:
             shutil.rmtree(bundle)
         bundle.mkdir(parents=True, exist_ok=True)
         if IDENTITY_EVIDENCE.is_file():
-            rec.run(
+            step = rec.run(
                 "map-identity",
                 [PY, str(EVIDENCE), "identity", "--source", str(IDENTITY_EVIDENCE), "--bundle", str(bundle), "--json"],
                 tool="write",
+                allow_fail=True,
             )
+            self._note_mapping(summary, "map-identity", step, bundle / "mapping" / "identity-report.json")
         audit = inputs.get("audit") or {}
         audit_path = audit.get("path")
         if audit_path and Path(audit_path).is_file():
-            rec.run(
+            step = rec.run(
                 "map-audit",
                 [
                     PY,
@@ -1055,11 +1061,12 @@ class Driver:
                 tool="write",
                 allow_fail=True,
             )
+            self._note_mapping(summary, "map-audit", step, bundle / "mapping" / "audit-report.json")
         trajectory = inputs["trajectory"]
         trajectory_path = Path(trajectory["path"])
         if trajectory_path.is_file():
             candidate_path = self._join_candidates(bundle, inputs)
-            rec.run(
+            step = rec.run(
                 "map-trace",
                 [
                     PY,
@@ -1083,10 +1090,11 @@ class Driver:
                 tool="write",
                 allow_fail=True,
             )
+            self._note_mapping(summary, "map-trace", step, bundle / "mapping" / "trace-report.json")
         self._artifact_facts(summary, inputs)
         spec = self._bundle_spec(inputs)
         write_json(bundle / "bundle-spec.json", spec)
-        rec.run(
+        assemble_step = rec.run(
             "assemble",
             [
                 PY,
@@ -1104,8 +1112,53 @@ class Driver:
             timeout=600,
         )
         report_path = bundle / "assemble-report.json"
+        self._note_mapping(summary, "assemble", assemble_step, report_path)
         if report_path.is_file():
             summary["gate"] = read_json(report_path).get("gate")
+
+    def _note_mapping(self, summary: dict[str, Any], name: str, step: StepResult, report_path: Path) -> None:
+        """Record projection status, gaps and INFRA failures separately.
+
+        Exit 1 with a report full of mapping gaps is an evidence gap (the gate
+        is expected to stay blocked); a missing report or a usage exit is an
+        INFRA failure.  Either way the step and its gaps become visible in the
+        driver summary.
+        """
+        status = summary.setdefault(
+            "normalizeStatus",
+            {"commands": [], "mappingGaps": [], "infraErrors": [], "gateOverall": None, "gateExitCode": None},
+        )
+        entry: dict[str, Any] = {"name": name, "returncode": step.returncode, "seconds": round(step.seconds, 3)}
+        status["commands"].append(entry)
+        if name == "assemble":
+            if report_path.is_file():
+                data = read_json(report_path)
+                entry["gateOverall"] = (data.get("gate") or {}).get("overall")
+                status["gateOverall"] = entry["gateOverall"]
+                status["gateExitCode"] = step.returncode
+                if step.returncode == 3:
+                    entry["expectedBlocked"] = True
+                elif step.returncode == 1:
+                    status["mappingGaps"].append("assemble: gate FAIL")
+            if step.returncode == 2 or step.returncode not in (0, 1, 3):
+                status["infraErrors"].append(f"{name}: exit {step.returncode} (usage/infra)")
+            return
+        if report_path.is_file():
+            data = read_json(report_path)
+            gaps = data.get("gaps") or []
+            entry["gaps"] = len(gaps)
+            entry["ok"] = data.get("ok")
+            for gap in gaps:
+                status["mappingGaps"].append(f"{name}: [{gap.get('code')}] {gap.get('message')}")
+            if gaps:
+                summary["gaps"].append(
+                    f"mapping {name}: {len(gaps)} gap(s): "
+                    + "; ".join(f"[{gap.get('code')}] {gap.get('message')}" for gap in gaps[:2])
+                )
+            elif step.returncode not in (0,):
+                status["infraErrors"].append(f"{name}: exit {step.returncode} but no gaps recorded")
+        elif step.returncode != 0:
+            status["infraErrors"].append(f"{name}: exit {step.returncode} and no report at {report_path}")
 
     def _join_candidates(self, bundle: Path, inputs: dict[str, Any]) -> Path | None:
         """Unverified candidates only; proof would have to come from the traces.
@@ -1249,6 +1302,21 @@ class Driver:
         ]
         for step in summary.get("steps", []):
             lines.append(f"| `{step['name']}` | {step['returncode']} | {step['seconds']} |")
+        status = summary.get("normalizeStatus")
+        if status:
+            lines += ["", "## Normalization (after finalization)", ""]
+            for command in status.get("commands", []):
+                suffix = " (expected blocked)" if command.get("expectedBlocked") else ""
+                gaps = command.get("gaps", 0)
+                lines.append(f"* `{command['name']}` rc={command['returncode']} gaps={gaps}{suffix}")
+            if status.get("gateOverall"):
+                lines.append(f"* gate: {status['gateOverall']} (exit {status.get('gateExitCode')})")
+            if status.get("mappingGaps"):
+                lines += ["", "Mapping gaps:"]
+                lines += [f"* {gap}" for gap in status["mappingGaps"]]
+            if status.get("infraErrors"):
+                lines += ["", "INFRA errors:"]
+                lines += [f"* {error}" for error in status["infraErrors"]]
         if summary.get("gaps"):
             lines += ["", "## Gaps (the gate must stay blocked for these)", ""]
             lines += [f"* {gap}" for gap in summary["gaps"]]

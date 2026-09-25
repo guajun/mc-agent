@@ -243,71 +243,148 @@ def _epoch_of(row: dict[str, Any]) -> int | None:
     return None
 
 
+def _raw_run(row: dict[str, Any]) -> Any:
+    return row.get("run") or row.get("runId")
+
+
+def _raw_instance(row: dict[str, Any]) -> Any:
+    return row.get("inst") or row.get("instanceId") or row.get("instance")
+
+
+def _raw_dimension(row: dict[str, Any]) -> Any:
+    return row.get("dimension") or row.get("dim")
+
+
+def _link_one(
+    row: dict[str, Any],
+    by_session_seq: dict[tuple[str, int], dict[str, Any]],
+    kind: str,
+    source_field: str,
+    target_field: str,
+    expected_type: str,
+    used: dict[tuple[str, int], Any],
+    session: str,
+    where: str,
+) -> tuple[dict[str, Any], list[Gap]]:
+    """Resolve one ``requestSeq``/``attemptSeq`` link in its own clock domain.
+
+    A reference is only valid inside the same session/run/instance/dimension
+    and strictly before the referencing event.  A reference that exists only
+    in another session is a scope gap; a same-session reference that does not
+    precede the referrer is a forward gap; an unknown seq is missing.
+    """
+    promoted: dict[str, Any] = {}
+    gaps: list[Gap] = []
+    value = row.get(source_field)
+    if value is None:
+        return promoted, gaps
+    if not _is_int(value):
+        gaps.append(
+            Gap("audit_events", f"{kind}_missing", f"{where}: {source_field} {value!r} is not an integer seq")
+        )
+        return promoted, gaps
+    referenced = by_session_seq.get((session, value))
+    if referenced is None:
+        other_sessions = sorted({key[0] for key in by_session_seq if key[1] == value})
+        if other_sessions:
+            gaps.append(
+                Gap(
+                    "audit_events",
+                    f"{kind}_scope",
+                    f"{where}: {source_field} {value!r} belongs to session(s) {other_sessions}, "
+                    f"not {session!r}",
+                )
+            )
+        else:
+            gaps.append(
+                Gap(
+                    "audit_events",
+                    f"{kind}_missing",
+                    f"{where}: {source_field} {value!r} does not reference any event",
+                )
+            )
+        return promoted, gaps
+    if referenced.get("type") != expected_type:
+        gaps.append(
+            Gap(
+                "audit_events",
+                f"{kind}_missing",
+                f"{where}: {source_field} {value!r} references a {referenced.get('type')!r}, "
+                f"not {expected_type!r}",
+            )
+        )
+        return promoted, gaps
+    for label, getter in (("run", _raw_run), ("instance", _raw_instance), ("dimension", _raw_dimension)):
+        own = getter(row)
+        other = getter(referenced)
+        if own is not None and other is not None and str(own) != str(other):
+            gaps.append(
+                Gap(
+                    "audit_events",
+                    f"{kind}_scope",
+                    f"{where}: {source_field} {value!r} {label} {other!r} != {own!r}",
+                )
+            )
+            return promoted, gaps
+    row_seq = row.get("seq")
+    ref_seq = referenced.get("seq")
+    if not (_is_int(ref_seq) and _is_int(row_seq) and ref_seq < row_seq):
+        gaps.append(
+            Gap(
+                "audit_events",
+                f"{kind}_forward",
+                f"{where}: {source_field} {value!r} does not precede seq {row_seq!r}",
+            )
+        )
+        return promoted, gaps
+    row_tick = row.get("tick")
+    ref_tick = referenced.get("tick")
+    if _is_int(row_tick) and _is_int(ref_tick) and ref_tick > row_tick:
+        gaps.append(
+            Gap(
+                "audit_events",
+                f"{kind}_forward",
+                f"{where}: {source_field} {value!r} tick {ref_tick!r} follows tick {row_tick!r}",
+            )
+        )
+        return promoted, gaps
+    key = (session, value)
+    if key in used:
+        gaps.append(
+            Gap(
+                "audit_events",
+                f"{kind}_reused",
+                f"{where}: {source_field} {value!r} was already referenced at seq {used[key]!r}",
+            )
+        )
+    used[key] = row_seq
+    promoted[target_field] = value
+    return promoted, gaps
+
+
 def _processed_links(
     row: dict[str, Any],
-    by_seq: dict[int, dict[str, Any]],
+    by_session_seq: dict[tuple[str, int], dict[str, Any]],
     used_requests: dict[tuple[str, int], Any],
     used_attempts: dict[tuple[str, int], Any],
     session: str,
     where: str,
 ) -> tuple[dict[str, Any], list[Gap]]:
-    """Promote and validate ``requestSeq``/``attemptSeq``/``agentOp``.
-
-    The published #18 P1 (request/attempt reuse) must stay visible: a repeated
-    reference or a dangling one is a gap, never a silent duplicate.
-    """
+    """Promote and validate ``requestSeq``/``attemptSeq``/``agentOp``."""
     promoted: dict[str, Any] = {}
     gaps: list[Gap] = []
-    request_seq = row.get("requestSeq")
-    attempt_seq = row.get("attemptSeq")
+    linked, link_gaps = _link_one(
+        row, by_session_seq, "request", "requestSeq", "request_seq", "input_request", used_requests, session, where
+    )
+    promoted.update(linked)
+    gaps.extend(link_gaps)
+    linked, link_gaps = _link_one(
+        row, by_session_seq, "attempt", "attemptSeq", "attempt_seq", "input_attempt", used_attempts, session, where
+    )
+    promoted.update(linked)
+    gaps.extend(link_gaps)
     agent_op = row.get("agentOp")
-    if request_seq is not None:
-        referenced = by_seq.get(request_seq) if _is_int(request_seq) else None
-        if referenced is None or referenced.get("type") != "input_request":
-            gaps.append(
-                Gap(
-                    "audit_events",
-                    "request_missing",
-                    f"{where}: requestSeq {request_seq!r} does not reference an input_request",
-                )
-            )
-        else:
-            key = (session, request_seq)
-            if key in used_requests:
-                gaps.append(
-                    Gap(
-                        "audit_events",
-                        "request_reused",
-                        f"{where}: requestSeq {request_seq!r} was already processed at seq "
-                        f"{used_requests[key]!r}",
-                    )
-                )
-            used_requests[key] = row.get("seq")
-            promoted["request_seq"] = request_seq
-    if attempt_seq is not None:
-        referenced = by_seq.get(attempt_seq) if _is_int(attempt_seq) else None
-        if referenced is None or referenced.get("type") != "input_attempt":
-            gaps.append(
-                Gap(
-                    "audit_events",
-                    "attempt_missing",
-                    f"{where}: attemptSeq {attempt_seq!r} does not reference an input_attempt",
-                )
-            )
-        else:
-            key = (session, attempt_seq)
-            if key in used_attempts:
-                gaps.append(
-                    Gap(
-                        "audit_events",
-                        "attempt_reused",
-                        f"{where}: attemptSeq {attempt_seq!r} was already processed at seq "
-                        f"{used_attempts[key]!r}",
-                    )
-                )
-            used_attempts[key] = row.get("seq")
-            promoted["attempt_seq"] = attempt_seq
-    if agent_op is True and attempt_seq is None:
+    if agent_op is True and row.get("attemptSeq") is None:
         gaps.append(
             Gap(
                 "audit_events",
@@ -318,6 +395,33 @@ def _processed_links(
     if agent_op is not None:
         promoted["agent_op"] = agent_op
     return promoted, gaps
+
+
+def _attempt_request_link(
+    row: dict[str, Any],
+    by_session_seq: dict[tuple[str, int], dict[str, Any]],
+    used_attempt_requests: dict[tuple[str, int], Any],
+    session: str,
+    where: str,
+) -> tuple[dict[str, Any], list[Gap]]:
+    """An ``input_attempt`` may point at the request it belongs to; validate it.
+
+    Attempt and processed references use separate reuse maps: one request is
+    normally referenced by the attempt that caused it *and* by the processing
+    that consumed it.  Only a second *processed* event citing the same request
+    is the published #18 reuse defect.
+    """
+    return _link_one(
+        row,
+        by_session_seq,
+        "request",
+        "requestSeq",
+        "request_seq",
+        "input_request",
+        used_attempt_requests,
+        session,
+        where,
+    )
 
 
 def _promoted_input_fields(row: dict[str, Any]) -> dict[str, Any]:
@@ -382,10 +486,10 @@ def map_audit_events(
     def session_of(row: dict[str, Any]) -> str:
         return str(row.get("session") or row.get("sessionId") or "legacy")
 
-    by_seq: dict[int, dict[str, Any]] = {}
+    by_session_seq: dict[tuple[str, int], dict[str, Any]] = {}
     for row in events:
         if _is_int(row.get("seq")):
-            by_seq[row["seq"]] = row
+            by_session_seq[(session_of(row), row["seq"])] = row
 
     removals: dict[tuple[str, int], list[dict[str, Any]]] = {}
     for row in events:
@@ -399,6 +503,7 @@ def map_audit_events(
     seen_event_ids: set[str] = set()
     used_requests: dict[tuple[str, int], Any] = {}
     used_attempts: dict[tuple[str, int], Any] = {}
+    used_attempt_requests: dict[tuple[str, int], Any] = {}
     for index, row in enumerate(events):
         where = f"event[{index}]"
         raw_type = str(row.get("type") or "")
@@ -490,7 +595,13 @@ def map_audit_events(
             record.update(_promoted_input_fields(row))
             if mapped_type == "input_processed":
                 promoted, link_gaps = _processed_links(
-                    row, by_seq, used_requests, used_attempts, session, where
+                    row, by_session_seq, used_requests, used_attempts, session, where
+                )
+                record.update(promoted)
+                gaps.extend(link_gaps)
+            elif mapped_type == "input_attempt" and row.get("requestSeq") is not None:
+                promoted, link_gaps = _attempt_request_link(
+                    row, by_session_seq, used_attempt_requests, session, where
                 )
                 record.update(promoted)
                 gaps.extend(link_gaps)
@@ -1611,6 +1722,40 @@ def run_selftest(out: TextIO | None = None) -> int:
         processed_row.pop("attemptSeq")
         _, gaps, _, _, _ = _map_audit(no_attempt)
         test.check("agentOp without attemptSeq is a gap", any(gap.code == "agent_op_without_attempt" for gap in gaps))
+        cross_session = [
+            {"seq": 1, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
+            {"seq": 2, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready"},
+            {"seq": 3, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}},
+            {"seq": 4, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+            {"seq": 5, "tick": 11, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete"},
+            {"seq": 6, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "ready", "type": "session_start"},
+            {"seq": 7, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "ready", "type": "audit_ready"},
+            {"seq": 8, "tick": 12, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "requestSeq": 4, "attemptSeq": 3, "agentOp": True},
+            {"seq": 9, "tick": 13, "run": "r1", "inst": "exp-1", "session": "s2", "phase": "end", "type": "audit_end", "status": "complete"},
+        ]
+        _, gaps, _, _, _ = _map_audit(cross_session)
+        test.check("cross-session request is a scope gap", any(gap.code == "request_scope" for gap in gaps))
+        test.check("cross-session attempt is a scope gap", any(gap.code == "attempt_scope" for gap in gaps))
+        forward = _fixture_audit() + [
+            {"seq": 12, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+            {"seq": 13, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "bbbb", "name": "Bot2"}},
+            {"seq": 11, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "bbbb", "name": "Bot2"}, "requestSeq": 12, "attemptSeq": 13, "agentOp": True},
+        ]
+        _, gaps, _, _, _ = _map_audit(forward)
+        test.check("forward request is a gap", any(gap.code == "request_forward" for gap in gaps))
+        test.check("forward attempt is a gap", any(gap.code == "attempt_forward" for gap in gaps))
+        identity_scope = _fixture_audit()
+        next(row for row in identity_scope if row["type"] == "input_attempt")["inst"] = "other-lab"
+        _, gaps, _, _, _ = _map_audit(identity_scope)
+        test.check("referenced identity must match", any(gap.code == "attempt_scope" for gap in gaps))
+        attempt_link = _fixture_audit() + [
+            {"seq": 11, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+            {"seq": 12, "tick": 22, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "bbbb", "name": "Bot2"}, "requestSeq": 11},
+        ]
+        attempt_rows, attempt_gaps, _, _, _ = _map_audit(attempt_link)
+        test.check("attempt request link is clean", not attempt_gaps, str([g.as_json() for g in attempt_gaps]))
+        linked_attempt = next(row for row in attempt_rows if row["event"] == "input_attempt" and row["detail"]["raw"].get("requestSeq") == 11)
+        test.equal("attempt request link is promoted", linked_attempt.get("request_seq"), 11)
         foreign = [dict(row) for row in _fixture_audit()]
         foreign[3]["run"] = "other"
         _, gaps, _, _, _ = _map_audit(foreign)

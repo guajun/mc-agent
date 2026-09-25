@@ -40,7 +40,9 @@ python tools/stage1_integration.py run --bundle-only   # 从 normalize-inputs.js
 2. 轨迹复制为 `run-<stamp>/trajectory.final.jsonl`，`normalize-inputs.json` 固定其 sha256、字节数、调用/结果数，并要求 `calls == uniqueCallIds`（重复 call id 会让冻结失败，而不是被折叠）；
 3. 归一化只使用冻结副本，带 `--expect-sha256`，且自身不被追踪。
 
-`--bundle-only` 重新读取 `normalize-inputs.json`、校验所有固定哈希，并逐字节复现 `tool-trace.jsonl`、`audit-events.jsonl`、映射报告与 `bundle.json`（已连续两次比较一致）。
+`--bundle-only` 重新读取 `normalize-inputs.json`、校验所有固定哈希，并逐字节复现 `tool-trace.jsonl`、`audit-events.jsonl`、映射报告与 `bundle.json`（已连续三次比较一致）。
+
+驱动 summary 会显式记录投影阶段：每个映射命令的退出码与缺口数、门禁总体状态、映射缺口与 **INFRA 错误**分开存放。退出码 1 且报告含缺口属于证据缺口，门禁应当保持 `blocked`；报告缺失、用法错误退出、或退出码 1 但无缺口属于 INFRA 失败。本修订复用了实机运行的冻结输入（未重跑实机）：唯一产物变化是新提升的 `input_attempt.request_seq`（原始事件 seq 183 -> 182）以及重新哈希它的证据索引；其余产物哈希不变，所有映射保持无缺口。
 
 ## 无损证据映射
 
@@ -57,7 +59,8 @@ python tools/stage1_integration.py run --bundle-only   # 从 normalize-inputs.js
 | 配置里的 dimension（或事件携带值） | `dimension` |
 | `phase` | `experiment -> agent`、`restore -> restore`、其余 `init`；原始 phase 保留 |
 | `input_attempt` / `input_processed` | 同名；`operator` 映射为 `actor_uuid`（对象取 `uuid`）；null actor 只有在有记录的 `actor_provenance` 时才允许 |
-| `input_processed` 链接 | `requestSeq`/`attemptSeq`/`agentOp` **提升**到规范记录并校验：悬空引用、重复 request/attempt、`agentOp` 无 attempt 都是缺口 |
+| `input_processed` 链接 | `requestSeq`/`attemptSeq`/`agentOp` **提升**到规范记录，并在各自时钟域内校验：被引用事件必须同 session/run/instance/dimension 且严格早于引用者（seq 与 tick）。跨 session、身份不符、前向或悬空引用、第二个 *processed* 复用 request/attempt、`agentOp` 无 attempt 都是缺口 |
+| `input_attempt.requestSeq` | 同样提升并按同 session/先后规则校验（一个 request 可由其 attempt 与消费它的 processing 各引用一次；第二个 attempt 复用即缺口） |
 | `input_request` | 原样保留（不算门禁操作） |
 | `cart_exit` | `cart_emitted`；`captured_before_removal` 要求移除事件记录的 `capturedPath` 含 `before_drop`（且有序库存存在） |
 | `cart_remove` | `cart_removed`；`capturedPath` 必需，`reason` 映射为 `removal_reason` |

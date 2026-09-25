@@ -1,8 +1,8 @@
 {
   "kind": "stage1-integration-summary",
-  "evidenceVersion": 2,
+  "evidenceVersion": 3,
   "issue": "guajun/mc-agent#14",
-  "date": "2026-09-25T17:50:24Z",
+  "date": "2026-09-25T18:03:14Z",
   "gateRepoHeadAtRun": "32aa245",
   "runId": "rom13-integration-run-20260925T174503Z",
   "runDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-20260925T174503Z",
@@ -14,6 +14,55 @@
     "uniqueCallIds": 71,
     "finalizedAt": "2026-09-25T17:48:30Z",
     "mappingSourceSha256Matches": true
+  },
+  "validationScope": {
+    "fullLiveRerun": false,
+    "reason": "scoping/validation and summary reporting changed; the immutable frozen inputs still validate and no live fact changed",
+    "reusedFrozenInputs": true,
+    "frozenSha256Checked": true,
+    "mappingGaps": [],
+    "infraErrors": [],
+    "gateExpectedBlocked": true,
+    "artifactDelta": [
+      "input_attempt.request_seq is now promoted from the raw requestSeq (seq 183 -> 182)",
+      "evidence-index.json re-hashes that audit-events artifact"
+    ]
+  },
+  "normalizeStatus": {
+    "commands": [
+      {
+        "name": "map-identity",
+        "returncode": 0,
+        "seconds": 0.264,
+        "gaps": 0,
+        "ok": true
+      },
+      {
+        "name": "map-audit",
+        "returncode": 0,
+        "seconds": 0.294,
+        "gaps": 0,
+        "ok": true
+      },
+      {
+        "name": "map-trace",
+        "returncode": 0,
+        "seconds": 0.273,
+        "gaps": 0,
+        "ok": true
+      },
+      {
+        "name": "assemble",
+        "returncode": 3,
+        "seconds": 0.352,
+        "gateOverall": "blocked",
+        "expectedBlocked": true
+      }
+    ],
+    "mappingGaps": [],
+    "infraErrors": [],
+    "gateOverall": "blocked",
+    "gateExitCode": 3
   },
   "java": {
     "path": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\java.exe",
@@ -197,6 +246,10 @@
       ],
       "ok": true
     },
+    "attemptRequestLinksPromoted": [
+      null,
+      182
+    ],
     "sourceCommit": "502f561",
     "noteCycled": true,
     "cartRemoved": true
@@ -211,13 +264,13 @@
     "command": "python tools/stage1_integration.py run --bundle-only",
     "artifactsIdentical": {
       "bundle/artifacts/trace_persistence/tool-trace.jsonl": "1e9f9a4e0c6d0174e2005630912f8f480da906b2d683580d3c04cb70a9a447e4",
-      "bundle/artifacts/independent_test_mod/audit-events.jsonl": "c2645dcc055ea0cdc13a0facb6e290e2365d4c21d38f4a58c35f678ea2b36472",
+      "bundle/artifacts/independent_test_mod/audit-events.jsonl": "aeafe1a6003b2a3f66e8e4a238cdbbd1bb59e1389fa8f22340e416926eda50de",
       "bundle/mapping/trace-report.json": "cebb58a82c3b403954d03f620500e94f2af5989ccfbc1adb886d9cc21732b895",
       "bundle/mapping/audit-report.json": "12f790caf2feaaafdc0fced94670bc9a8b3465ddc97920e4a0c0dac164495211",
       "bundle/bundle.json": "59cae3d61a48471e723fcf5119ce97c42775668ea5108654ff5059ffc9f14bc8",
-      "bundle/artifacts/smoke_fixture_validity/evidence-index.json": "95d9420f2d073f74a28737f261506a422550a3b8e25722ec09b16c10efc5eed5"
+      "bundle/artifacts/smoke_fixture_validity/evidence-index.json": "eaa6cb2b31ce90477a32fb903184dfa11f386b62baf8fa7cea374233a21e817f"
     },
-    "note": "two consecutive bundle-only runs reproduced these files byte for byte from normalize-inputs.json"
+    "note": "three consecutive bundle-only runs reproduced these files byte for byte from normalize-inputs.json"
   },
   "bridge6RestoreCollection": {
     "ok": true,
