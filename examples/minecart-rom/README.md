@@ -116,8 +116,9 @@ No command block is placed anywhere; the exporter scans every chunk palette and 
 traffic (RCON). The note block is the only input; the fixture never presses it.
 
 The ready snapshot (`ready-snapshot.json`) is deliberately not sanitized: cart
-UUIDs, positions, motions, full item NBT, the in-memory entity order, the
-machine block states, the user identity and the frozen tick state. UUIDs are
+UUIDs, positions, motions, inventories, the full entity NBT dump of every
+cart, the in-memory entity order, the machine block states, the user identity
+and the frozen tick state. UUIDs are
 used for correlation only — no name, tag or scoreboard encodes an order or an
 answer.
 
