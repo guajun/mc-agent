@@ -1,8 +1,9 @@
 # 阶段一集成运行
 
-!!! success "完整门禁通过（评审修复运行，分支 `codex/rom13-fullgate`）"
+!!! success "完整门禁通过（权威运行，分支 `codex/rom13-fullgate`）"
     issue #14 的验收运行（`tools/stage1_fullgate.py`，run id
-    `rom13-fullgate-20260926T011803Z`）在已合并的 #15 fixture 与 #18 审计 mod
+    `rom13-fullgate-20260926T044858Z`，执行源提交
+    `6e0091081aa7ccc2250d968415d5c5895b84e6f9`）在已合并的 #15 fixture 与 #18 审计 mod
     上执行**完整**组合阶段一流程，门禁结果为 **pass 8/8**（exit 0），并通过只读源世界重新哈希。带全部固定哈希的版本化摘要见
     [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json)。
     下文记录的 blocked 结果是更早的通用接线运行（#28，head `32aa245`），仅作历史保留。
@@ -13,7 +14,9 @@
 
 完整门禁驱动在端口 27240-27249 上以六个阶段运行（无 mod 对照使用 27150/27151）：`live`（本 run 三次独立 fixture 初始化、fork + 同 run 守卫恢复、在源副本与恢复副本上执行**有界真实 ROM 标定**：夹具玩家在悬停座上右键夹具音符盒，一个原始箱子矿车越过输出平面并自然落入虚空被移除，随后在同一世界副本上执行无 mod 对照；七类失败用例、真实 hit/miss 身份探针、四个负例与冻结轨迹）、`identity`（五条 player_context 记录）、`devcap`（真实构建/加载/依赖探针、同尺寸 jar 更新、重启后机器实体快照+验证、preflight 派生的工具环境、真实重启/状态隔离与冲突拒绝）、`trace`（冻结轨迹到门禁工具轨迹、因果 join、缺失日志检测）、`smoke`（五套 smoke 套件、无 mod 对照、原始计数器 hook 开销、版本锁）、`compose`（审计导出、恢复快照与失败用例、bundle 规格、门禁运行）。
 
-评审修复运行 `rom13-fullgate-20260926T011803Z` 的关键事实：地图 `469548…1387`；本 run 三次 init 一致（`86215e40…`/`a3ba3757…`，09:19-09:21 本地时间）；恢复 10 个实体并验证（顺序哈希 `2df69346…`）；七类失败用例全部通过（含修复后的 `unverified`）；10 条 canonical agent 事件（两个实例，`input_processed` 走真实 `playNote` 路径）；60 次冻结调用、10 条 verified join（6 条直接 receipt + 4 条有界 tick 链）、0 个未匹配 agent 事件；无 mod 对照一致；hook 开销 101.99 ms（来自原始计数器）；27 条 evidence index 固定项；源世界 `8cd54c86…` 在运行前后分别观测且未改变。
+权威运行 `rom13-fullgate-20260926T044858Z`（源提交 `6e00910`）的关键事实：地图 `469548…1387`；本 run 三次 init 一致（`86215e40…`/`a3ba3757…`，09:19-09:21 本地时间）；恢复 10 个实体并验证（顺序哈希 `790ea415…`）；七类失败用例全部通过（含修复后的 `unverified`）；10 条 canonical agent 事件（两个实例，`input_processed` 走真实 `playNote` 路径）；61 行投影轨迹、10 条 verified join（6 条直接 receipt + 4 条有界 tick 链）、0 个未匹配 agent 事件；无 mod 对照一致；hook 开销 109.835 ms（整场会话 hook 总时长，来自原始计数器）；bundle 树 `7c3d872f…`、27 条 evidence index 固定项；源世界 `8cd54c86…` 在运行前后分别观测且未改变。
+
+补充的 stage-two 前置探针（`tools/attack_use_window_probe.py`，驱动提交 `5f135267947e91910ab70a8740f07c36a481a8a8`）在全新一次性实验室上使用未改动的审计 jar 重跑 punch-then-use，并通过单条持久 RCON 连接背靠背发送两条命令：原始请求相隔 **1 个 tick**（<= `correlationWindowTicks: 2`），use 恰好产生一条 `input_processed`（`playNote`），且没有陈旧的 attack 归因。该探针为补充证据，不改变已冻结的完整门禁运行及其溯源。
 
 ```bash
 python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity \

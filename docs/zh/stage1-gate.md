@@ -207,7 +207,6 @@ stage1-evidence/
 | `dimension` | s | 必须等于该 `instance_id` 声明的 `dimension` |
 | `tick` | i | >= 0；真实服务器 tick，重启后允许重置 |
 | `seq` | i | >= 0；按 `run_id/instance_id/dimension` 严格递增（追加顺序即排序键） |
-| `seq` | i | >= 0；相同/碰撞的序号对失败，不能据此建立顺序 |
 | `event` | s | 见下 |
 | `phase` | s | `init`、`agent` 或 `restore`；`agent` 事件必须属于父 run |
 | `actor_uuid` | s/null | `input_attempt`/`input_processed` 上必需：绑定的任务玩家 UUID，或 `null` 加非空 `actor_provenance` 说明缺失原因 |

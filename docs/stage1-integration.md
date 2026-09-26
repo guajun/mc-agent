@@ -1,8 +1,9 @@
 # Stage-one integration run
 
-!!! success "Full gate pass (review-fix run, branch `codex/rom13-fullgate`)"
+!!! success "Full gate pass (authoritative run, branch `codex/rom13-fullgate`)"
     The issue-#14 acceptance run (`tools/stage1_fullgate.py`, run id
-    `rom13-fullgate-20260926T011803Z`) executed the **full** combined
+    `rom13-fullgate-20260926T044858Z`, executed source commit
+    `6e0091081aa7ccc2250d968415d5c5895b84e6f9`) executed the **full** combined
     stage-one recipe against the merged #15 fixture and #18 audit mod and the
     gate reports **pass 8/8** (exit 0), including the read-only source-world
     re-hash. The compact, versioned record with every pinned hash is
@@ -33,24 +34,37 @@ copy uses 27150/27151:
 | `smoke` | five smoke suites, the no-mod parity record and the raw-counter hook overhead, version lock |
 | `compose` | audit export, restore snapshot trees + failure cases, bundle spec, gate run |
 
-The review-fix pass used run id `rom13-fullgate-20260926T011803Z`:
+The authoritative pass used run id `rom13-fullgate-20260926T044858Z`
+(source commit `6e00910`; every phase recorded the clean HEAD and the driver
+bytes `6bdc4d20…` / Git blob `a872f067…`):
 
 | Check | Verdict | Evidence anchor |
 | --- | --- | --- |
 | `fixture_map` | pass | map `469548…1387`, this run's three live inits (`86215e40…`, 09:19-09:21 local), player `3ec122d5…` |
-| `restore_fidelity` | pass | 10 entities restored and verified, order hash `2df69346…` before and after, seven failure cases incl. the fixed `unverified` |
+| `restore_fidelity` | pass | 10 entities restored and verified, order hash `790ea415…` before and after, seven failure cases incl. the fixed `unverified` |
 | `player_context` | pass | five live records: note-block view hit, real `type=miss`, distinct second player, unknown rejected |
 | `agent_dev_capability` | pass | real probe flags, jar update `227d7a91…` -> `2f042c13…` loaded, post-restart memory verify, preflight-derived tools, refused conflict |
 | `independent_test_mod` | pass | 10 canonical events (2 instances), `input_processed` via the real `playNote` path, `cart_removed` reason `DISCARDED`, four failing negatives, passing source child |
-| `trace_persistence` | pass | 60 finalized calls, 10 verified joins (6 direct receipts + 4 bounded chains), 0 unmatched agent events, 0 gaps |
-| `smoke_fixture_validity` | pass | five suites, 9-component version lock, no-mod parity, hook overhead 101.99 ms **total session hook time** from the raw counters |
-| `evidence_integrity` | pass | 27 pinned index entries, source world `8cd54c86…` observed unchanged before and after |
+| `trace_persistence` | pass | 61 projected trace rows, 10 verified joins (6 direct receipts + 4 bounded chains), 0 unmatched agent events, 0 gaps |
+| `smoke_fixture_validity` | pass | five suites, 9-component version lock, no-mod parity, hook overhead 109.835 ms **total session hook time** from the raw counters |
+| `evidence_integrity` | pass | bundle tree `7c3d872f…`, 27 pinned index entries, source world `8cd54c86…` observed unchanged before and after |
 
 ```bash
 python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity \
   && python tools/stage1_fullgate.py devcap && python tools/stage1_fullgate.py trace \
   && python tools/stage1_fullgate.py smoke && python tools/stage1_fullgate.py compose
 ```
+
+A supplemental stage-two prerequisite probe (`tools/attack_use_window_probe.py`,
+driver commit `5f135267947e91910ab70a8740f07c36a481a8a8`) re-ran the
+punch-then-use case on a fresh disposable lab with the unchanged audit jar and
+sent both commands over one persistent RCON connection: the raw requests are
+**1 tick apart** (<= `correlationWindowTicks: 2`) with exactly one
+`input_processed` (`playNote`) for the use and no stale attack attribution.
+The compact record is
+[`docs/evidence/rom13-stage1/attack-use-window-probe.json`](evidence/rom13-stage1/attack-use-window-probe.json).
+This probe is supplemental; it does not alter the frozen full-gate run or its
+provenance.
 
 **Bounded calibration scope.** The audited scene is the real fixture machine,
 not a stand-in: the fixture player is parked on the hover seat, right-clicks
