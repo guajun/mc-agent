@@ -421,6 +421,18 @@ class Lab:
 # --------------------------------------------------------------------------- driver
 
 
+def merged_step_rows(primary: Any, secondary: Any) -> list[dict[str, Any]]:
+    """Summary step rows for one recorder, or two when they are distinct.
+
+    The ``--bundle-only`` path reuses a single recorder for normalization, so
+    appending it again would duplicate every mapping step in the summary.
+    """
+    rows = [step.as_json() for step in primary.steps] if primary is not None else []
+    if secondary is not None and secondary is not primary:
+        rows += [step.as_json() for step in secondary.steps]
+    return rows
+
+
 @dataclass
 class Driver:
     name: str
@@ -501,9 +513,10 @@ class Driver:
                         text=True,
                         timeout=180,
                     )
-            summary["steps"] = [step.as_json() for step in rec.steps] if "rec" in locals() else []
-            if "normalize_rec" in locals():
-                summary["steps"] += [step.as_json() for step in normalize_rec.steps]
+            summary["steps"] = merged_step_rows(
+                rec if "rec" in locals() else None,
+                normalize_rec if "normalize_rec" in locals() else None,
+            )
             summary["finishedAt"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
             write_json(self.base / "summary.json", summary)
             (self.base / "summary.md").write_text(self._markdown(summary), encoding="utf-8")
@@ -1157,8 +1170,10 @@ class Driver:
                 )
             elif step.returncode not in (0,):
                 status["infraErrors"].append(f"{name}: exit {step.returncode} but no gaps recorded")
-        elif step.returncode != 0:
-            status["infraErrors"].append(f"{name}: exit {step.returncode} and no report at {report_path}")
+        else:
+            status["infraErrors"].append(
+                f"{name}: exit {step.returncode} but no report at {report_path}"
+            )
 
     def _join_candidates(self, bundle: Path, inputs: dict[str, Any]) -> Path | None:
         """Unverified candidates only; proof would have to come from the traces.

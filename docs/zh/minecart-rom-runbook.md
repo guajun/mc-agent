@@ -35,19 +35,19 @@ issue 标成完成；在门禁或审计真正输出通过之前，不得把本�
 | 阶段一门禁工具 | 已合并（#22） | `tools/stage1_gate.py`；`selftest` **152 checks** |
 | 冷启动协议工具 | 已合并（#25） | `tools/coldstart.py`、`harness_preflight.py`、`run_trace.py`、`run_audit.py` |
 | 组合集成驱动 | 已合并（#28，`2675825`） | `tools/stage1_integration.py`；[阶段一集成运行](stage1-integration.md) |
-| fixture #15 | PR [#27](https://github.com/guajun/mc-agent/pull/27) 仍开启；已检查快照 `37fb824`（2026-09-26），**未接受** | 分支上的 `examples/minecart-rom/` |
-| 审计 mod #18 | PR [#26](https://github.com/guajun/mc-agent/pull/26) 仍开启；已检查快照 `0e8c15b`（2026-09-26），**未接受** | 分支上的 `tests/mods/minecart-audit/` |
-| 真实阶段一门禁 | **BLOCKED**（1 pass、0 fail、7 blocked） | [`docs/evidence/rom13-stage1/integration-summary.json`](evidence/rom13-stage1/integration-summary.json) |
+| 完整门禁验收驱动 | 分支 `codex/rom13-fullgate`（#14 PR #30），评审修复运行 | `tools/stage1_fullgate.py`；真实有界 ROM 标定 + 无 mod 对照 + 重启后记忆验证；[完整门禁摘要](evidence/rom13-stage1/full-gate-summary.json) |
+| fixture #15 | 已合并（#27，`8dd75c6`） | `examples/minecart-rom/` |
+| 审计 mod #18 | 已合并（#26，`824c15d`） | `tests/mods/minecart-audit/` |
+| 真实阶段一门禁 | 分支 `codex/rom13-fullgate` 上 **PASS 8/8**（exit 0），等待人工评审 | [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json) |
 | 阶段 #20 | 未开始 | 无冷启动 run 目录、无 Agent logger |
 | 阶段 #21 | 未准备 | - |
-| 源存档 | 未变化 | tree hash `8cd54c86...324a`（40 个文件） |
+| 源存档 | 完整门禁运行前后未变化 | tree hash `8cd54c86...324a`（40 个文件，11,556,310 字节） |
 
-此时已合并的前置 PR：bridge#8、bridge#9、#22、#23、#24、#25、#28。#16、#17 与 bridge#6
-已带证据评论关闭；#15 与 #18 仍开启。
+已合并的前置 PR：bridge#8、bridge#9、#22、#23、#24、#25、#26、#27、#28、#29。#16、#17 与 bridge#6
+已带证据评论关闭。上面的完整门禁通过是 #14 的验收运行；只有经过评审的 `pass` 才授权阶段二，且 Agent 不做合并。
 
-上表中的 PR head 是**不可变快照**，不是实时声明：快照之后两个分支仍在修复。执行配方前请解析
-实际已接受/已合并的 head（例如 `gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`），
-并按该树重新核对参数。
+上表中的合并 head 是完整门禁运行的输入。重新执行配方前请重新解析（例如
+`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`），并确认树仍与完整门禁摘要中的固定哈希一致。
 
 !!! note "跟踪器历史（历史记录，2026-09-25）"
     #14 与 #19 在工具 PR 合并后曾被短暂关闭，当天 18:26 UTC 在仍为 blocked 的实机门禁

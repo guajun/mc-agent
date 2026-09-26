@@ -195,7 +195,7 @@ stage1-evidence/
 
 ### 5. `independent_test_mod` —— 可审计的机器输入与瞬态输出（#18）
 
-`test-mod-manifest.json`：`mod_id`、`version`（s）、`sha256`（h64，与 `version_lock.test-mod` 交叉核对）、`read_only`（true）、`hook_overhead_ms`（n >= 0）、`fixture_behavior_unchanged`（true）、`loaded_in`（非空字符串列表，含 `source_audit` 与 `experiment`）、`agent_mod_coexists`（true）、`no_command_blocks`（true）。
+`test-mod-manifest.json`：`mod_id`、`version`（s）、`sha256`（h64，与 `version_lock.test-mod` 交叉核对）、`read_only`（true）、`hook_overhead_ms`（n >= 0，整场会话所有 hook 的总时长，不是每次调用/每 tick）、`fixture_behavior_unchanged`（true）、`loaded_in`（非空字符串列表，含 `source_audit` 与 `experiment`）、`agent_mod_coexists`（true）、`no_command_blocks`（true）。
 
 `audit-events.jsonl` —— 规范的服务端事件 schema：
 
@@ -205,8 +205,8 @@ stage1-evidence/
 | `run_id` | s | 父 `run.run_id`，或 `init`/`restore` 阶段所属的 `run.child_runs` id |
 | `instance_id` | s | 在 `run.instances` 中声明；child run 则为其声明的实例 |
 | `dimension` | s | 必须等于该 `instance_id` 声明的 `dimension` |
-| `tick` | i | >= 0；`(tick, seq)` 按 `run_id/instance_id/dimension` 严格递增 |
-| `seq` | i | >= 0；相同/碰撞的序号对失败，不能据此建立顺序 |
+| `tick` | i | >= 0；真实服务器 tick，重启后允许重置 |
+| `seq` | i | >= 0；按 `run_id/instance_id/dimension` 严格递增（追加顺序即排序键） |
 | `event` | s | 见下 |
 | `phase` | s | `init`、`agent` 或 `restore`；`agent` 事件必须属于父 run |
 | `actor_uuid` | s/null | `input_attempt`/`input_processed` 上必需：绑定的任务玩家 UUID，或 `null` 加非空 `actor_provenance` 说明缺失原因 |
@@ -233,7 +233,7 @@ stage1-evidence/
 
 `smoke-report.json`：`suites[]` 覆盖 `smoke_offline`、`lab_boot`、`fake_player_mcp`、`snapshot_restore`、`test_mod_load`，每项 `{name, command, status: "pass", checks >= 1, log_ref}`。
 
-`fixture-validity.json`：`input_semantics`（s）、`stack_positions`（非空 `[x, y, z]` 列表）、`output_boundary`（非空对象）、`void_window_ticks`（i >= 1）、`end_condition`（s）、`timeout_s`（i >= 1）、`hook_overhead_ms`（n >= 0）、`with_mod_without_mod_consistent`（true）。
+`fixture-validity.json`：`input_semantics`（s）、`stack_positions`（非空 `[x, y, z]` 列表）、`output_boundary`（非空对象）、`void_window_ticks`（i >= 1）、`end_condition`（s）、`timeout_s`（i >= 1）、`hook_overhead_ms`（n >= 0，整场会话所有 hook 的总时长，不是每次调用/每 tick）、`with_mod_without_mod_consistent`（true）。
 
 `version-lock.json`：`components[]` 必须包含以下名称，每项带其必需固定值（`version` 字符串在它本身就是固定值时必需，否则可选）：
 

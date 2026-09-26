@@ -1,11 +1,87 @@
 # Stage-one integration run
 
+!!! success "Full gate pass (authoritative run, branch `codex/rom13-fullgate`)"
+    The issue-#14 acceptance run (`tools/stage1_fullgate.py`, run id
+    `rom13-fullgate-20260926T044858Z`, executed source commit
+    `6e0091081aa7ccc2250d968415d5c5895b84e6f9`) executed the **full** combined
+    stage-one recipe against the merged #15 fixture and #18 audit mod and the
+    gate reports **pass 8/8** (exit 0), including the read-only source-world
+    re-hash. The compact, versioned record with every pinned hash is
+    [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json).
+    The blocked result documented below is the earlier generic plumbing run
+    (#28, head `32aa245`) and is kept as history.
+
 This page documents the reproducible **combined** stage-one integration: two
 real Fabric labs, the self-built smoke mod, the committed #18 audit mod, a
 finalized tool trajectory, the merged bridge#6 restore evidence and the gate
 verdict. It is the bridge between the individual prerequisites and the
-stage-two cold start, and it deliberately stops at the gate's `blocked` line:
-the ROM map fixture (#15) and the same-run restore artifacts do not exist yet.
+stage-two cold start, and it deliberately stops at the gate line: no stage-two
+work happens here.
+
+## Full gate run (`tools/stage1_fullgate.py`)
+
+The full gate driver executes six phases against a fresh pair of labs on
+ports 27240-27249, using the merged fixture on `rom13-src` (27240-27243) and
+the restored experiment copy on `rom13-exp` (27244-27247); the no-mod parity
+copy uses 27150/27151:
+
+| Phase | What it produces |
+| --- | --- |
+| `live` | three independent live fixture initializations, fork + guarded same-run restore, **the bounded real ROM calibration** on the copied source world and the restored copy (one real player press on the fixture note block, a natural cart exit through the output plane and a natural void removal), a like-for-like no-mod control run, the seven failure cases, the real hit/miss identity probe on the hover seat, the four #18 negatives and the finalized trajectory |
+| `identity` | the five `player_context` records from the live seat probe (a real view target block hit and a real `miss`) |
+| `devcap` | real build/load/missing-dependency probes, same-size jar update, a post-restart snapshot/verify of the machine entities, the harness preflight-derived tool environment and instance isolation with a refused conflicting provision |
+| `trace` | frozen trajectory to gate `tool-trace`, causal joins (receipts + bounded tick chains), missing-log detection |
+| `smoke` | five smoke suites, the no-mod parity record and the raw-counter hook overhead, version lock |
+| `compose` | audit export, restore snapshot trees + failure cases, bundle spec, gate run |
+
+The authoritative pass used run id `rom13-fullgate-20260926T044858Z`
+(source commit `6e00910`; every phase recorded the clean HEAD and the driver
+bytes `6bdc4d20…` / Git blob `a872f067…`):
+
+| Check | Verdict | Evidence anchor |
+| --- | --- | --- |
+| `fixture_map` | pass | map `469548…1387`, this run's three live inits (`86215e40…`, 09:19-09:21 local), player `3ec122d5…` |
+| `restore_fidelity` | pass | 10 entities restored and verified, order hash `790ea415…` before and after, seven failure cases incl. the fixed `unverified` |
+| `player_context` | pass | five live records: note-block view hit, real `type=miss`, distinct second player, unknown rejected |
+| `agent_dev_capability` | pass | real probe flags, jar update `227d7a91…` -> `2f042c13…` loaded, post-restart memory verify, preflight-derived tools, refused conflict |
+| `independent_test_mod` | pass | 10 canonical events (2 instances), `input_processed` via the real `playNote` path, `cart_removed` reason `DISCARDED`, four failing negatives, passing source child |
+| `trace_persistence` | pass | 61 projected trace rows, 10 verified joins (6 direct receipts + 4 bounded chains), 0 unmatched agent events, 0 gaps |
+| `smoke_fixture_validity` | pass | five suites, 9-component version lock, no-mod parity, hook overhead 109.835 ms **total session hook time** from the raw counters |
+| `evidence_integrity` | pass | bundle tree `7c3d872f…`, 27 pinned index entries, source world `8cd54c86…` observed unchanged before and after |
+
+```bash
+python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity \
+  && python tools/stage1_fullgate.py devcap && python tools/stage1_fullgate.py trace \
+  && python tools/stage1_fullgate.py smoke && python tools/stage1_fullgate.py compose
+```
+
+A supplemental stage-two prerequisite probe (`tools/attack_use_window_probe.py`,
+driver commit `5f135267947e91910ab70a8740f07c36a481a8a8`) re-ran the
+punch-then-use case on a fresh disposable lab with the unchanged audit jar and
+sent both commands over one persistent RCON connection: the raw requests are
+**1 tick apart** (<= `correlationWindowTicks: 2`) with exactly one
+`input_processed` (`playNote`) for the use and no stale attack attribution.
+The compact record is
+[`docs/evidence/rom13-stage1/attack-use-window-probe.json`](evidence/rom13-stage1/attack-use-window-probe.json).
+This probe is supplemental; it does not alter the frozen full-gate run or its
+provenance.
+
+**Bounded calibration scope.** The audited scene is the real fixture machine,
+not a stand-in: the fixture player is parked on the hover seat, right-clicks
+the fixture note block, and the machine pops one chest minecart which crosses
+the fixture's output plane and falls into the void where the game removes it
+(`DISCARDED`, inventory captured before removal). The same run is repeated
+without the audit mod on the same copied world; both produce the same note
+step and the same single removal. The audit mod's `input_processed` event
+records which vanilla path processed the note (`triggerEvent`, or `playNote`
+when the fixture's harp note block has a non-air block above), so the evidence
+names the real path instead of assuming one.
+
+The gate only accepts the raw artifacts; raw logs stay in the git-ignored
+`labs/fullgate-evidence/` of the worktree that ran them, and the summary above
+pins their hashes. Only a reviewed `pass` authorizes stage two; the driver
+never merges and never closes the issue.
+
 
 !!! warning "No ROM solution"
     The scene is a single generic note block pushing one stack of chest
@@ -154,7 +230,7 @@ and pins their hashes. It is a **different live run** and is deliberately not
 joined to the generic integration run: there is no shared tool/event clock
 across the old labs, so the gate's same-run restore binding is not claimed.
 
-## Gate result
+## Earlier run: gate result (blocked)
 
 `python tools/stage1_evidence.py assemble --bundle labs/rom13-integration/bundle --spec … --source-world "<save>"`
 

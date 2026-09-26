@@ -275,7 +275,7 @@ covered; ports must be unique and inside the declared/effective ranges.
 
 `test-mod-manifest.json`: `mod_id`, `version` (s), `sha256` (h64,
 cross-checked against `version_lock.test-mod`), `read_only` (true),
-`hook_overhead_ms` (n >= 0), `fixture_behavior_unchanged` (true), `loaded_in`
+`hook_overhead_ms` (n >= 0; **total session hook time** across all hooks, not per-call or per-tick), `fixture_behavior_unchanged` (true), `loaded_in`
 (non-empty string list containing `source_audit` and `experiment`),
 `agent_mod_coexists` (true), `no_command_blocks` (true).
 
@@ -287,8 +287,8 @@ cross-checked against `version_lock.test-mod`), `read_only` (true),
 | `run_id` | s | parent `run.run_id`, or a `run.child_runs` id for `init`/`restore` phases |
 | `instance_id` | s | declared in `run.instances`; for a child run, its declared instance |
 | `dimension` | s | must equal the declared `dimension` of that `instance_id` |
-| `tick` | i | >= 0; `(tick, seq)` strictly increasing per `run_id/instance_id/dimension` |
-| `seq` | i | >= 0; equal/colliding pairs fail, they cannot establish ordering |
+| `tick` | i | >= 0; the real server tick, which may reset across a restart |
+| `seq` | i | >= 0; strictly increasing per `run_id/instance_id/dimension` (the append sequence is the ordering key) |
 | `event` | s | see below |
 | `phase` | s | `init`, `agent` or `restore`; `agent` events must belong to the parent run |
 | `actor_uuid` | s/null | required key on `input_attempt`/`input_processed`: the bound task-player UUID, or `null` with a non-empty `actor_provenance` explaining the absence |
@@ -356,7 +356,7 @@ fail loudly, never be silently ignored.
 `fixture-validity.json`: `input_semantics` (s), `stack_positions` (non-empty
 list of `[x, y, z]`), `output_boundary` (non-empty object),
 `void_window_ticks` (i >= 1), `end_condition` (s), `timeout_s` (i >= 1),
-`hook_overhead_ms` (n >= 0), `with_mod_without_mod_consistent` (true).
+`hook_overhead_ms` (n >= 0; **total session hook time** across all hooks, not per-call or per-tick), `with_mod_without_mod_consistent` (true).
 
 `version-lock.json`: `components[]` that must include these names, each with
 its required pin (a `version` string is optional unless it is the pin):

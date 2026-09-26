@@ -1,0 +1,483 @@
+{
+  "bundle": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\fullgate-evidence\\bundle",
+  "declared": [
+    "artifacts/agent_dev_capability/instance-isolation.jsonl",
+    "artifacts/agent_dev_capability/jar-update.json",
+    "artifacts/agent_dev_capability/smoke-mod.json",
+    "artifacts/agent_dev_capability/tool-environment.json",
+    "artifacts/fixture_map/cleanup-rebuild.json",
+    "artifacts/fixture_map/command-block-scan.json",
+    "artifacts/fixture_map/fixture-manifest.json",
+    "artifacts/fixture_map/init-runs.jsonl",
+    "artifacts/fixture_map/player-identity.json",
+    "artifacts/independent_test_mod/audit-events.jsonl",
+    "artifacts/independent_test_mod/audit-lifecycle.json",
+    "artifacts/independent_test_mod/negative-cases.jsonl",
+    "artifacts/independent_test_mod/test-mod-manifest.json",
+    "artifacts/player_context/entry-contract.json",
+    "artifacts/player_context/identity-records.jsonl",
+    "artifacts/player_context/version-pins.json",
+    "artifacts/restore_fidelity/failure-cases.jsonl",
+    "artifacts/restore_fidelity/restore-record.json",
+    "artifacts/restore_fidelity/snapshot-after",
+    "artifacts/restore_fidelity/snapshot-before",
+    "artifacts/restore_fidelity/source-unchanged.json",
+    "artifacts/smoke_fixture_validity/fixture-validity.json",
+    "artifacts/smoke_fixture_validity/smoke-report.json",
+    "artifacts/smoke_fixture_validity/version-lock.json",
+    "artifacts/trace_persistence/missing-log-detection.jsonl",
+    "artifacts/trace_persistence/tool-trace.jsonl",
+    "artifacts/trace_persistence/trace-join.json"
+  ],
+  "index_entries": 27,
+  "gate": {
+    "schema_version": 1,
+    "gate": "rom13-stage1",
+    "issue": "guajun/mc-agent#14",
+    "generated_at": "2026-09-26T05:04:44Z",
+    "bundle": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\fullgate-evidence\\bundle",
+    "overall": "pass",
+    "checks": [
+      {
+        "id": "fixture_map",
+        "title": "Map fixture pinned and initialized deterministically",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "three independent initializations",
+            "ok": true,
+            "detail": "3 run(s)"
+          },
+          {
+            "name": "initialization reproducible",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "fixture_manifest",
+            "path": "artifacts/fixture_map/fixture-manifest.json",
+            "status": "ok",
+            "sha256": "a2e3243d778f2fe9cb0405be4cb5ed5a086f27347bc205be3f5ae39696760ac6",
+            "tree_sha256": null,
+            "bytes": 1991,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "init_runs",
+            "path": "artifacts/fixture_map/init-runs.jsonl",
+            "status": "ok",
+            "sha256": "e02a3a4250766949943bdf5194d81f86ad43ccc435cc3489e7613963985b3891",
+            "tree_sha256": null,
+            "bytes": 2586,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "player_identity",
+            "path": "artifacts/fixture_map/player-identity.json",
+            "status": "ok",
+            "sha256": "95128ba25b40a23b3e26b04bec12bb29a9db944f2874b01e150bbed5ecc9f20b",
+            "tree_sha256": null,
+            "bytes": 433,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "command_block_scan",
+            "path": "artifacts/fixture_map/command-block-scan.json",
+            "status": "ok",
+            "sha256": "c0654f4978d0627be289a15c527abf7e2b86ba100453ebb7751707e32eaa00cc",
+            "tree_sha256": null,
+            "bytes": 344,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "cleanup_rebuild",
+            "path": "artifacts/fixture_map/cleanup-rebuild.json",
+            "status": "ok",
+            "sha256": "49c2d2a6b61dd520dcfd8beca2519aea6b5eb14a3c6c48e77b0db57e1ea86bad",
+            "tree_sha256": null,
+            "bytes": 1818,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "restore_fidelity",
+        "title": "Snapshot restore is faithful, not just issued",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "restore order reproduced",
+            "ok": true,
+            "detail": "790ea41554c66005"
+          },
+          {
+            "name": "restore full state equal",
+            "ok": true,
+            "detail": "0 mismatch(es)"
+          },
+          {
+            "name": "restore failure cases covered",
+            "ok": true,
+            "detail": "7 case(s)"
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "snapshot_before",
+            "path": "artifacts/restore_fidelity/snapshot-before",
+            "status": "ok",
+            "sha256": null,
+            "tree_sha256": "f2c1ffae30b592f630cdaa011289f2d37bc00042e6e74a03c048a1c7acb2a56d",
+            "bytes": 7638,
+            "files": 2,
+            "detail": "2 file(s)"
+          },
+          {
+            "kind": "snapshot_after",
+            "path": "artifacts/restore_fidelity/snapshot-after",
+            "status": "ok",
+            "sha256": null,
+            "tree_sha256": "b379eb1f02aa1bec25afdcac6fa89110be29fd19b1ab57cf5c01cee79d727d29",
+            "bytes": 7500,
+            "files": 2,
+            "detail": "2 file(s)"
+          },
+          {
+            "kind": "restore_record",
+            "path": "artifacts/restore_fidelity/restore-record.json",
+            "status": "ok",
+            "sha256": "5d6008a8854c4ab3d10b8d8bdc4576bc5723d8fc3493c4de3ea83dbd285668ce",
+            "tree_sha256": null,
+            "bytes": 10917,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "source_unchanged",
+            "path": "artifacts/restore_fidelity/source-unchanged.json",
+            "status": "ok",
+            "sha256": "f34bf7a27b1f7bfe7b802ca4cf4d9b52874c88de77757be07c2818db2f4e51ec",
+            "tree_sha256": null,
+            "bytes": 1007,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "failure_cases",
+            "path": "artifacts/restore_fidelity/failure-cases.jsonl",
+            "status": "ok",
+            "sha256": "2f27c63c537a6a1e150ce5c07c2fdb4ff398dca457cf78ab9e8af32ee6dc2261",
+            "tree_sha256": null,
+            "bytes": 3549,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "player_context",
+        "title": "Fake-player identity and server-vantage context on the real server",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "identity cases covered",
+            "ok": true,
+            "detail": "5 case(s)"
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "identity_records",
+            "path": "artifacts/player_context/identity-records.jsonl",
+            "status": "ok",
+            "sha256": "b46601c3b47ac7ee048c541142a9a864f8976e9a86cac47e59241d99acf7a09c",
+            "tree_sha256": null,
+            "bytes": 6877,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "entry_contract",
+            "path": "artifacts/player_context/entry-contract.json",
+            "status": "ok",
+            "sha256": "69ea46c0a689c391d3c9ceffcbc1499fda975f5fbacbed805b1b7a1d3c3fbcf3",
+            "tree_sha256": null,
+            "bytes": 530,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "version_pins",
+            "path": "artifacts/player_context/version-pins.json",
+            "status": "ok",
+            "sha256": "44639e7ac756de3a43aa59d7b23700847c5a9615a7c4792203b98973648f6a8d",
+            "tree_sha256": null,
+            "bytes": 297,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "agent_dev_capability",
+        "title": "Agent can write, build and install a mod into a located experiment instance",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "same-size jar update detected",
+            "ok": true,
+            "detail": ""
+          },
+          {
+            "name": "instances isolated",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "tool_environment",
+            "path": "artifacts/agent_dev_capability/tool-environment.json",
+            "status": "ok",
+            "sha256": "7822bac41884d3abe8c5caf9cb7a1fe5641244f37d8c0120ad86b47a19affeae",
+            "tree_sha256": null,
+            "bytes": 2230,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "jar_update",
+            "path": "artifacts/agent_dev_capability/jar-update.json",
+            "status": "ok",
+            "sha256": "8ef1be91f03d590f79c2e5a83788beca0c6cb7645bf79c8c4a8cb6ec53d9349b",
+            "tree_sha256": null,
+            "bytes": 1116,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "smoke_mod",
+            "path": "artifacts/agent_dev_capability/smoke-mod.json",
+            "status": "ok",
+            "sha256": "d4b3f39de3af83a39295fad97defef10719d4828b1667f99c70051b4268d9f18",
+            "tree_sha256": null,
+            "bytes": 2486,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "instance_isolation",
+            "path": "artifacts/agent_dev_capability/instance-isolation.jsonl",
+            "status": "ok",
+            "sha256": "882d7d561e722d1c70f766d13caf77ec1eb99eb8a73dadc1a86c85916e6a98a0",
+            "tree_sha256": null,
+            "bytes": 1550,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "independent_test_mod",
+        "title": "Independent test mod audits inputs and transient cart outputs",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "input -> processing -> output chain",
+            "ok": true,
+            "detail": ""
+          },
+          {
+            "name": "negative cases rejected",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "test_mod_manifest",
+            "path": "artifacts/independent_test_mod/test-mod-manifest.json",
+            "status": "ok",
+            "sha256": "42d18c54e25080a576627cea879432219734940ad080cc06cf91b30a1cb44b19",
+            "tree_sha256": null,
+            "bytes": 5581,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "audit_events",
+            "path": "artifacts/independent_test_mod/audit-events.jsonl",
+            "status": "ok",
+            "sha256": "778bc093ba7beb87c1bad0abc77c684a1b58559acb7b743cd0d3b82f5e0bf17e",
+            "tree_sha256": null,
+            "bytes": 5921,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "negative_cases",
+            "path": "artifacts/independent_test_mod/negative-cases.jsonl",
+            "status": "ok",
+            "sha256": "ab0a40bacc44be9fe38cd050e274d42a7e990c856ccad78537cb3a40247a696f",
+            "tree_sha256": null,
+            "bytes": 1670,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "audit_lifecycle",
+            "path": "artifacts/independent_test_mod/audit-lifecycle.json",
+            "status": "ok",
+            "sha256": "b76a9de06006a2fb3ab704689f235278f6aff9345a51386d1404e3a4ed6dcce7",
+            "tree_sha256": null,
+            "bytes": 4503,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "trace_persistence",
+        "title": "Tool calls and game events persist and join by run/instance",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "tool categories covered",
+            "ok": true,
+            "detail": "errors preserved: 3"
+          },
+          {
+            "name": "tool trace joins game events",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "tool_trace",
+            "path": "artifacts/trace_persistence/tool-trace.jsonl",
+            "status": "ok",
+            "sha256": "3880ebbf4869ec62f00cfe760eab65c14fc0b47afaf28db673bec0893f6ff9f3",
+            "tree_sha256": null,
+            "bytes": 170721,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "trace_join",
+            "path": "artifacts/trace_persistence/trace-join.json",
+            "status": "ok",
+            "sha256": "c5c6d0aad8572ce595a9c2fa815e3e8bd25857e4b9283e9f5a6ec5b1cecb13b4",
+            "tree_sha256": null,
+            "bytes": 13338,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "missing_log_detection",
+            "path": "artifacts/trace_persistence/missing-log-detection.jsonl",
+            "status": "ok",
+            "sha256": "6f9154d65303ad7d030ed7f9a34ef6874aa167c8312bcf52c4643f827eba9d14",
+            "tree_sha256": null,
+            "bytes": 364,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "smoke_fixture_validity",
+        "title": "Generic smoke tests pass and the run is pinned/evidenced",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "version lock covers components",
+            "ok": true,
+            "detail": ""
+          }
+        ],
+        "evidence": [
+          {
+            "kind": "smoke_report",
+            "path": "artifacts/smoke_fixture_validity/smoke-report.json",
+            "status": "ok",
+            "sha256": "54f535bf83e9f57b3eeebeff31a6d44859367b6c917f9b6335a4a68121826bbc",
+            "tree_sha256": null,
+            "bytes": 1433,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "fixture_validity",
+            "path": "artifacts/smoke_fixture_validity/fixture-validity.json",
+            "status": "ok",
+            "sha256": "7424cf74dff87d749fb8b401bba981a9a3dbcc896845addb94609c57d3e8d1e6",
+            "tree_sha256": null,
+            "bytes": 2812,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "version_lock",
+            "path": "artifacts/smoke_fixture_validity/version-lock.json",
+            "status": "ok",
+            "sha256": "05032e21b4959e50a77ff0bd9cbff8430428fef147f32f4527edc1cd6ee53dc9",
+            "tree_sha256": null,
+            "bytes": 1117,
+            "files": null,
+            "detail": ""
+          },
+          {
+            "kind": "evidence_index",
+            "path": "artifacts/smoke_fixture_validity/evidence-index.json",
+            "status": "ok",
+            "sha256": "7fdbe2ff135cadf8e3e777110d0ba14129497998b2e4bd7d5ac5cf9b8e430bc2",
+            "tree_sha256": null,
+            "bytes": 5164,
+            "files": null,
+            "detail": ""
+          }
+        ]
+      },
+      {
+        "id": "evidence_integrity",
+        "title": "Bundle structure, artifact hashes, ports and source world",
+        "status": "pass",
+        "reasons": [],
+        "assertions": [
+          {
+            "name": "integration instances isolated",
+            "ok": true,
+            "detail": ""
+          },
+          {
+            "name": "source world re-hashed read-only",
+            "ok": true,
+            "detail": "40 file(s), 8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a"
+          }
+        ],
+        "evidence": []
+      }
+    ],
+    "limitations": [
+      "The gate validates coordinator-provided raw artifacts; it cannot prove they were not fabricated. Keep the raw logs and spot-check the evidence index.",
+      "Boolean facts such as hook read-only behavior are cross-checked against the canonical event log, not re-measured live by this tool.",
+      "A pass authorizes the stage-two cold start only after the coordinator reviews this report and the artifact hashes."
+    ]
+  },
+  "gate_exit_code": 0
+}

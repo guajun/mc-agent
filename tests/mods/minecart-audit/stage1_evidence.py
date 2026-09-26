@@ -28,6 +28,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Any
 
 MODULE = Path(__file__).resolve().parent
 ROOT = MODULE.parents[2]
@@ -45,6 +46,20 @@ NEGATIVE_KEYS = {
     "answer_only": "answer_only",
     "attack_only": "attack_only",
 }
+
+
+def require_passing_child(verdict: Any, run_id: str) -> None:
+    """An attestation requires a passing child run, not merely a closed one.
+
+    A verdict of ``incomplete`` is the obvious refusal, but an
+    ordering/phase/capture failure (``fail``) must refuse the export too: the
+    bridge fixture only attests the child run if the source session passed.
+    """
+    if verdict != "pass":
+        raise SystemExit(
+            f"source child run {run_id} verdict is {verdict!r}; "
+            "a passing child run is required for the attestation"
+        )
 
 
 def run(argv: list[object], check: bool = True, timeout: float = 600) -> subprocess.CompletedProcess:
@@ -121,8 +136,7 @@ def main() -> int:
         src_report = json.loads(src_check.stdout)
     except ValueError:
         raise SystemExit(f"source child run {src_run} is unreadable: {src_check.stdout}")
-    if src_report.get("verdict") == "incomplete":
-        raise SystemExit(f"source child run {src_run} is incomplete; close it with /mcaudit end")
+    require_passing_child(src_report.get("verdict"), src_run)
     summary_flags["source_child_verdict"] = src_report.get("verdict")
 
     negative_specs = []

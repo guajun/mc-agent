@@ -452,6 +452,58 @@ def scenario_environment_only(name: str, run_id: str, instance: str) -> dict:
     return observable
 
 
+def scenario_attack_then_use(name: str, run_id: str, instance: str) -> dict:
+    """Punch then use within the correlation window (mixed-trigger regression).
+
+    The punch plays the note without changing its state; the following use is
+    the only state-changing operation and must be the only ``input_processed``
+    event attributed to the agent.  A stale pending play from the punch must
+    not be consumed by the use's first callback.
+    """
+    write_config(name, run_id, instance, [NOTE_1], STACK_1, OUTPUT_1)
+    fresh_world(name)
+    lab("start", "--name", name, "--wait", "300")
+    rcon(name, "mcaudit phase init")
+    reset_machine(name)
+    # A non-air block above the note block removes the scheduled block event,
+    # so the playNote path (the pending-play contract) is the one exercised.
+    rcon(name, "setblock 0 -58 0 minecraft:stone")
+    summon_cart(name, 3.5, 0.5, "apple", 3)
+    ensure_bot(name, 0.5)
+    rcon(name, "gamemode survival Bot")
+    rcon(name, "mcaudit phase experiment_start")
+    rcon(name, "player Bot attack once")
+    rcon(name, "player Bot use once")
+    time.sleep(1)
+    note_cycled = test_passed(rcon(name, "execute if block 0 -59 0 minecraft:note_block[note=1]"))
+    rcon(name, "tick sprint 200")
+    time.sleep(2)
+    rcon(name, "mcaudit phase experiment_end")
+    rcon(name, "mcaudit end")
+    lab("stop", "--name", name, "--timeout", "120")
+    log_path = LABS / name / "mc-audit" / f"audit-{run_id}.jsonl"
+    rows = [
+        json.loads(line)
+        for line in log_path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    processed = [
+        row for row in rows if row.get("type") == "input_processed" and row.get("targetInput")
+    ]
+    agent_processed = [row for row in processed if row.get("agentOp")]
+    return {
+        "note_cycled": note_cycled,
+        "processed_count": len(processed),
+        "agent_processed_count": len(agent_processed),
+        "exactly_one_processed": len(processed) == 1 and len(agent_processed) == 1,
+        "processed_paths": [row.get("path") for row in processed],
+        "attack_attempts": sum(
+            1 for row in rows if row.get("type") == "input_attempt" and row.get("path") == "attack"
+        ),
+        "log": str(log_path),
+    }
+
+
 def scenario_source_world(mc_dir: Path, java: Path, source_save: Path) -> dict:
     """Load a read-only copy of the source save with the audit mod installed.
 

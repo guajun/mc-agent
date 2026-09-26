@@ -19,6 +19,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.NoteBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.NoteBlockInstrument;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -65,6 +66,10 @@ public final class AuditEngine {
     private int serverTick;
     private String phase = "bootstrap";
     private boolean ended;
+    private boolean pendingPlayNote;
+    private long pendingPlayNotePos = 0L;
+    private long pendingPlayNoteRequest = -1L;
+    private int pendingPlayNoteTick = -1;
 
     private AuditEngine(AuditConfig config, AuditLog log, Path auditDir) {
         this.config = config;
@@ -195,6 +200,18 @@ public final class AuditEngine {
                         player instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
                         "player",
                         request == null ? -1L : request.seq()));
+                if (pendingPlayNote
+                        && "useWithoutItem".equals(path)
+                        && pendingPlayNoteTick == serverTick
+                        && pendingPlayNotePos == BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ())
+                        && request != null
+                        && request.seq() == pendingPlayNoteRequest) {
+                    InputRecord consumed = consumeAttempt(pos, request.seq());
+                    oldest(requests, pos, serverTick, true);
+                    recordProcessed(state, level, pos, 0, 0, true, "playNote", region, true, request, consumed);
+                    pendingPlayNote = false;
+                    pendingPlayNoteRequest = -1L;
+                }
             }
         } catch (Throwable error) {
             hookError("note_use", error);
@@ -208,6 +225,13 @@ public final class AuditEngine {
         if (ended) {
             return;
         }
+        // An attack opens a new interaction: any pending play from an earlier
+        // interaction (attack or environment) must not be consumed by a later
+        // use callback. The attack's own playNote sets a fresh, unclaimed
+        // pending if the block event is not scheduled.
+        pendingPlayNote = false;
+        pendingPlayNoteRequest = -1L;
+        pendingPlayNoteTick = -1;
         long started = System.nanoTime();
         try {
             if (!(level instanceof ServerLevel)) {
@@ -275,7 +299,7 @@ public final class AuditEngine {
             }
             log.append(event);
             if (region != null) {
-                record(requests, new InputRecord(
+                InputRecord request = new InputRecord(
                         log.seq(),
                         serverTick,
                         "request",
@@ -286,7 +310,32 @@ public final class AuditEngine {
                         entity instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
                         entity instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
                         trigger,
-                        -1L));
+                        -1L);
+                record(requests, request);
+                boolean scheduled = true;
+                if (state.getBlock() instanceof NoteBlock) {
+                    NoteBlockInstrument instrument = state.getValue(NoteBlock.INSTRUMENT);
+                    scheduled = instrument.worksAboveNoteBlock() || level.getBlockState(pos.above()).isAir();
+                }
+                if (!scheduled) {
+                    // Vanilla only calls blockEvent (triggerEvent) when the
+                    // instrument works above the block or the block above is
+                    // air. Otherwise playNote is the server-side processing.
+                    if (entity == null) {
+                        // No attempt callback will follow a redstone/environment
+                        // play: record it immediately, never as an agent op and
+                        // never through a stale player pending.
+                        recordProcessed(state, level, pos, 0, 0, true, "playNote", region, true, request, null);
+                    } else {
+                        // A player play stays pending for the matching
+                        // useWithoutItem attempt (attack plays stay unclaimed
+                        // and are cleared by the next attack/use).
+                        pendingPlayNote = true;
+                        pendingPlayNotePos = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
+                        pendingPlayNoteRequest = request.seq();
+                        pendingPlayNoteTick = serverTick;
+                    }
+                }
             }
         } catch (Throwable error) {
             hookError("play_note", error);
@@ -312,47 +361,64 @@ public final class AuditEngine {
             // event: consuming the match stops a later trigger in the same
             // window from inheriting the same player.
             InputRecord request = oldest(requests, pos, serverTick, target);
-            // Proof-carrying association: consume the attempt that observed
-            // this exact request. No match means no attributed attempt.
-            InputRecord attempt = target && request != null
-                    ? consumeAttempt(pos, request.seq())
-                    : null;
-            String operatorUuid = request != null ? request.operatorUuid() : null;
-            JsonObject event = log.event("input_processed");
-            event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
-            event.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
-            event.addProperty("region", region == null ? null : region.name);
-            event.addProperty("targetInput", target);
-            event.addProperty("eventId", eventId);
-            event.addProperty("eventParam", eventParam);
-            event.addProperty("played", played);
-            if (state.getBlock() instanceof NoteBlock) {
-                event.addProperty("note", state.getValue(NoteBlock.NOTE));
-                event.addProperty("instrument", state.getValue(NoteBlock.INSTRUMENT).name());
-            }
-            addSeq(event, "requestSeq", request);
-            event.addProperty("requestTrigger", request == null ? null : request.trigger());
-            addSeq(event, "attemptSeq", attempt);
-            JsonObject operator = new JsonObject();
-            if (request != null && request.operatorUuid() != null) {
-                operator.addProperty("uuid", request.operatorUuid());
-                operator.addProperty("name", request.operatorName());
-            }
-            event.add("operator", request != null && request.operatorUuid() != null ? operator : JsonNull.INSTANCE);
-            event.addProperty("agentOp", operatorUuid != null && config.isAgentOperator(operatorUuid));
-            event.addProperty("orderingEvidence", request != null);
-            if (target && request == null) {
-                markIncomplete(
-                        "target_input_without_request",
-                        "triggerEvent at " + pos + " had no playNote request within "
-                                + config.correlationWindowTicks + " ticks");
-            }
-            log.append(event);
+            InputRecord attempt = target && request != null ? consumeAttempt(pos, request.seq()) : null;
+            recordProcessed(state, level, pos, eventId, eventParam, played, "triggerEvent", region, target, request, attempt);
         } catch (Throwable error) {
             hookError("trigger_event", error);
         } finally {
             hook("trigger_event").record(System.nanoTime() - started);
         }
+    }
+
+    /**
+     * Shared processing record for both vanilla paths: ``triggerEvent`` when
+     * the block event is scheduled, and ``playNote`` when the instrument/block
+     * above makes the play itself the server processing.
+     */
+    private void recordProcessed(
+            BlockState state,
+            Level level,
+            BlockPos pos,
+            int eventId,
+            int eventParam,
+            boolean played,
+            String path,
+            Region region,
+            boolean target,
+            InputRecord request,
+            InputRecord attempt) {
+        String operatorUuid = request != null ? request.operatorUuid() : null;
+        JsonObject event = log.event("input_processed");
+        event.add("pos", JsonViews.position(pos.getX(), pos.getY(), pos.getZ()));
+        event.addProperty("block", BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+        event.addProperty("region", region == null ? null : region.name);
+        event.addProperty("targetInput", target);
+        event.addProperty("eventId", eventId);
+        event.addProperty("eventParam", eventParam);
+        event.addProperty("played", played);
+        event.addProperty("path", path);
+        if (state.getBlock() instanceof NoteBlock) {
+            event.addProperty("note", state.getValue(NoteBlock.NOTE));
+            event.addProperty("instrument", state.getValue(NoteBlock.INSTRUMENT).name());
+        }
+        addSeq(event, "requestSeq", request);
+        event.addProperty("requestTrigger", request == null ? null : request.trigger());
+        addSeq(event, "attemptSeq", attempt);
+        JsonObject operator = new JsonObject();
+        if (request != null && request.operatorUuid() != null) {
+            operator.addProperty("uuid", request.operatorUuid());
+            operator.addProperty("name", request.operatorName());
+        }
+        event.add("operator", request != null && request.operatorUuid() != null ? operator : JsonNull.INSTANCE);
+        event.addProperty("agentOp", operatorUuid != null && config.isAgentOperator(operatorUuid));
+        event.addProperty("orderingEvidence", request != null);
+        if (target && request == null) {
+            markIncomplete(
+                    "target_input_without_request",
+                    "processed input at " + pos + " had no playNote request within "
+                            + config.correlationWindowTicks + " ticks");
+        }
+        log.append(event);
     }
 
     /** Called at HEAD of Entity.remove. */

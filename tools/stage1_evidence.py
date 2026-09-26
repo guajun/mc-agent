@@ -50,6 +50,7 @@ import re
 import sys
 import tempfile
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Sequence, TextIO
 
@@ -165,6 +166,376 @@ class Gap:
 
     def as_json(self) -> dict[str, str]:
         return {"artifact": self.artifact, "code": self.code, "message": self.message}
+
+
+CAUSAL_USE_COMMAND = re.compile(r"\bplayer\s+\S+\s+use\b", re.IGNORECASE)
+CAUSAL_SPRINT_COMMAND = re.compile(r"\btick\s+sprint\b", re.IGNORECASE)
+
+
+def _iso_to_ms(value: Any) -> float | None:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.timestamp() * 1000.0
+
+
+def _event_wall_ms(event: dict[str, Any]) -> int | None:
+    detail = event.get("detail") if isinstance(event.get("detail"), dict) else {}
+    raw = detail.get("raw") if isinstance(detail.get("raw"), dict) else {}
+    for source in (detail.get("wall"), event.get("wall"), detail.get("wall_ms"), raw.get("wall")):
+        if isinstance(source, (int, float)):
+            return int(source)
+    return None
+
+
+def _event_session(row: dict[str, Any]) -> str:
+    detail = row.get("detail") if isinstance(row.get("detail"), dict) else {}
+    raw = detail.get("raw") if isinstance(detail.get("raw"), dict) else {}
+    for candidate in (row.get("session"), detail.get("session"), raw.get("session")):
+        if isinstance(candidate, str) and candidate:
+            return candidate
+    return ""
+
+
+def _event_raw_seq(row: dict[str, Any]) -> int | None:
+    detail = row.get("detail") if isinstance(row.get("detail"), dict) else {}
+    raw = detail.get("raw") if isinstance(detail.get("raw"), dict) else {}
+    for candidate in (detail.get("raw_seq"), raw.get("seq"), row.get("seq")):
+        if isinstance(candidate, int):
+            return candidate
+    return None
+
+
+def _execution_receipts(
+    calls: dict[str, list[dict[str, Any]]],
+    results: dict[str, list[dict[str, Any]]],
+) -> dict[str, dict[str, Any]]:
+    """Per-call receipt windows: command, start/end and the next call start."""
+    receipts: dict[str, dict[str, Any]] = {}
+    for call_id, entries in calls.items():
+        if len(entries) != 1:
+            continue
+        call = entries[0]
+        result_entries = results.get(call_id) or []
+        if len(result_entries) != 1:
+            continue
+        started = _iso_to_ms(call.get("at"))
+        ended = _iso_to_ms(result_entries[0].get("at"))
+        if started is None or ended is None:
+            continue
+        arguments = call.get("arguments") if isinstance(call.get("arguments"), dict) else {}
+        receipts[call_id] = {
+            "call_id": call_id,
+            "instance": str(call.get("instance") or ""),
+            "tool": str(call.get("tool") or "unknown"),
+            "command": str(arguments.get("command") or arguments.get("cmd") or ""),
+            "started_ms": started,
+            "ended_ms": ended,
+            "next_start_ms": None,
+        }
+    by_instance: dict[str, list[tuple[float, str]]] = {}
+    for call_id, receipt in receipts.items():
+        by_instance.setdefault(receipt["instance"], []).append((receipt["started_ms"], call_id))
+    for entries in by_instance.values():
+        entries.sort(key=lambda item: (item[0], item[1]))
+        for index, (_, call_id) in enumerate(entries):
+            receipts[call_id]["next_start_ms"] = (
+                entries[index + 1][0] if index + 1 < len(entries) else None
+            )
+    return receipts
+
+
+def _verify_execution_joins(
+    joins: Sequence[dict[str, Any]],
+    *,
+    calls: dict[str, list[dict[str, Any]]],
+    results: dict[str, list[dict[str, Any]]],
+    event_by_id: dict[str, dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Verify direct and chained joins from receipts, never from proximity.
+
+    A direct join is accepted only when the event wall lies inside the issuing
+    call's receipt window (``started <= wall < next recorded call``), the call
+    command is the causal operation for that event kind, the event carries the
+    proof's actor, and an ``input_processed`` resolves its ``attempt_seq`` to a
+    verified same-session attempt.  A chain join is accepted only through an
+    explicit predecessor event id of the expected kind and a bounded tick
+    delta, and inherits the predecessor's receipt.  Read-only commands,
+    ambiguity with the next call, cross-scope events and out-of-bound chains
+    stay unverified candidates.
+    """
+    receipts = _execution_receipts(calls, results)
+    verified: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+    verified_event_call: dict[str, str] = {}
+    verified_events: dict[str, dict[str, Any]] = {}
+
+    def bucket(join: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "call_id": join.get("call_id"),
+            "audit_ref": join.get("audit_ref"),
+            "basis": join.get("basis") or join.get("note"),
+            "verified": False,
+            "problems": [],
+        }
+
+    def identity_of(row: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
+        return (row.get("run_id"), row.get("instance_id"), row.get("dimension"), _event_session(row))
+
+    ordered = sorted(
+        (join for join in (joins or []) if isinstance(join, dict)),
+        key=lambda item: (
+            event_by_id.get(str((item.get("audit_ref") or {}).get("event_id")), {}).get("seq", -1)
+        ),
+    )
+
+    for join in ordered:
+        call_id = join.get("call_id")
+        ref = join.get("audit_ref")
+        candidate = bucket(join)
+        proof = join.get("proof") if isinstance(join.get("proof"), dict) else {}
+        if not isinstance(call_id, str) or not call_id or not isinstance(ref, dict):
+            candidate["problems"].append("needs call_id + audit_ref")
+            candidates.append(candidate)
+            continue
+        event_id = ref.get("event_id")
+        event = event_by_id.get(str(event_id))
+        if event is None:
+            candidate["problems"].append(f"event {event_id!r} is not in the mapped audit events")
+            candidates.append(candidate)
+            continue
+        for field in ("run_id", "instance_id", "dimension"):
+            value = join.get(field, ref.get(field))
+            if value is not None and value != event.get(field):
+                candidate["problems"].append(
+                    f"{field}={value!r} does not match the event value {event.get(field)!r}"
+                )
+        if ref.get("tick") is not None and ref.get("tick") != event.get("tick"):
+            candidate["problems"].append(
+                f"tick={ref.get('tick')!r} does not match the event tick {event.get('tick')!r}"
+            )
+        if event.get("phase") != "agent":
+            candidate["problems"].append(f"event phase {event.get('phase')!r} is not agent")
+        proof_ok = (
+            isinstance(proof.get("producer"), str)
+            and bool(proof["producer"].strip())
+            and isinstance(proof.get("basis"), str)
+            and bool(proof["basis"].strip())
+            and isinstance(proof.get("clock"), str)
+            and bool(proof["clock"].strip())
+        )
+        if candidate["problems"]:
+            candidates.append(candidate)
+            continue
+        if not proof_ok:
+            candidate["problems"].append(
+                "no explicit proof (producer/basis/clock); kept as an unverified candidate"
+            )
+            candidates.append(candidate)
+            continue
+
+        kind = str(proof.get("kind") or "direct")
+        event_kind = str(event.get("event") or "")
+        if kind == "chain":
+            derived_id = str(proof.get("derived_from_event_id") or "")
+            derived = event_by_id.get(derived_id)
+            rule = str(proof.get("rule") or "")
+            if derived is None:
+                candidate["problems"].append(f"chain predecessor {derived_id!r} is not a mapped audit event")
+                candidates.append(candidate)
+                continue
+            if identity_of(derived) != identity_of(event):
+                candidate["problems"].append("chain predecessor is not on the same run/instance/dimension/session")
+                candidates.append(candidate)
+                continue
+            if derived_id not in verified_events:
+                candidate["problems"].append("chain predecessor has no verified join")
+                candidates.append(candidate)
+                continue
+            delta = int(event.get("tick") or 0) - int(derived.get("tick") or 0)
+            max_delta = proof.get("max_tick_delta")
+            if not isinstance(max_delta, int) or max_delta < 1:
+                candidate["problems"].append("chain proof needs an integer max_tick_delta")
+                candidates.append(candidate)
+                continue
+            if not 0 < delta <= max_delta:
+                candidate["problems"].append(
+                    f"chain tick delta {delta} is outside 1..{max_delta}"
+                )
+                candidates.append(candidate)
+                continue
+            if event_kind == "cart_emitted":
+                if rule != "input_to_emission" or derived.get("event") != "input_processed":
+                    candidate["problems"].append(
+                        "cart_emitted must chain from the input_processed that popped it"
+                    )
+                    candidates.append(candidate)
+                    continue
+            elif event_kind == "cart_removed":
+                if rule != "emission_to_removal" or derived.get("event") != "cart_emitted":
+                    candidate["problems"].append(
+                        "cart_removed must chain from the cart_emitted of the same cart"
+                    )
+                    candidates.append(candidate)
+                    continue
+                if derived.get("cart_uuid") != event.get("cart_uuid"):
+                    candidate["problems"].append("cart_removed chains to a different cart_uuid")
+                    candidates.append(candidate)
+                    continue
+            else:
+                candidate["problems"].append(f"chain joins are only defined for cart events, not {event_kind!r}")
+                candidates.append(candidate)
+                continue
+            receipt = verified_events[derived_id]["proof"]["receipt"]
+            if call_id != verified_event_call[derived_id]:
+                candidate["problems"].append(
+                    "chain join must inherit the predecessor's issuing call"
+                )
+                candidates.append(candidate)
+                continue
+            entry = {
+                "call_id": call_id,
+                "audit_ref": {
+                    "run_id": event.get("run_id"),
+                    "instance_id": event.get("instance_id"),
+                    "dimension": event.get("dimension"),
+                    "event_id": event_id,
+                    "tick": event.get("tick"),
+                },
+                "verified": True,
+                "proof": {
+                    **proof,
+                    "kind": "chain",
+                    "derived_from": {
+                        "event_id": derived_id,
+                        "event": derived.get("event"),
+                        "tick": derived.get("tick"),
+                        "tick_delta": delta,
+                    },
+                    "receipt": receipt,
+                },
+                "note": join.get("note"),
+            }
+            verified.append(entry)
+            verified_event_call[str(event_id)] = call_id
+            verified_events[str(event_id)] = entry
+            continue
+
+        # ---- direct join: an issuing receipt with a causal command ---------
+        receipt = receipts.get(call_id)
+        if receipt is None:
+            candidate["problems"].append(f"call {call_id!r} has no complete receipt")
+            candidates.append(candidate)
+            continue
+        if receipt["instance"] and receipt["instance"] != event.get("instance_id"):
+            candidate["problems"].append(
+                f"call instance {receipt['instance']!r} does not match the event instance "
+                f"{event.get('instance_id')!r}"
+            )
+        wall = _event_wall_ms(event)
+        if wall is None:
+            candidate["problems"].append("the mapped event carries no wall clock; cannot bound the receipt")
+        elif wall < receipt["started_ms"]:
+            candidate["problems"].append(
+                f"event wall {wall} precedes the issuing call start {int(receipt['started_ms'])}"
+            )
+        next_start = receipt["next_start_ms"]
+        if next_start is not None and wall is not None and wall >= next_start:
+            candidate["problems"].append(
+                f"event wall {wall} is at/after the next recorded call {int(next_start)}; ambiguous receipt"
+            )
+        latency = proof.get("max_event_latency_ms")
+        if not isinstance(latency, int) or not 0 <= latency <= 2000:
+            candidate["problems"].append(
+                "proof.max_event_latency_ms must be a declared integer 0..2000; an unbounded future "
+                "window is not a receipt"
+            )
+        elif wall is not None and wall > receipt["ended_ms"] + latency:
+            candidate["problems"].append(
+                f"event wall {wall} is beyond the call end {int(receipt['ended_ms'])} + declared "
+                f"latency {latency}ms"
+            )
+        command = receipt["command"]
+        if event_kind in ("input_attempt", "input_processed"):
+            if not CAUSAL_USE_COMMAND.search(command):
+                candidate["problems"].append(
+                    f"command {command!r} is not a player-use operation for {event_kind}"
+                )
+            actor = event.get("actor_uuid")
+            proof_actor = proof.get("actor")
+            if not isinstance(proof_actor, str) or not proof_actor:
+                candidate["problems"].append("proof.actor is required for input events")
+            elif actor != proof_actor:
+                candidate["problems"].append(
+                    f"event actor {actor!r} does not match proof.actor {proof_actor!r}"
+                )
+            if event_kind == "input_processed":
+                detail = event.get("detail") if isinstance(event.get("detail"), dict) else {}
+                attempt_seq = detail.get("attempt_seq")
+                if attempt_seq is None:
+                    attempt_seq = event.get("attempt_seq")
+                attempt = next(
+                    (
+                        row
+                        for row in event_by_id.values()
+                        if row.get("event") == "input_attempt"
+                        and row.get("run_id") == event.get("run_id")
+                        and row.get("instance_id") == event.get("instance_id")
+                        and row.get("dimension") == event.get("dimension")
+                        and _event_session(row) == _event_session(event)
+                        and _event_raw_seq(row) == attempt_seq
+                    ),
+                    None,
+                )
+                if attempt_seq is None or attempt is None:
+                    candidate["problems"].append(
+                        f"input_processed attempt_seq {attempt_seq!r} does not resolve to an attempt"
+                    )
+                elif str(attempt.get("event_id")) not in verified_events:
+                    candidate["problems"].append("the linked attempt has no verified join")
+                elif verified_event_call[str(attempt.get("event_id"))] != call_id:
+                    candidate["problems"].append("processed and attempt were not issued by the same call")
+        else:
+            candidate["problems"].append(
+                f"{event_kind!r} needs an explicit chain join (kind=chain), not a time-only receipt"
+            )
+        if candidate["problems"]:
+            candidates.append(candidate)
+            continue
+        entry = {
+            "call_id": call_id,
+            "audit_ref": {
+                "run_id": event.get("run_id"),
+                "instance_id": event.get("instance_id"),
+                "dimension": event.get("dimension"),
+                "event_id": event_id,
+                "tick": event.get("tick"),
+            },
+            "verified": True,
+            "proof": {
+                **proof,
+                "kind": "direct",
+                "receipt": receipt,
+                "clock_bounds": {
+                    "event_wall_ms": wall,
+                    "call_started_ms": int(receipt["started_ms"]),
+                    "call_ended_ms": int(receipt["ended_ms"]),
+                    "next_call_start_ms": int(next_start) if next_start is not None else None,
+                    "command": command,
+                },
+            },
+            "note": join.get("note"),
+        }
+        verified.append(entry)
+        verified_event_call[str(event_id)] = call_id
+        verified_events[str(event_id)] = entry
+
+    return verified, candidates
 
 
 @dataclass
@@ -867,82 +1238,13 @@ def map_trajectory(
     event_by_id: dict[str, dict[str, Any]] = {}
     if audit_events is not None:
         event_by_id = {str(row.get("event_id")): row for row in audit_events}
-    verified: list[dict[str, Any]] = []
-    candidates: list[dict[str, Any]] = []
-    resolved_event_ids: set[str] = set()
-    for index, join in enumerate(joins or []):
-        call_id = join.get("call_id")
-        ref = join.get("audit_ref")
-        candidate = {
-            "call_id": call_id,
-            "audit_ref": ref,
-            "basis": join.get("basis") or join.get("note"),
-            "verified": False,
-            "problems": [],
-        }
-        if not isinstance(call_id, str) or not isinstance(ref, dict):
-            candidate["problems"].append("needs call_id + audit_ref")
-            candidates.append(candidate)
-            continue
-        if call_id not in calls or len(calls.get(call_id, [])) != 1:
-            candidate["problems"].append(f"call {call_id!r} is not a unique trace call")
-            candidates.append(candidate)
-            continue
-        event_id = ref.get("event_id")
-        event = event_by_id.get(str(event_id))
-        if audit_events is not None and event is None:
-            candidate["problems"].append(f"event {event_id!r} is not in the mapped audit events")
-            candidates.append(candidate)
-            continue
-        if event is not None:
-            for field in ("run_id", "instance_id", "dimension"):
-                value = join.get(field, ref.get(field))
-                if value is not None and value != event.get(field):
-                    candidate["problems"].append(
-                        f"{field}={value!r} does not match the event value {event.get(field)!r}"
-                    )
-            if ref.get("tick") is not None and ref.get("tick") != event.get("tick"):
-                candidate["problems"].append(
-                    f"tick={ref.get('tick')!r} does not match the event tick {event.get('tick')!r}"
-                )
-            if event.get("phase") != "agent":
-                candidate["problems"].append(f"event phase {event.get('phase')!r} is not agent")
-        proof = join.get("proof")
-        proof_ok = (
-            isinstance(proof, dict)
-            and isinstance(proof.get("producer"), str)
-            and bool(proof["producer"].strip())
-            and isinstance(proof.get("basis"), str)
-            and bool(proof["basis"].strip())
-            and isinstance(proof.get("clock"), str)
-            and bool(proof["clock"].strip())
-        )
-        if candidate["problems"]:
-            candidates.append(candidate)
-            continue
-        if not proof_ok:
-            candidate["problems"].append(
-                "no explicit proof (producer/basis/clock); kept as an unverified candidate"
-            )
-            candidates.append(candidate)
-            continue
-        full_ref = {
-            "run_id": event.get("run_id", run_id),
-            "instance_id": event.get("instance_id", instance_id),
-            "dimension": event.get("dimension"),
-            "event_id": event_id,
-            "tick": event.get("tick"),
-        }
-        verified.append(
-            {
-                "call_id": call_id,
-                "audit_ref": full_ref,
-                "verified": True,
-                "proof": proof,
-                "note": join.get("note"),
-            }
-        )
-        resolved_event_ids.add(str(event_id))
+    verified, candidates = _verify_execution_joins(
+        joins or [],
+        calls=calls,
+        results=results,
+        event_by_id=event_by_id,
+    )
+    resolved_event_ids = {str(row.get("audit_ref", {}).get("event_id")) for row in verified}
 
     if verified:
         joined_calls = {row["call_id"] for row in verified}
@@ -1450,7 +1752,12 @@ def assemble(
         evidence: dict[str, Any] = {}
         for kind, artifact in check_spec.artifacts.items():
             canonical = CANONICAL.get(kind)
-            if canonical is None or kind == "evidence_index":
+            if canonical is None:
+                continue
+            if kind == "evidence_index":
+                # written below; declare it so the gate sees the artifact, but
+                # never index it (its own hash is circular)
+                evidence[kind] = canonical
                 continue
             path = bundle / canonical
             if path.is_file() or path.is_dir():
@@ -1616,17 +1923,22 @@ class _Selftest:
 
 
 def _fixture_audit() -> list[dict[str, Any]]:
+    base = _iso_to_ms("2026-09-26T00:00:00Z") or 0
+
+    def at(seconds: float) -> int:
+        return int(base + seconds * 1000)
+
     return [
-        {"seq": 1, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
-        {"seq": 2, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready", "config": {"dimension": "minecraft:overworld"}},
-        {"seq": 3, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "init", "type": "phase", "from": "bootstrap", "to": "init"},
-        {"seq": 4, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}, "from": [0, 0, 0], "to": [0, 0, 0]},
-        {"seq": 5, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
-        {"seq": 6, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "targetInput": True, "agentOp": True, "requestSeq": 5, "attemptSeq": 4, "note": 0, "instrument": "harp"},
-        {"seq": 7, "tick": 30, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_tracked", "uuid": "cart-1", "epoch": 1, "inventory": []},
-        {"seq": 8, "tick": 40, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_exit", "uuid": "cart-1", "epoch": 1, "pos": [2.5, 60.0, 0.5]},
-        {"seq": 9, "tick": 80, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_remove", "uuid": "cart-1", "epoch": 1, "reason": "DISCARDED", "pos": [2.5, -70.0, 0.5], "capturedPath": "minecart_container_remove_before_drop", "inventory": [{"slot": 0, "id": "minecraft:stone", "count": 3}]},
-        {"seq": 10, "tick": 90, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete", "truncated": False},
+        {"seq": 1, "tick": 0, "wall": at(0), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
+        {"seq": 2, "tick": 0, "wall": at(0), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready", "config": {"dimension": "minecraft:overworld"}},
+        {"seq": 3, "tick": 10, "wall": at(1), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "init", "type": "phase", "from": "bootstrap", "to": "init"},
+        {"seq": 4, "tick": 20, "wall": at(8.2), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}, "from": [0, 0, 0], "to": [0, 0, 0]},
+        {"seq": 5, "tick": 20, "wall": at(8.3), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+        {"seq": 6, "tick": 21, "wall": at(8.4), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "targetInput": True, "agentOp": True, "requestSeq": 5, "attemptSeq": 4, "note": 0, "instrument": "harp"},
+        {"seq": 7, "tick": 30, "wall": at(8.6), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_tracked", "uuid": "cart-1", "epoch": 1, "inventory": []},
+        {"seq": 8, "tick": 40, "wall": at(9.0), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_exit", "uuid": "cart-1", "epoch": 1, "pos": [2.5, 60.0, 0.5]},
+        {"seq": 9, "tick": 80, "wall": at(9.5), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_remove", "uuid": "cart-1", "epoch": 1, "reason": "DISCARDED", "pos": [2.5, -70.0, 0.5], "capturedPath": "minecart_container_remove_before_drop", "inventory": [{"slot": 0, "id": "minecraft:stone", "count": 3}]},
+        {"seq": 10, "tick": 90, "wall": at(10), "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete", "truncated": False},
     ]
 
 
@@ -1640,6 +1952,8 @@ def _fixture_trajectory() -> list[dict[str, Any]]:
         {"record": "result", "call_id": "c3", "status": "ok", "result": "abc", "at": "2026-09-26T00:00:05Z"},
         {"record": "call", "call_id": "c4", "tool": "mcp_probe", "arguments": {"tool": "mc_state"}, "at": "2026-09-26T00:00:06Z", "phase": "prepare", "actor": "operator", "instance": "exp-1"},
         {"record": "result", "call_id": "c4", "status": "ok", "result": {"tick": 21}, "at": "2026-09-26T00:00:07Z"},
+        {"record": "call", "call_id": "c5", "tool": "bash", "arguments": {"command": "player Bot use once"}, "at": "2026-09-26T00:00:08Z", "phase": "experiment", "actor": "operator", "instance": "exp-1"},
+        {"record": "result", "call_id": "c5", "status": "ok", "result": "used", "at": "2026-09-26T00:00:09Z"},
     ]
 
 
@@ -1766,7 +2080,7 @@ def run_selftest(out: TextIO | None = None) -> int:
             _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=None, audit_events=rows
         )
         test.check("trace maps without gaps", not trace_gaps, str([g.as_json() for g in trace_gaps]))
-        test.equal("trace row count", len(trace_rows), 4)
+        test.equal("trace row count", len(trace_rows), 5)
         test.equal("trace categories present", {row["tool"] for row in trace_rows}, {"bash", "write", "git", "mcp_probe"})
         test.equal("trace keeps explicit instances", {row["instance_id"] for row in trace_rows}, {"exp-1", "src-1"})
         test.check("no joins means no trace-join doc", join_doc is None)
@@ -1812,26 +2126,134 @@ def run_selftest(out: TextIO | None = None) -> int:
         )
         test.check("trajectory run_id mismatch is a gap", any(gap.code == "run_id_mismatch" for gap in trace_gaps))
 
-        # joins: verified requires explicit proof ---------------------------------
-        unproven = [{"call_id": "c4", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld", "audit_ref": {"event_id": "s1:6", "tick": 21}, "basis": "nearest call"}]
+        # joins: receipts, causal commands and bounded chains only ---------------
+        join_rows = [
+            row
+            for row in rows
+            if row.get("event") in {"input_attempt", "input_processed", "cart_emitted", "cart_removed"}
+        ]
+
+        def fresh_joins() -> list[dict[str, Any]]:
+            return [
+                {
+                    "call_id": "c5", "run_id": "r1", "instance_id": "exp-1",
+                    "dimension": "minecraft:overworld",
+                    "audit_ref": {"event_id": "s1:4", "tick": 20},
+                    "proof": {"producer": "integration driver", "basis": "player use receipt",
+                              "clock": "wall inside the press call", "actor": "aaaa",
+                              "max_event_latency_ms": 2000},
+                },
+                {
+                    "call_id": "c5", "run_id": "r1", "instance_id": "exp-1",
+                    "dimension": "minecraft:overworld",
+                    "audit_ref": {"event_id": "s1:6", "tick": 21},
+                    "proof": {"producer": "integration driver", "basis": "attemptSeq 4 -> requestSeq 5",
+                              "clock": "wall inside the press call", "actor": "aaaa",
+                              "max_event_latency_ms": 2000},
+                },
+                {
+                    "call_id": "c5", "run_id": "r1", "instance_id": "exp-1",
+                    "dimension": "minecraft:overworld",
+                    "audit_ref": {"event_id": "s1:8", "tick": 40},
+                    "proof": {"kind": "chain", "producer": "integration driver",
+                              "basis": "input_processed s1:6 popped the cart", "clock": "tick chain",
+                              "derived_from_event_id": "s1:6", "rule": "input_to_emission",
+                              "max_tick_delta": 60},
+                },
+                {
+                    "call_id": "c5", "run_id": "r1", "instance_id": "exp-1",
+                    "dimension": "minecraft:overworld",
+                    "audit_ref": {"event_id": "s1:9", "tick": 80},
+                    "proof": {"kind": "chain", "producer": "integration driver",
+                              "basis": "cart_exit s1:8 fell into the void", "clock": "tick chain",
+                              "derived_from_event_id": "s1:8", "rule": "emission_to_removal",
+                              "max_tick_delta": 300},
+                },
+            ]
+
+        proven = fresh_joins()
         _, join_doc, join_gaps, candidates = map_trajectory(
-            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=unproven, audit_events=rows
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=proven, audit_events=join_rows
         )
-        test.check("unproven join has no gaps", not join_gaps)
-        test.check("unproven join is not verified", join_doc is None)
-        test.check("unproven join is a candidate", len(candidates) == 1 and not candidates[0]["verified"])
-        proven = [dict(unproven[0])]
-        proven[0]["proof"] = {"producer": "integration driver", "basis": "requestSeq 5 -> attemptSeq 4", "clock": "tick 21"}
-        _, join_doc, join_gaps, candidates = map_trajectory(
-            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=proven, audit_events=rows
+        test.check("proven joins have no gaps", not join_gaps)
+        test.check("direct and chained joins verify", join_doc is not None and len(join_doc["joins"]) == 4)
+        test.equal("all agent events are joined", join_doc["unmatched_agent_events"], 0)
+        test.check("proven joins leave no candidates", candidates == [])
+        direct = join_doc["joins"][0]
+        test.check(
+            "receipt is recomputed",
+            direct["proof"]["receipt"]["call_id"] == "c5"
+            and direct["proof"]["clock_bounds"]["command"] == "player Bot use once",
         )
-        test.check("proven join has no gaps", not join_gaps)
-        test.check("proven join is verified", join_doc is not None and len(join_doc["joins"]) == 1)
-        test.equal("verified join unmatched agent events", join_doc["unmatched_agent_events"], 5)
-        test.check("proven join leaves no candidates", candidates == [])
+        test.equal("chain inherits the press receipt", join_doc["joins"][2]["proof"]["receipt"]["call_id"], "c5")
+        test.equal("chain records the tick delta", join_doc["joins"][3]["proof"]["derived_from"]["tick_delta"], 40)
+
+        no_proof = fresh_joins()
+        for item in no_proof:
+            item.pop("proof", None)
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=no_proof, audit_events=join_rows
+        )
+        test.check("joins without proof stay unverified", join_doc is None and len(candidates) == 4)
+
+        read_command = fresh_joins()
+        read_command[0]["call_id"] = "c1"  # status: a read command
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=read_command, audit_events=join_rows
+        )
+        test.check("read command cannot attest an input", join_doc is None and len(candidates) == 4)
+
+        future = fresh_joins()
+        future[0]["proof"]["max_event_latency_ms"] = 0
+        future[0]["proof"]["clock"] = "claimed"
+        edited_rows = [dict(row) for row in join_rows]
+        next(row for row in edited_rows if row["event_id"] == "s1:4")["detail"] = {
+            **next(row for row in edited_rows if row["event_id"] == "s1:4")["detail"],
+            "wall": (_iso_to_ms("2026-09-26T00:00:09.500Z") or 0),
+        }
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=future, audit_events=edited_rows
+        )
+        test.check("future event beyond the declared latency fails closed", join_doc is None)
+
+        cross_scope = fresh_joins()
+        scoped_rows = [dict(row) for row in join_rows]
+        next(row for row in scoped_rows if row["event_id"] == "s1:4")["instance_id"] = "src-1"
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=cross_scope, audit_events=scoped_rows
+        )
+        test.check("cross-scope join fails closed", join_doc is None)
+
+        bad_chain = fresh_joins()
+        bad_chain[2]["proof"]["max_tick_delta"] = 5
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=bad_chain, audit_events=join_rows
+        )
+        test.check(
+            "out-of-bound chain delta fails closed",
+            join_doc is not None and join_doc["unmatched_agent_events"] == 2,
+        )
+
+        no_predecessor = fresh_joins()
+        no_predecessor.pop(1)  # drop the processed join the chain points at
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=no_predecessor, audit_events=join_rows
+        )
+        test.check(
+            "chain without a verified predecessor fails closed",
+            join_doc is not None and join_doc["unmatched_agent_events"] == 3,
+        )
+
+        wrong_actor = fresh_joins()
+        wrong_actor[0]["proof"]["actor"] = "bbbb"
+        _, join_doc, _, candidates = map_trajectory(
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=wrong_actor, audit_events=join_rows
+        )
+        test.check("actor mismatch fails closed", join_doc is None)
+
         bogus = [{"call_id": "c4", "audit_ref": {"tick": 21, "event_id": "nope"}, "proof": {"producer": "x", "basis": "y", "clock": "z"}}]
         _, join_doc, _, candidates = map_trajectory(
-            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=bogus, audit_events=rows
+            _fixture_trajectory(), run_id="r1", instance_id="exp-1", instance_ids=["src-1"], joins=bogus, audit_events=join_rows
         )
         test.check("unknown join event stays unverified", join_doc is None and len(candidates) == 1)
 

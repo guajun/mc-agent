@@ -887,6 +887,24 @@ def canonical_audit_rows(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
         if errors:
             raise SystemExit(f"cannot export {entry['path']}: {'; '.join(errors[:3])}")
 
+        # The canonical ordering is the raw file sequence (it survives server
+        # restarts); the canonical tick stays the *real* server tick so a
+        # consumer can see clock resets instead of an invented counter.
+        last_seq = -1
+        for event in events:
+            raw_seq = event.get("seq")
+            raw_tick = event.get("tick")
+            if not isinstance(raw_seq, int) or not isinstance(raw_tick, int):
+                raise SystemExit(
+                    f"{entry['path']}: event {raw_seq!r} has no integer seq/tick; "
+                    "refusing to invent an ordering"
+                )
+            if raw_seq <= last_seq:
+                raise SystemExit(
+                    f"{entry['path']}: seq {raw_seq} does not increase after {last_seq}"
+                )
+            last_seq = raw_seq
+
         # Bind the raw evidence to the declared identity instead of stamping
         # the CLI values over it: a foreign or relabelled event is refused.
         started = {str(event.get("session")) for event in events if event.get("type") == "session_start"}
@@ -958,6 +976,7 @@ def canonical_audit_rows(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
             identity = (entry["run_id"], entry["instance_id"], entry["dimension"])
             counters[identity] = counters.get(identity, 0) + 1
             index = counters[identity]
+            session = str(event.get("session") or "")
             canonical.update(
                 {
                     "event_id": f"{entry['run_id']}-{entry['instance_id']}-{index:06d}",
@@ -965,14 +984,17 @@ def canonical_audit_rows(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
                     "instance_id": entry["instance_id"],
                     "dimension": event.get("dim") or event.get("level") or entry["dimension"],
                     "phase": phase,
-                    "tick": index,
-                    "seq": index,
+                    "tick": event.get("tick"),
+                    "seq": event.get("seq"),
+                    "session": session,
                     "detail": {
                         "source_event": kind,
                         "server_tick": event.get("tick"),
                         "raw_seq": event.get("seq"),
                         "raw_phase": raw_phase,
-                        "session": event.get("session"),
+                        "session": session,
+                        "wall": event.get("wall"),
+                        "clock": f"{session or 'legacy'}:{event.get('tick')}",
                         "attempt_seq": event.get("attemptSeq"),
                         "request_seq": event.get("requestSeq"),
                         "region": event.get("region"),
@@ -1020,6 +1042,140 @@ def _negative_row(case: str, log: str) -> dict[str, Any]:
     }
 
 
+def derive_lifecycle(
+    events: list[dict[str, Any]],
+    *,
+    entry_sequences: list[dict[str, Any]] | None = None,
+    parent_tail: list[dict[str, Any]] | None = None,
+    status_path: Path | None = None,
+    flush_receipt: dict[str, Any] | None = None,
+    missing_log_probe: dict[str, Any] | None = None,
+    overflow_probe: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Derive the lifecycle artifact from the raw logs instead of a list.
+
+    ``ready``/``init``/``restore``/``experiment_start``/``experiment_end`` are
+    read from the actual ``audit_ready``/``phase`` events; ``flush`` needs the
+    status snapshot the flush command wrote (seq and phase must match the log
+    tail, and the receipt names the command that wrote it).
+    """
+    states: list[str] = []
+    per_session: dict[str, dict[str, Any]] = {}
+    evidence: dict[str, Any] = {}
+
+    def mark(state: str, event: dict[str, Any]) -> None:
+        if state not in states:
+            states.append(state)
+        key = f"{state}_evidence"
+        if key not in evidence:
+            evidence[key] = {
+                "seq": event.get("seq"),
+                "tick": event.get("tick"),
+                "session": event.get("session"),
+                "type": event.get("type"),
+                "from": event.get("from"),
+                "to": event.get("to"),
+            }
+
+    for event in events:
+        session = str(event.get("session") or "legacy")
+        summary = per_session.setdefault(
+            session, {"session": session, "states": [], "seq_start": event.get("seq"), "seq_end": event.get("seq")}
+        )
+        summary["seq_end"] = event.get("seq")
+        kind = event.get("type")
+        if kind == "audit_ready":
+            mark("ready", event)
+            if "ready" not in summary["states"]:
+                summary["states"].append("ready")
+        elif kind == "phase":
+            to = str(event.get("to") or "")
+            state = {
+                "init": "init",
+                "restore": "restore",
+                "experiment": "experiment_start",
+                "post": "experiment_end",
+                "end": "experiment_end",
+            }.get(to)
+            if state:
+                mark(state, event)
+                if state not in summary["states"]:
+                    summary["states"].append(state)
+
+    if not isinstance(flush_receipt, dict):
+        raise SystemExit(
+            "flush must be derived from a recorded /mcaudit flush receipt plus the status snapshot; "
+            "refusing to list it as a constant"
+        )
+    if status_path is None or not status_path.is_file():
+        raise SystemExit("flush evidence requires the status snapshot the flush wrote")
+    status = json.loads(status_path.read_text(encoding="utf-8"))
+    tail = (parent_tail or events)[-1] if (parent_tail or events) else {}
+    if status.get("seq") != tail.get("seq"):
+        raise SystemExit(
+            f"status seq {status.get('seq')!r} does not match the last event seq {tail.get('seq')!r}; "
+            "the flush snapshot is not this run's log tail"
+        )
+    if status.get("phase") != tail.get("phase"):
+        raise SystemExit(
+            f"status phase {status.get('phase')!r} does not match the last event phase {tail.get('phase')!r}"
+        )
+    if status.get("truncated") is True:
+        raise SystemExit("the flushed status reports a truncated log")
+    states.append("flush")
+
+    # Per-instance files plus append-only contiguity, both from the raw files.
+    # The frozen copies may share one collection directory; what matters is
+    # one distinct file and one distinct instance per exported log.
+    sequences = list(entry_sequences or [])
+    if not sequences:
+        raise SystemExit("lifecycle needs the per-file raw sequences")
+    paths = [str(item["path"]) for item in sequences]
+    instances = [str(item.get("instance_id") or "") for item in sequences]
+    per_instance = (
+        len(set(paths)) == len(sequences)
+        and len(set(instances)) == len(sequences)
+        and all(instances)
+    )
+    if not per_instance:
+        raise SystemExit(f"event logs are not one file per instance: {list(zip(paths, instances))}")
+    contiguous = all(item.get("contiguous") for item in sequences)
+    if not contiguous:
+        raise SystemExit(f"an event file is not append-only contiguous: {sequences}")
+    evidence["per_instance_files"] = {
+        "files": sequences,
+        "distinct_files": len(set(paths)),
+        "distinct_instances": len(set(instances)),
+    }
+    evidence["ring_buffer"] = {"files": sequences, "contiguous": contiguous}
+
+    if not isinstance(missing_log_probe, dict) or missing_log_probe.get("value") is not True:
+        raise SystemExit("missing_log_status needs the real missing-log detection probe")
+    if not isinstance(overflow_probe, dict) or overflow_probe.get("value") is not True:
+        raise SystemExit("overflow_status needs the real overflow probe")
+    evidence["missing_log_detection"] = missing_log_probe.get("evidence")
+    evidence["overflow_detection"] = overflow_probe.get("evidence")
+    evidence["flush"] = {
+        "command": flush_receipt.get("command"),
+        "call_id": flush_receipt.get("call_id"),
+        "output": flush_receipt.get("output"),
+        "status_path": str(status_path),
+        "status_sha256": hashlib.sha256(status_path.read_bytes()).hexdigest(),
+        "status_seq": status.get("seq"),
+        "status_phase": status.get("phase"),
+    }
+
+    return {
+        "states": states,
+        "per_instance_files": per_instance,
+        "ring_buffer_reliance": not contiguous,
+        "missing_log_status": "error",
+        "overflow_status": "error",
+        "sessions": [per_session[key] for key in sorted(per_session)],
+        "evidence": evidence,
+    }
+
+
 def cmd_export(args: argparse.Namespace) -> int:
     entries = _parse_event_specs(args.events)
     output = Path(args.out)
@@ -1056,40 +1212,90 @@ def cmd_export(args: argparse.Namespace) -> int:
     if not jar.is_file():
         raise SystemExit(f"--jar not found: {jar}")
     jar_sha = hashlib.sha256(jar.read_bytes()).hexdigest()
+
+    facts: dict[str, Any] = {}
+    if args.facts:
+        facts_path = Path(args.facts)
+        if not facts_path.is_file():
+            raise SystemExit(f"--facts not found: {facts_path}")
+        facts = json.loads(facts_path.read_text(encoding="utf-8"))
+        if not isinstance(facts, dict):
+            raise SystemExit("--facts must be a JSON object")
+
+    def derived_truth(name: str) -> bool:
+        entry = facts.get(name)
+        if isinstance(entry, dict) and "value" in entry:
+            return bool(entry["value"])
+        if isinstance(entry, bool):
+            return bool(entry)
+        if args.facts:
+            raise SystemExit(f"--facts must derive {name!r}; refusing a constant attestation")
+        return bool(getattr(args, name, False))
+
+    def derived_evidence(name: str) -> Any:
+        entry = facts.get(name)
+        return entry.get("evidence") if isinstance(entry, dict) else None
+
+    all_events: list[dict[str, Any]] = []
+    entry_sequences: list[dict[str, Any]] = []
+    for entry in entries:
+        events, errors = read_events(Path(entry["path"]))
+        if errors:
+            raise SystemExit(f"cannot read {entry['path']}: {'; '.join(errors[:3])}")
+        all_events.extend(events)
+        seqs = sorted(int(row["seq"]) for row in events if isinstance(row.get("seq"), int))
+        contiguous = bool(seqs) and seqs[0] <= 2 and seqs[-1] - seqs[0] + 1 == len(seqs)
+        entry_sequences.append({
+            "path": entry["path"],
+            "instance_id": entry["instance_id"],
+            "first_seq": seqs[0] if seqs else None,
+            "last_seq": seqs[-1] if seqs else None,
+            "events": len(seqs),
+            "contiguous": contiguous,
+        })
+    status_path = Path(args.status) if args.status else None
+    flush_receipt = facts.get("flush_receipt")
+    lifecycle = derive_lifecycle(
+        all_events or parent_events,
+        entry_sequences=entry_sequences,
+        parent_tail=parent_events,
+        status_path=status_path,
+        flush_receipt=flush_receipt,
+        missing_log_probe=facts.get("missing_log_detection"),
+        overflow_probe=facts.get("overflow_detection"),
+    )
+    (output / "audit-lifecycle.json").write_text(json.dumps(lifecycle, indent=2) + "\n", encoding="utf-8")
+
     manifest = {
         "mod_id": "mc-agent-minecart-audit",
         "version": args.version,
         "sha256": jar_sha,
         "read_only": True,
         "hook_overhead_ms": hook_overhead_ms(parent_events),
-        "fixture_behavior_unchanged": bool(args.fixture_behavior_unchanged),
-        "agent_mod_coexists": bool(args.agent_mod_coexists),
+        "hook_overhead_scope": "total session hook time across all hooks "
+                               "(sum of per-hook totalNanos / 1e6), not per-call or per-tick",
+        "hook_overhead_by_hook": next(
+            (event.get("hooks") for event in parent_events if event.get("type") == "audit_end"), {}
+        ),
+        "fixture_behavior_unchanged": derived_truth("fixture_behavior_unchanged"),
+        "agent_mod_coexists": derived_truth("agent_mod_coexists"),
         "no_command_blocks": True,
         "loaded_in": [item for item in args.loaded_in.split(",") if item],
         "hooks": (next((event.get("hooks") for event in parent_events if event.get("type") == "audit_end"), {})),
+        "fact_evidence": {
+            "fixture_behavior_unchanged": derived_evidence("fixture_behavior_unchanged"),
+            "agent_mod_coexists": derived_evidence("agent_mod_coexists"),
+            "facts_source": str(args.facts) if args.facts else "cli-flags (caller-derived)",
+        },
         "evidence": {
             "parent_log": parent_entries[0]["path"],
+            "parent_log_sha256": hashlib.sha256(Path(parent_entries[0]["path"]).read_bytes()).hexdigest(),
             "parent_verdict": parent_report["verdict"],
             "negative_logs": [row["evidence_ref"] for row in negatives],
         },
         "notes": dict(part.split("=", 1) for part in args.note if "=" in part),
     }
     (output / "test-mod-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
-
-    lifecycle = {
-        "states": ["ready", "init", "restore", "experiment_start", "experiment_end", "flush", "end"],
-        "missing_log_status": "error",
-        "overflow_status": "error",
-        "per_instance_files": True,
-        "ring_buffer_reliance": False,
-        "evidence": {
-            "missing_log": "verifier selftest missing_end -> incomplete; status-unconfigured.json on a bad config",
-            "overflow": "verifier selftest truncated -> incomplete; maxBytes sets audit_end.truncated",
-            "flush": "AuditLog flushes every event; /mcaudit flush writes the status snapshot",
-            "sessions": [session["id"] for session in parent_report["sessions"]],
-        },
-    }
-    (output / "audit-lifecycle.json").write_text(json.dumps(lifecycle, indent=2) + "\n", encoding="utf-8")
 
     provenance = {
         "exported_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
@@ -1153,6 +1359,17 @@ def build_parser() -> argparse.ArgumentParser:
     export.add_argument("--loaded-in", default="source_audit,experiment")
     export.add_argument("--fixture-behavior-unchanged", action="store_true")
     export.add_argument("--agent-mod-coexists", action="store_true")
+    export.add_argument(
+        "--facts",
+        default="",
+        help="JSON facts derived from the real run (behavior parity, coexistence, flush receipt); "
+        "required for an attestation",
+    )
+    export.add_argument(
+        "--status",
+        default="",
+        help="status-<run>.json the /mcaudit flush command wrote (lifecycle evidence)",
+    )
     export.add_argument("--interface-sha", default="")
     export.add_argument("--bridge-commit", default="")
     export.add_argument("--note", action="append", default=[], metavar="KEY=VALUE")
