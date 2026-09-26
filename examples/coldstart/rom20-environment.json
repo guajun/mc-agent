@@ -1,6 +1,11 @@
 {
   "schema": "mc-agent/rom20-environment/1",
-  "doc": "Fixed inputs for the meta20 (rom20) operator preparation. This file is tracked; it is operator setup, not agent context. The clean agent context is built from examples/coldstart/task-minecart-rom.md, the generated ENV.md and the generic minecraft-toolkit skill only.",
+  "doc": "Host-specific inputs for the meta20 (rom20) operator preparation. This file is tracked as a record of the host that prepared the historical run; it is operator setup, not agent context. On another checkout, copy it, set repo.root to that checkout, adjust the absolute paths and pass --env <file> (or set ROM20_ENV). The clean agent context is built from examples/coldstart/task-minecart-rom.md, the generated ENV.md and the generic minecraft-toolkit skill only.",
+  "host_specific": true,
+  "provenance": {
+    "prepared_source_revision": "1deb735ba0f0b2ff36533868fc5d91fab8546d09",
+    "note": "The historical rom20 environment was prepared from 1deb735 and the coordinator launched the agent with an explicit --session. This file does not claim that a later source revision executed that run."
+  },
   "repo": {
     "root": "F:/mc-agent-worktrees/rom13/coldstart",
     "branch": "codex/rom13-coldstart",
