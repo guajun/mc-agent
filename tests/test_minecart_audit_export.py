@@ -113,15 +113,35 @@ class LifecycleTests(unittest.TestCase):
         )
         return path
 
+    def _sequences(self, tmp: str) -> list[dict]:
+        return [
+            {
+                "path": str(Path(tmp) / "audit-r1.jsonl"),
+                "instance_id": "rom13-exp",
+                "first_seq": 1,
+                "last_seq": 12,
+                "events": 12,
+                "contiguous": True,
+            }
+        ]
+
+    def _probes(self) -> dict:
+        return {
+            "missing_log_probe": {"value": True, "evidence": {"case": "audit_missing"}},
+            "overflow_probe": {"value": True, "evidence": {"case": "truncated"}},
+        }
+
     def test_states_come_from_events_and_the_flushed_status(self) -> None:
         events = raw_events()
         with tempfile.TemporaryDirectory() as tmp:
             status = self._status(Path(tmp), events[-1])
             lifecycle = AUDIT.derive_lifecycle(
                 events,
+                entry_sequences=self._sequences(tmp),
                 parent_tail=events,
                 status_path=status,
                 flush_receipt={"call_id": "c9", "command": "mcaudit flush", "output": "mcaudit: flushed"},
+                **self._probes(),
             )
         self.assertEqual(
             set(lifecycle["states"]),
@@ -130,12 +150,44 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(lifecycle["per_instance_files"], True)
         self.assertFalse(lifecycle["ring_buffer_reliance"])
         self.assertEqual(lifecycle["evidence"]["flush"]["status_seq"], 12)
+        self.assertTrue(lifecycle["evidence"]["ring_buffer"]["contiguous"])
+
+    def test_non_contiguous_or_missing_probes_are_refused(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            status = self._status(Path(tmp), raw_events()[-1])
+            sequences = self._sequences(tmp)
+            sequences[0]["contiguous"] = False
+            with self.assertRaises(SystemExit):
+                AUDIT.derive_lifecycle(
+                    raw_events(),
+                    entry_sequences=sequences,
+                    parent_tail=raw_events(),
+                    status_path=status,
+                    flush_receipt={"call_id": "c9", "command": "mcaudit flush", "output": "ok"},
+                    **self._probes(),
+                )
+            with self.assertRaises(SystemExit):
+                AUDIT.derive_lifecycle(
+                    raw_events(),
+                    entry_sequences=self._sequences(tmp),
+                    parent_tail=raw_events(),
+                    status_path=status,
+                    flush_receipt={"call_id": "c9", "command": "mcaudit flush", "output": "ok"},
+                    missing_log_probe=None,
+                    overflow_probe={"value": True},
+                )
 
     def test_flush_without_a_receipt_is_refused(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             status = self._status(Path(tmp), raw_events()[-1])
             with self.assertRaises(SystemExit):
-                AUDIT.derive_lifecycle(raw_events(), status_path=status, flush_receipt=None)
+                AUDIT.derive_lifecycle(
+                    raw_events(),
+                    entry_sequences=self._sequences(tmp),
+                    status_path=status,
+                    flush_receipt=None,
+                    **self._probes(),
+                )
 
     def test_stale_status_snapshot_is_refused(self) -> None:
         events = raw_events()
@@ -146,9 +198,11 @@ class LifecycleTests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 AUDIT.derive_lifecycle(
                     events,
+                    entry_sequences=self._sequences(tmp),
                     parent_tail=events,
                     status_path=status,
                     flush_receipt={"call_id": "c9", "command": "mcaudit flush", "output": "ok"},
+                    **self._probes(),
                 )
 
 

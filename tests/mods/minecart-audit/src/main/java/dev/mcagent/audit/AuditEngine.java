@@ -69,6 +69,7 @@ public final class AuditEngine {
     private boolean pendingPlayNote;
     private long pendingPlayNotePos = 0L;
     private long pendingPlayNoteRequest = -1L;
+    private int pendingPlayNoteTick = -1;
 
     private AuditEngine(AuditConfig config, AuditLog log, Path auditDir) {
         this.config = config;
@@ -200,6 +201,8 @@ public final class AuditEngine {
                         "player",
                         request == null ? -1L : request.seq()));
                 if (pendingPlayNote
+                        && "useWithoutItem".equals(path)
+                        && pendingPlayNoteTick == serverTick
                         && pendingPlayNotePos == BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ())
                         && request != null
                         && request.seq() == pendingPlayNoteRequest) {
@@ -222,6 +225,13 @@ public final class AuditEngine {
         if (ended) {
             return;
         }
+        // An attack opens a new interaction: any pending play from an earlier
+        // interaction (attack or environment) must not be consumed by a later
+        // use callback. The attack's own playNote sets a fresh, unclaimed
+        // pending if the block event is not scheduled.
+        pendingPlayNote = false;
+        pendingPlayNoteRequest = -1L;
+        pendingPlayNoteTick = -1;
         long started = System.nanoTime();
         try {
             if (!(level instanceof ServerLevel)) {
@@ -289,7 +299,7 @@ public final class AuditEngine {
             }
             log.append(event);
             if (region != null) {
-                record(requests, new InputRecord(
+                InputRecord request = new InputRecord(
                         log.seq(),
                         serverTick,
                         "request",
@@ -300,7 +310,8 @@ public final class AuditEngine {
                         entity instanceof ServerPlayer serverPlayer ? serverPlayer.getUUID().toString() : null,
                         entity instanceof ServerPlayer serverPlayer ? serverPlayer.getScoreboardName() : null,
                         trigger,
-                        -1L));
+                        -1L);
+                record(requests, request);
                 boolean scheduled = true;
                 if (state.getBlock() instanceof NoteBlock) {
                     NoteBlockInstrument instrument = state.getValue(NoteBlock.INSTRUMENT);
@@ -309,11 +320,21 @@ public final class AuditEngine {
                 if (!scheduled) {
                     // Vanilla only calls blockEvent (triggerEvent) when the
                     // instrument works above the block or the block above is
-                    // air. Otherwise playNote is the server-side processing;
-                    // the matching attempt hook emits the processed event.
-                    pendingPlayNote = true;
-                    pendingPlayNotePos = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
-                    pendingPlayNoteRequest = log.seq();
+                    // air. Otherwise playNote is the server-side processing.
+                    if (entity == null) {
+                        // No attempt callback will follow a redstone/environment
+                        // play: record it immediately, never as an agent op and
+                        // never through a stale player pending.
+                        recordProcessed(state, level, pos, 0, 0, true, "playNote", region, true, request, null);
+                    } else {
+                        // A player play stays pending for the matching
+                        // useWithoutItem attempt (attack plays stay unclaimed
+                        // and are cleared by the next attack/use).
+                        pendingPlayNote = true;
+                        pendingPlayNotePos = BlockPos.asLong(pos.getX(), pos.getY(), pos.getZ());
+                        pendingPlayNoteRequest = request.seq();
+                        pendingPlayNoteTick = serverTick;
+                    }
                 }
             }
         } catch (Throwable error) {

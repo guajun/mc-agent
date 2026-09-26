@@ -108,6 +108,114 @@ def _uuid_from_nbt(value: Any) -> str:
     return f"{hexed[0:8]}-{hexed[8:12]}-{hexed[12:16]}-{hexed[16:20]}-{hexed[20:32]}"
 
 
+#: Source files whose bytes define the executable acceptance run.  Each phase
+#: records the actual bytes hash and the Git blob hash separately, so a CRLF
+#: checkout is visible as a distinct working-tree hash instead of a mismatch.
+TRACKED_SOURCE_FILES = (
+    "tools/stage1_fullgate.py",
+    "tools/stage1_gate.py",
+    "tools/stage1_evidence.py",
+    "tools/minecart_audit.py",
+    "tools/stage1_fullgate_summary.py",
+    "tests/mods/minecart-audit/src/main/java/dev/mcagent/audit/AuditEngine.java",
+    "tests/mods/minecart-audit/live_smoke.py",
+)
+
+
+def _git_bytes(*args: str) -> bytes:
+    result = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True)
+    return result.stdout
+
+
+def _file_provenance(relative: str) -> dict[str, Any]:
+    path = ROOT / relative
+    data = path.read_bytes() if path.is_file() else b""
+    blob = _git_bytes("cat-file", "-p", f"HEAD:{relative}")
+    normalized = data.replace(b"\r\n", b"\n")
+    return {
+        "bytes": len(data),
+        "actual_sha256": hashlib.sha256(data).hexdigest(),
+        "git_blob_sha256": hashlib.sha256(blob).hexdigest() if blob else None,
+        "crlf": b"\r\n" in data,
+        "normalized_matches_git_blob": blob == normalized if blob else None,
+    }
+
+
+def source_provenance() -> dict[str, Any]:
+    """The immutable source identity for one phase: HEAD, dirty state, bytes.
+
+    ``actual_sha256`` is the working-tree byte hash (CRLF included);
+    ``git_blob_sha256`` is the LF blob a reviewer can retrieve with
+    ``git cat-file``.  ``normalized_matches_git_blob`` says whether the
+    working-tree bytes are exactly the committed blob modulo line endings.
+    """
+    head = _git_bytes("rev-parse", "HEAD").decode("utf-8", errors="replace").strip()
+    dirty = [
+        line
+        for line in _git_bytes("status", "--porcelain", "--untracked-files=no")
+        .decode("utf-8", errors="replace")
+        .splitlines()
+        if line.strip()
+    ]
+    jars = {}
+    for key, path in (("audit", AUDIT_JAR), ("interface", INTERFACE_JAR)):
+        jars[key] = {
+            "path": str(path),
+            "bytes": path.stat().st_size if path.is_file() else 0,
+            "sha256": sha256_file(path) if path.is_file() else None,
+        }
+    return {
+        "head": head,
+        "dirty": dirty,
+        "clean": not dirty,
+        "branch": _git_bytes("rev-parse", "--abbrev-ref", "HEAD").decode("utf-8", errors="replace").strip(),
+        "files": {relative: _file_provenance(relative) for relative in TRACKED_SOURCE_FILES},
+        "jars": jars,
+        "lineEndingConvention": "CRLF working tree, LF Git blob"
+        if any(_file_provenance(relative)["crlf"] for relative in TRACKED_SOURCE_FILES)
+        else "LF",
+        "capturedAt": _now_iso_ms(),
+    }
+
+
+def require_clean_source(phase: str) -> dict[str, Any]:
+    """Refuse to start an authoritative phase on a dirty or stale worktree."""
+    provenance = source_provenance()
+    if not provenance["clean"] and os.environ.get("MC_AGENT_ALLOW_DIRTY") != "1":
+        raise RuntimeError(
+            f"the worktree is dirty before {phase}: {provenance['dirty'][:5]}; commit the source first "
+            "(or set MC_AGENT_ALLOW_DIRTY=1 for a deliberately recorded mixed run)"
+        )
+    if not provenance["head"]:
+        raise RuntimeError("the worktree has no Git HEAD; the run source would not be retrievable")
+    for relative, entry in provenance["files"].items():
+        if entry["normalized_matches_git_blob"] is False:
+            raise RuntimeError(
+                f"{relative} differs from its committed Git blob beyond line endings; "
+                "commit the source before running"
+            )
+    return provenance
+
+
+def close_phase(phase: str, before: dict[str, Any]) -> dict[str, Any]:
+    """Fail the phase if any tracked source file changed while it ran."""
+    after = source_provenance()
+    changed = [
+        relative
+        for relative, entry in before["files"].items()
+        if entry["actual_sha256"] != after["files"].get(relative, {}).get("actual_sha256")
+    ]
+    if after["head"] != before["head"] or changed or after["dirty"] != before["dirty"]:
+        raise RuntimeError(
+            f"the source changed while {phase} ran: head {before['head']} -> {after['head']}, "
+            f"files {changed}, dirty {len(before['dirty'])} -> {len(after['dirty'])}; this phase's "
+            "evidence mixes revisions and must not be used"
+        )
+    document = {"phase": phase, "before": before, "after": after, "changed": False}
+    write_json(EVIDENCE / "provenance" / f"{phase}.json", document)
+    return document
+
+
 def _now_iso_ms() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -938,6 +1046,7 @@ def control_parity(control_world: Path, run_id: str, audited: dict[str, Any]) ->
 
 
 async def live(args: argparse.Namespace) -> int:
+    provenance = require_clean_source("live")
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     LOGS.mkdir(parents=True, exist_ok=True)
     stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
@@ -1203,6 +1312,35 @@ async def live(args: argparse.Namespace) -> int:
             raise RuntimeError("guarded restore/verify failed")
         if int((verified or {}).get("verification", {}).get("matched") or 0) <= 0:
             raise RuntimeError(f"verify matched no entities: {verified}")
+        # Real post-restore probes instead of hardcoded restore-record flags.
+        frozen_before = rcon(EXP["name"], "tick query")
+        seat_probe = rcon(EXP["name"], "execute if entity @e[type=minecraft:armor_stand,tag=minecart-rom-fixture]")
+        cart_probe = rcon(
+            EXP["name"], "execute if entity @e[type=minecraft:chest_minecart,x=13,y=-53,z=-23,dx=3,dy=4,dz=3]"
+        )
+        frozen_after = rcon(EXP["name"], "tick query")
+        applied_result_probe = applied.get("result") or {}
+        verified_probe = verified.get("result") or {}
+        restore_flags = {
+            "chunks_loaded": "Test passed" in seat_probe and _parse_count(cart_probe) > 0,
+            "tick_controlled": "frozen" in frozen_before.lower() and "frozen" in frozen_after.lower(),
+            "pause_state_preserved": "frozen" in frozen_after.lower(),
+            "issued_is_not_success": int(applied_result_probe.get("issued") or 0) > 0
+            and int((verified_probe.get("verification") or {}).get("matched") or 0)
+            == int(applied_result_probe.get("count") or -1),
+            "evidence": {
+                "seat_probe": seat_probe.strip()[:200],
+                "cart_probe": cart_probe.strip()[:200],
+                "tick_query_before": frozen_before.strip()[:120],
+                "tick_query_after": frozen_after.strip()[:120],
+                "issued": applied_result_probe.get("issued"),
+                "count": applied_result_probe.get("count"),
+                "matched": (verified_probe.get("verification") or {}).get("matched"),
+            },
+        }
+        if not all(restore_flags[key] for key in ("chunks_loaded", "tick_controlled", "pause_state_preserved", "issued_is_not_success")):
+            raise RuntimeError(f"the real restore flag probes failed: {restore_flags}")
+        facts["stages"]["restore"]["flags"] = restore_flags
         after_copy = snapshots / "after"
         shutil.rmtree(after_copy, ignore_errors=True)
         after_copy.mkdir(parents=True)
@@ -1240,6 +1378,12 @@ async def live(args: argparse.Namespace) -> int:
         )
         (EVIDENCE / "audit-positive-check.log").write_text(positive_check.stdout + positive_check.stderr, encoding="utf-8")
         positive_report = json.loads(positive_check.stdout[positive_check.stdout.find("{"):]) if "{" in positive_check.stdout else {}
+        raw_positive = _read_audit(exp_log)
+        audit_end = next((row for row in raw_positive if row.get("type") == "audit_end"), {})
+        hooks_raw = audit_end.get("hooks") if isinstance(audit_end.get("hooks"), dict) else {}
+        hook_overhead_ms = round(
+            sum(float(entry.get("totalNanos") or 0) for entry in hooks_raw.values()) / 1_000_000.0, 3
+        ) if hooks_raw else None
         positive = {
             "runId": run_id,
             "log": str(exp_log),
@@ -1251,7 +1395,9 @@ async def live(args: argparse.Namespace) -> int:
             "flush": {"call_id": "audit-flush", "command": "mcaudit flush", "output": flush_output},
             "status": str(status_copy),
             "statusSha256": sha256_file(status_copy),
-            "hookOverheadMs": (positive_report.get("overhead_ms") if isinstance(positive_report, dict) else None),
+            "hookOverheadMs": hook_overhead_ms,
+            "hookOverheadScope": "total session hook time across all hooks (sum of per-hook totalNanos / 1e6)",
+            "hookCountersNanos": hooks_raw,
         }
         if positive_check.returncode != 0 or positive["verdict"] != "pass":
             raise RuntimeError(f"the restored-copy calibration did not pass: {positive_report}")
@@ -1310,13 +1456,14 @@ async def live(args: argparse.Namespace) -> int:
             json.dumps(facts, indent=2) + "\n", encoding="utf-8"
         )
         return 1
+    facts["provenance"] = {"source": provenance, "phase": close_phase("live", provenance)}
     write_json(EVIDENCE / "facts-live.json", facts)
     say(f"live: run {run_id} completed")
     return 0
 
 
 def run_negatives(rec: Recorder, run_id: str) -> dict[str, Any]:
-    """Four no-operation negatives on a disposable void lab via the live_smoke helpers."""
+    """The four gate negatives plus attack/environment extras and the mixed-trigger regression."""
     import importlib.util
 
     spec = importlib.util.spec_from_file_location("live_smoke", ROOT / "tests" / "mods" / "minecart-audit" / "live_smoke.py")
@@ -1336,6 +1483,10 @@ def run_negatives(rec: Recorder, run_id: str) -> dict[str, Any]:
         ("wrong_position", live_smoke.scenario_wrong_position),
         ("marker_only", live_smoke.scenario_marker_only),
         ("answer_only", live_smoke.scenario_answer_only),
+        # extras beyond the gate's four: an attack-only punch and a redstone
+        # trigger must still not count as an agent operation.
+        ("attack_only", live_smoke.scenario_attack_only),
+        ("environment_only", live_smoke.scenario_environment_only),
     ]
     for case, function in scenarios:
         neg_run = f"{run_id}-neg-{case}"
@@ -1343,6 +1494,14 @@ def run_negatives(rec: Recorder, run_id: str) -> dict[str, Any]:
             result[case] = function("rom13-neg", neg_run, "rom13-neg")
         except BaseException as error:  # noqa: BLE001
             result[case] = {"error": f"{type(error).__name__}: {error}"}
+    # mixed-trigger regression: punch then use in the same window must yield
+    # exactly one processed operation (the use), never a stale double count
+    try:
+        result["attack_then_use"] = live_smoke.scenario_attack_then_use(
+            "rom13-neg", f"{run_id}-neg-attack_then_use", "rom13-neg"
+        )
+    except BaseException as error:  # noqa: BLE001
+        result["attack_then_use"] = {"error": f"{type(error).__name__}: {error}"}
     run([PY, LAB_SERVER, "stop", "--name", "rom13-neg", "--timeout", "120"], check=False)
     return result
 
@@ -1357,6 +1516,7 @@ def ensure_bridge_path() -> None:
 
 
 async def identity_phase(args: argparse.Namespace) -> int:
+    provenance = require_clean_source("identity")
     """Emit the player_context artifact from the live identity probe.
 
     The probe ran on the restored machine with the player parked on the
@@ -1392,6 +1552,7 @@ async def identity_phase(args: argparse.Namespace) -> int:
         "bridge": {"repo": "guajun/mc-agent-bridge", "commit": BRIDGE_MERGED, "tested": True},
     })
     write_json(EVIDENCE / "facts-identity.json", {"records": len(records), "path": str(target)})
+    close_phase("identity", provenance)
     say(f"identity: wrote {len(records)} live records to {target}")
     return 0
 
@@ -1497,6 +1658,7 @@ def _docs_visible_probe(paths: Sequence[str]) -> tuple[list[str], dict[str, Any]
 
 
 async def devcap_phase(args: argparse.Namespace) -> int:
+    provenance = require_clean_source("devcap")
     if str(BRIDGE_SOURCE / "src") not in sys.path:
         sys.path.insert(0, str(BRIDGE_SOURCE / "src"))
     facts = read_json(EVIDENCE / "facts-live.json")
@@ -1799,10 +1961,17 @@ async def devcap_phase(args: argparse.Namespace) -> int:
     with target.joinpath("instance-isolation.jsonl").open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row) + chr(10))
+    close_phase("devcap", provenance)
     write_json(EVIDENCE / "facts-devcap.json", {
         "markerLoaded": marker_loaded, "preflightExit": preflight.returncode,
         "memoryRebuilt": bool(memory_rebuilt), "expectedEntities": expected_entities,
         "matchedEntities": matched_entities, "conflictRejected": conflict_rejected,
+        "smokeJar": {"sha256": deployed_v2, "bytes": bytes_v2, "path": str(v2_jar)},
+        "probeFlags": {
+            "build_errors_detected": probes["build_errors_detected"]["detected"],
+            "load_failure_detected": probes["load_failure_detected"]["detected"],
+            "missing_dependency_detected": probes["missing_dependency_detected"]["detected"],
+        },
     })
     say(f"devcap: probes ok, v1={deployed_v1[:12]} v2={deployed_v2[:12]} memory matched={matched_entities}")
     return 0
@@ -1812,6 +1981,7 @@ async def devcap_phase(args: argparse.Namespace) -> int:
 
 
 def trace_phase(args: argparse.Namespace) -> int:
+    provenance = require_clean_source("trace")
     facts = read_json(EVIDENCE / "facts-live.json")
     bundle = EVIDENCE / "bundle"
     run_dir = Path(facts["runDir"])
@@ -1838,11 +2008,47 @@ def trace_phase(args: argparse.Namespace) -> int:
     with (trace_dir / "missing-log-detection.jsonl").open("w", encoding="utf-8") as handle:
         for row in detections:
             handle.write(json.dumps(row) + chr(10))
+    # Real overflow probe: a syntactically valid log whose audit_end reports a
+    # truncated stream must make the verifier refuse a pass.
+    overflow_dir = EVIDENCE / "overflow-probe"
+    overflow_dir.mkdir(parents=True, exist_ok=True)
+    overflow_log = overflow_dir / "audit-truncated.jsonl"
+    overflow_rows = [
+        {"seq": 1, "tick": 0, "run": "overflow-probe", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
+        {"seq": 2, "tick": 0, "run": "overflow-probe", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready"},
+        {"seq": 3, "tick": 10, "run": "overflow-probe", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "incomplete", "truncated": True, "bytes": 999999, "incompleteReasons": ["maxBytes"]},
+    ]
+    overflow_log.write_text("".join(json.dumps(row) + chr(10) for row in overflow_rows), encoding="utf-8")
+    overflow_check = run(
+        [PY, ROOT / "tools" / "minecart_audit.py", "check", "--log", str(overflow_log), "--json"],
+        check=False, timeout=120,
+    )
+    overflow_text = overflow_check.stdout + overflow_check.stderr
+    (overflow_dir / "overflow-check.log").write_text(overflow_text, encoding="utf-8")
+    overflow_report = {}
+    if "{" in overflow_check.stdout:
+        try:
+            overflow_report = json.loads(overflow_check.stdout[overflow_check.stdout.find("{"):])
+        except ValueError:
+            overflow_report = {}
+    overflow_detected = overflow_check.returncode != 0 or str(overflow_report.get("verdict")) not in ("pass",)
+    if not overflow_detected:
+        raise RuntimeError(f"the truncated-log overflow probe passed the verifier: {overflow_report}")
     write_json(EVIDENCE / "facts-trace.json", {
-        "agentEvents": len(agent_events),
+        "experimentPhaseRows": len(agent_events),
+        "canonicalAgentEventsNote": "canonical agent events are counted by the compose export; "
+                                    "experimentPhaseRows counts raw experiment-phase rows incl. samples",
         "detections": detections,
         "missingLogDetected": all(row["detected"] for row in detections),
+        "overflowDetected": overflow_detected,
+        "overflowProbe": {
+            "log": str(overflow_log),
+            "exit": overflow_check.returncode,
+            "verdict": overflow_report.get("verdict"),
+            "message_ref": str(overflow_dir / "overflow-check.log"),
+        },
     })
+    close_phase("trace", provenance)
     say(f"trace: {len(agent_events)} agent events, missing-log detection={all(r['detected'] for r in detections)}")
     return 0
 
@@ -1851,6 +2057,7 @@ def trace_phase(args: argparse.Namespace) -> int:
 
 
 def smoke_phase(args: argparse.Namespace) -> int:
+    provenance = require_clean_source("smoke")
     bundle = EVIDENCE / "bundle"
     facts = read_json(EVIDENCE / "facts-live.json")
     target = bundle / "artifacts" / "smoke_fixture_validity"
@@ -1888,6 +2095,7 @@ def smoke_phase(args: argparse.Namespace) -> int:
     if any(suite["status"] != "pass" for suite in suites):
         raise RuntimeError(f"a smoke suite is not pass: {[s for s in suites if s['status'] != 'pass']}")
     write_json(target / "smoke-report.json", {"suites": suites})
+    close_phase("smoke", provenance)
 
     # fixture calibration from the accepted spec plus the live like-for-like
     # parity run (same copied world, same presses, no audit mod)
@@ -1920,6 +2128,8 @@ def smoke_phase(args: argparse.Namespace) -> int:
         "end_condition": spec["scene"]["end_condition"],
         "timeout_s": int(spec["scene"]["timeout_seconds"]),
         "hook_overhead_ms": hook_overhead_ms,
+        "hook_overhead_scope": "total session hook time across all hooks "
+                               "(sum of per-hook totalNanos / 1e6), not per-call or per-tick",
         "with_mod_without_mod_consistent": True,
         "detail": {
             "spec": str(FIXTURE_SPEC),
@@ -1955,6 +2165,7 @@ def smoke_phase(args: argparse.Namespace) -> int:
 
 
 def compose_phase(args: argparse.Namespace) -> int:
+    provenance = require_clean_source("compose")
     import stage1_evidence as evidence
 
     facts = read_json(EVIDENCE / "facts-live.json")
@@ -1974,6 +2185,7 @@ def compose_phase(args: argparse.Namespace) -> int:
     positives = facts["stages"]["positive"]
     child = facts["stages"]["sourceChild"]
     trace_facts = read_json(EVIDENCE / "facts-trace.json") if (EVIDENCE / "facts-trace.json").is_file() else {}
+    devcap = read_json(EVIDENCE / "facts-devcap.json") if (EVIDENCE / "facts-devcap.json").is_file() else {}
     control = facts["stages"]["control"]
     capability = {
         "control_parity": (control.get("control") or {}).get("observations"),
@@ -1998,9 +2210,12 @@ def compose_phase(args: argparse.Namespace) -> int:
                 "restored_entities": facts["stages"]["restore"].get("matched"),
                 "interface_sha256": INTERFACE_SHA,
                 "audit_jar_sha256": sha256_file(AUDIT_JAR),
+                "smoke_mod": (devcap.get("smokeJar") or {}),
+                "smoke_mod_probe_flags": devcap.get("probeFlags"),
                 "calibration": positives.get("calibration", {}).get("observations"),
-                "note": "the interface mod and the audit mod loaded together while the restored machine "
-                        "was operated by the real fixture player and a cart exited and was removed",
+                "note": "the self-built smoke mod, the interface mod and the audit mod were loaded together "
+                        "while the restored machine was operated by the real fixture player and a cart exited "
+                        "and was removed",
             },
         },
         "missing_log_detection": {
@@ -2008,8 +2223,8 @@ def compose_phase(args: argparse.Namespace) -> int:
             "evidence": trace_facts.get("detections"),
         },
         "overflow_detection": {
-            "value": True,
-            "evidence": {"truncated": False, "source": positives["log"]},
+            "value": bool(trace_facts.get("overflowDetected")),
+            "evidence": trace_facts.get("overflowProbe"),
         },
         "flush_receipt": positives["flush"],
     }
@@ -2032,10 +2247,25 @@ def compose_phase(args: argparse.Namespace) -> int:
         "wrong_position": "wrong_position",
         "marker_only": "marker_only",
         "answer_only": "answer_only",
+        "attack_only": "attack_only",
+        "environment_only": "environment_only",
     }
     for key, case in negatives.items():
         log = LABS / "rom13-neg" / "mc-audit" / f"audit-{facts['runId']}-neg-{key}.jsonl"
         export_cmd += ["--negative", f"{case}={log}"]
+    # mixed-trigger regression stays a supporting probe (it passes the
+    # verifier because the use is a real operation); assert the raw count.
+    mixed = (facts["stages"].get("negatives") or {}).get("attack_then_use") or {}
+    if not mixed.get("exactly_one_processed"):
+        raise RuntimeError(f"attack-then-use mixed-trigger regression failed: {mixed}")
+    mixed_log = Path(str(mixed.get("log") or ""))
+    if mixed_log.is_file():
+        mixed_copy = EVIDENCE / "audit" / f"attack-then-use-{facts['runId']}.jsonl"
+        shutil.copyfile(mixed_log, mixed_copy)
+        mixed["logCopy"] = str(mixed_copy)
+        mixed["logCopySha256"] = sha256_file(mixed_copy)
+        facts["stages"]["negatives"]["attack_then_use"] = mixed
+        write_json(EVIDENCE / "facts-live.json", facts)
     exported = run(export_cmd, check=False, timeout=600)
     (EVIDENCE / "audit-export.log").write_text(exported.stdout + exported.stderr, encoding="utf-8")
     if exported.returncode != 0:
@@ -2059,22 +2289,28 @@ def compose_phase(args: argparse.Namespace) -> int:
     if not isinstance(duplicates, int):
         duplicates = 0
     failed_commands = applied_result.get("failed") or []
+    restore_flags = restore.get("flags") or {}
+    for key in ("chunks_loaded", "tick_controlled", "pause_state_preserved", "issued_is_not_success"):
+        if not restore_flags.get(key):
+            raise RuntimeError(f"the real restore flag probe {key!r} is missing or false: {restore_flags}")
     write_json(target / "restore-record.json", {
         "endpoint": {"source": "rom13-src", "target": "rom13-exp",
                      "target_resolved": bool(restore["applied"].get("ok")),
                      "wrong_target_rejected": any(r["case"] == "wrong_endpoint" and r["passed"] for r in facts["failureCases"])},
         "dimension": applied_result.get("dimension") or "minecraft:overworld",
-        "chunks_loaded": True,
-        "tick_controlled": True,
+        "chunks_loaded": bool(restore_flags["chunks_loaded"]),
+        "tick_controlled": bool(restore_flags["tick_controlled"]),
         "duplicates_pre_existing": duplicates,
         "commands_issued": int(applied_result.get("issued", 0) or 0),
         "commands_failed": len(failed_commands),
         "partial_failure": bool(applied_result.get("partial")),
-        "pause_state_preserved": True,
-        "issued_is_not_success": True,
+        "pause_state_preserved": bool(restore_flags["pause_state_preserved"]),
+        "issued_is_not_success": bool(restore_flags["issued_is_not_success"]),
+        "flags_evidence": restore_flags.get("evidence"),
         "detail": {"applied": restore["applied"], "verified": restore["verified"],
                    "restored": applied_result.get("count"),
-                   "tick_control": "tick freeze before restore; tick unfreeze after verify"},
+                   "tick_control": "tick freeze before restore; tick unfreeze after verify",
+                   "flag_probes": "post-restore entity visibility + tick query + issued/matched counts"},
     })
     source_before = facts.get("sourceWorldBefore") or {}
     source_after = facts.get("sourceWorldAfter") or {}
@@ -2282,6 +2518,7 @@ def compose_phase(args: argparse.Namespace) -> int:
             spec["checks"][check_spec.id] = {"evidence": entry}
     report = evidence.assemble(bundle, spec, run_gate=True, source_world_override=str(SOURCE_SAVE))
     write_json(EVIDENCE / "gate-report.json", report)
+    close_phase("compose", provenance)
     gate = report.get("gate") or {}
     say(f"gate: {gate.get('overall')} (exit {report.get('gate_exit_code')})")
     for check in gate.get("checks", []):

@@ -1045,9 +1045,12 @@ def _negative_row(case: str, log: str) -> dict[str, Any]:
 def derive_lifecycle(
     events: list[dict[str, Any]],
     *,
+    entry_sequences: list[dict[str, Any]] | None = None,
     parent_tail: list[dict[str, Any]] | None = None,
     status_path: Path | None = None,
     flush_receipt: dict[str, Any] | None = None,
+    missing_log_probe: dict[str, Any] | None = None,
+    overflow_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Derive the lifecycle artifact from the raw logs instead of a list.
 
@@ -1120,6 +1123,27 @@ def derive_lifecycle(
     if status.get("truncated") is True:
         raise SystemExit("the flushed status reports a truncated log")
     states.append("flush")
+
+    # Per-instance files plus append-only contiguity, both from the raw files.
+    sequences = list(entry_sequences or [])
+    if not sequences:
+        raise SystemExit("lifecycle needs the per-file raw sequences")
+    parents = {str(Path(item["path"]).parent) for item in sequences}
+    per_instance = len(parents) == len(sequences)
+    if not per_instance:
+        raise SystemExit(f"event logs are not per-instance files: {sorted(parents)}")
+    contiguous = all(item.get("contiguous") for item in sequences)
+    if not contiguous:
+        raise SystemExit(f"an event file is not append-only contiguous: {sequences}")
+    evidence["per_instance_files"] = {"files": sequences, "distinct_log_dirs": len(parents)}
+    evidence["ring_buffer"] = {"files": sequences, "contiguous": contiguous}
+
+    if not isinstance(missing_log_probe, dict) or missing_log_probe.get("value") is not True:
+        raise SystemExit("missing_log_status needs the real missing-log detection probe")
+    if not isinstance(overflow_probe, dict) or overflow_probe.get("value") is not True:
+        raise SystemExit("overflow_status needs the real overflow probe")
+    evidence["missing_log_detection"] = missing_log_probe.get("evidence")
+    evidence["overflow_detection"] = overflow_probe.get("evidence")
     evidence["flush"] = {
         "command": flush_receipt.get("command"),
         "call_id": flush_receipt.get("call_id"),
@@ -1132,8 +1156,8 @@ def derive_lifecycle(
 
     return {
         "states": states,
-        "per_instance_files": True,
-        "ring_buffer_reliance": False,
+        "per_instance_files": per_instance,
+        "ring_buffer_reliance": not contiguous,
         "missing_log_status": "error",
         "overflow_status": "error",
         "sessions": [per_session[key] for key in sorted(per_session)],
@@ -1202,22 +1226,33 @@ def cmd_export(args: argparse.Namespace) -> int:
         return entry.get("evidence") if isinstance(entry, dict) else None
 
     all_events: list[dict[str, Any]] = []
+    entry_sequences: list[dict[str, Any]] = []
     for entry in entries:
         events, errors = read_events(Path(entry["path"]))
-        if not errors:
-            all_events.extend(events)
+        if errors:
+            raise SystemExit(f"cannot read {entry['path']}: {'; '.join(errors[:3])}")
+        all_events.extend(events)
+        seqs = sorted(int(row["seq"]) for row in events if isinstance(row.get("seq"), int))
+        contiguous = bool(seqs) and seqs[0] <= 2 and seqs[-1] - seqs[0] + 1 == len(seqs)
+        entry_sequences.append({
+            "path": entry["path"],
+            "instance_id": entry["instance_id"],
+            "first_seq": seqs[0] if seqs else None,
+            "last_seq": seqs[-1] if seqs else None,
+            "events": len(seqs),
+            "contiguous": contiguous,
+        })
     status_path = Path(args.status) if args.status else None
     flush_receipt = facts.get("flush_receipt")
     lifecycle = derive_lifecycle(
         all_events or parent_events,
+        entry_sequences=entry_sequences,
         parent_tail=parent_events,
         status_path=status_path,
         flush_receipt=flush_receipt,
+        missing_log_probe=facts.get("missing_log_detection"),
+        overflow_probe=facts.get("overflow_detection"),
     )
-    missing_log = facts.get("missing_log_detection") if isinstance(facts, dict) else None
-    if not isinstance(missing_log, dict) or missing_log.get("value") is not True:
-        raise SystemExit("--facts must prove missing-log detection (value true) for the lifecycle artifact")
-    lifecycle["evidence"]["missing_log_detection"] = missing_log.get("evidence")
     (output / "audit-lifecycle.json").write_text(json.dumps(lifecycle, indent=2) + "\n", encoding="utf-8")
 
     manifest = {
@@ -1226,6 +1261,11 @@ def cmd_export(args: argparse.Namespace) -> int:
         "sha256": jar_sha,
         "read_only": True,
         "hook_overhead_ms": hook_overhead_ms(parent_events),
+        "hook_overhead_scope": "total session hook time across all hooks "
+                               "(sum of per-hook totalNanos / 1e6), not per-call or per-tick",
+        "hook_overhead_by_hook": next(
+            (event.get("hooks") for event in parent_events if event.get("type") == "audit_end"), {}
+        ),
         "fixture_behavior_unchanged": derived_truth("fixture_behavior_unchanged"),
         "agent_mod_coexists": derived_truth("agent_mod_coexists"),
         "no_command_blocks": True,

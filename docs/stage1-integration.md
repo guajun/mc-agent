@@ -43,7 +43,7 @@ The review-fix pass used run id `rom13-fullgate-20260926T011803Z`:
 | `agent_dev_capability` | pass | real probe flags, jar update `227d7a91…` -> `2f042c13…` loaded, post-restart memory verify, preflight-derived tools, refused conflict |
 | `independent_test_mod` | pass | 10 canonical events (2 instances), `input_processed` via the real `playNote` path, `cart_removed` reason `DISCARDED`, four failing negatives, passing source child |
 | `trace_persistence` | pass | 60 finalized calls, 10 verified joins (6 direct receipts + 4 bounded chains), 0 unmatched agent events, 0 gaps |
-| `smoke_fixture_validity` | pass | five suites, 9-component version lock, no-mod parity, hook overhead 101.99 ms from the raw counters |
+| `smoke_fixture_validity` | pass | five suites, 9-component version lock, no-mod parity, hook overhead 101.99 ms **total session hook time** from the raw counters |
 | `evidence_integrity` | pass | 27 pinned index entries, source world `8cd54c86…` observed unchanged before and after |
 
 ```bash

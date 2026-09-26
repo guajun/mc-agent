@@ -133,6 +133,15 @@ session: the byte counter is seeded from the existing file size, so a run
 restarted several times cannot reset the budget. Overflow sets `truncated` and
 the verifier treats the run as incomplete.
 
+`hook_overhead_ms` in the gate manifest is the **total session hook time**
+(sum of every hook's `totalNanos` divided by 1e6); the per-hook
+calls/total/max/avg/errors live in the same manifest under
+`hook_overhead_by_hook` (`audit_end.hooks`), so the figure cannot be read as
+per-call or per-tick.  The mixed-trigger regression
+(`scenario_attack_then_use`) punches the note block and then uses it within
+the correlation window: the use must be the only `input_processed`, and a
+punch's unscheduled play must never be consumed by a later use callback.
+
 Key event types:
 
 | Type | Meaning |

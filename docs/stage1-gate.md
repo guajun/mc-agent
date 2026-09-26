@@ -289,7 +289,6 @@ cross-checked against `version_lock.test-mod`), `read_only` (true),
 | `dimension` | s | must equal the declared `dimension` of that `instance_id` |
 | `tick` | i | >= 0; the real server tick, which may reset across a restart |
 | `seq` | i | >= 0; strictly increasing per `run_id/instance_id/dimension` (the append sequence is the ordering key) |
-| `seq` | i | >= 0; equal/colliding pairs fail, they cannot establish ordering |
 | `event` | s | see below |
 | `phase` | s | `init`, `agent` or `restore`; `agent` events must belong to the parent run |
 | `actor_uuid` | s/null | required key on `input_attempt`/`input_processed`: the bound task-player UUID, or `null` with a non-empty `actor_provenance` explaining the absence |
