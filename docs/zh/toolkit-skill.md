@@ -120,5 +120,5 @@ hermes skills list                  # minecraft-toolkit | （无分类）| local
 ## 下一步：Hermes 无人值守
 
 Skill 只是事件驱动方案的一半。另一半是用户在 Hermes Gateway 里配置的 webhook
-route：它加载这份 Skill，并把 route 限制到 Bridge MCP toolset。见
+route：它加载这份 Skill，并把 route 限制到 Toolkit MCP toolset。见
 [Hermes 无人值守：webhook + Toolkit Skill](hermes-unattended.md)。

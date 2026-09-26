@@ -1,195 +1,115 @@
 # Installation
 
-What to install, in what order, and how to tell that it worked. The
-[Getting started](getting-started.md) page is the tour; this one is the
-reference you come back to when something is off.
+[中文](https://guajun.github.io/mc-agent/zh/install/)
 
-Nothing here needs a compiler toolchain beyond a JDK, and nothing installs
-system-wide.
+[Getting started](getting-started.md) is the shortest working path. This page
+records versions, placement, discovery and removal.
 
-## What you need
+## Requirements and placement
 
-| Piece | Needed for | Where it goes |
+| Component | Requirement | Runs on |
 | --- | --- | --- |
-| **Minecraft 26.2** with **Fabric Loader 0.19+** and **Fabric API** | everything | your instance |
-| **Java 25** | building the mod, and running a lab server | the JDK you point `--jdk` at; the game's own runtime is fine for the game |
-| **Python 3.11+** | bridge, loop, tools | a virtual environment next to the repos |
-| **interface mod jar** | everything | `<instance>/mods/` |
-| **an agent runtime** | the agent's mind - [Hermes](hermes-setup.md), or anything that speaks MCP/HTTP; install the portable [Toolkit Skill](toolkit-skill.md) so it knows how to use the server-vantage Toolkit | its own directory |
-| **a Fabric server** (optional) | the isolated-lab track | `labs/<name>/`, provisioned by `tools/lab_server.py` |
+| Fabric mod | Minecraft 26.2, Fabric Loader 0.19+, Fabric API, Java 25 | dedicated server or single-player integrated server |
+| Toolkit (`mc-agent-bridge`) | Python 3.11+ | the same machine as the mod endpoint and Harness |
+| Harness | MCP support or permission to run the CLI | the same machine as the Toolkit |
 
-## 1. Minecraft and Fabric
+Keeping the mod socket and Toolkit API on loopback is a deployment assumption,
+not an inconvenience to work around. Do not expose either game-control port to
+the Internet.
 
-Use a Fabric instance for 26.2 with **Fabric API** in `mods/`. Two details
-matter later:
+## Fabric mod
 
-* the mod writes its state into the **game directory** of the instance
-  (`<gameDir>/mc-agent/`), which with per-version isolation is the version
-  folder, not `.minecraft`;
-* building the mod reads that instance's `libraries/` and
-  `.fabric/processedMods/`, so **start the game once** before building.
-
-## 2. The interface mod
-
-### Where it runs
-
-One jar, two entrypoints, and Fabric loads whichever matches:
-
-| Entrypoint | Runs in | Serves |
-| --- | --- | --- |
-| `client` | any client | what that client sees and can do: screens, opening a save, publishing to the LAN |
-| `main` | any server - **including the integrated server inside a single-player world** | authoritative state, console commands, snapshots |
-
-**Single player gets both**, at the same time, in the same process: the client
-vantage on `mcagent.port` (25580) and the server vantage on `mcagent.serverPort`
-(25581). That is the whole reason the fork workflow works without a dedicated
-server - you can snapshot an authoritative world while you are playing it.
-The two write to different places: `<gameDir>/mc-agent/` and
-`mc-agent-server/` (or wherever `-Dmcagent.dir` / `-Dmcagent.serverDir` point).
-
-Two things to keep in mind when both run in one process: `tick freeze` freezes
-the world you are playing in, and anything expensive you run in the server
-vantage shares the frame budget of your client.
-
-```bash
+~~~powershell
 git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py \
-    --minecraft-dir "C:/Users/me/AppData/Roaming/.minecraft" \
-    --version 26.2-Fabric \
-    --jdk "C:/Program Files/Java/jdk-25"
-```
+python mc-agent-interface-mod/build.py --minecraft-dir <instance> --version 26.2-Fabric --jdk <jdk25>
+~~~
 
-The result is `dist/mc-agent-interface-<version>.jar`. Copy it next to Fabric
-API in `<instance>/mods/` and start the game. It worked when the log says:
+Copy the built jar and Fabric API into the server or client instance's
+**mods/** directory. The same jar has client and server entrypoints. The
+Toolkit uses the server entrypoint by default, including the integrated server
+in a single-player world.
 
-```
-[mc-agent-interface] initialized, dir=<gameDir>/mc-agent basePort=25580
-[mc-agent-interface] server vantage armed, dir=mc-agent-server basePort=25581
-[mc-agent-interface] listening on 127.0.0.1:25580
-```
+| Property | Default | Purpose |
+| --- | --- | --- |
+| **mcagent.serverDir** | **mc-agent-server** | server-vantage state, snapshots and port file |
+| **mcagent.serverPort** | **25581** | first loopback port to try |
+| **mcagent.contextCacheSize** | **256** | maximum chat context bundles |
+| **mcagent.contextCacheTtlSeconds** | **300** | bundle lifetime |
+| **mcagent.dir** / **mcagent.port** | **<gameDir>/mc-agent** / **25580** | legacy client-vantage endpoint |
 
-| Task | How |
-| --- | --- |
-| **upgrade** | replace the jar; one version at a time, or Fabric will complain about a duplicate mod id |
-| **uninstall** | delete the jar. Everything the mod wrote lives in `<gameDir>/mc-agent/` (and `mc-agent-server/` for the server vantage) - delete those too for a clean slate |
-| **move the data** | `-Dmcagent.dir=<path>` (client) and `-Dmcagent.serverDir=<path>` (server vantage) |
-| **fix the port** | `-Dmcagent.port=25580` (client), `-Dmcagent.serverPort=25581` (server vantage); without them the mod takes the next free port and records it in `port.txt` |
+To upgrade, replace the jar and keep exactly one version. To uninstall, remove
+the jar; remove the data directories too only when their events and snapshots
+are no longer needed.
 
-## 3. The Python side
+## Toolkit (`mc-agent-bridge`)
 
-The bridge and the loop are two packages; the loop depends on the bridge, so
-install both into one environment:
-
-```bash
+~~~powershell
 git clone https://github.com/guajun/mc-agent-bridge
-git clone https://github.com/guajun/mc-agent-loop
 python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop   # Windows
-.venv/bin/pip     install -e "mc-agent-bridge[mcp]" -e mc-agent-loop   # POSIX
-```
+.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
+~~~
 
-`[mcp]` pulls the Model Context Protocol SDK; without it you still get the
-daemon, the CLI and the loopback API. Check the install:
+Use **pip install -e mc-agent-bridge** without the MCP extra when only the
+daemon, CLI or JSON-lines API is needed. An editable install upgrades with a
+pull in that checkout; delete the virtual environment to uninstall it.
 
-```bash
+Verify the executable:
+
+~~~powershell
 .venv/Scripts/mc-bridge --help
-.venv/Scripts/mc-agent-loop backends
-```
+.venv/Scripts/mc-bridge discover
+~~~
 
-Both installs are **editable**: `git pull` in those repositories is enough to
-update them, no reinstall. To uninstall, delete the virtual environment.
+## Server-vantage discovery
 
-## 4. The agent runtime
+The default **mc-bridge run** resolution order is:
 
-The loop talks to an OpenAI-compatible endpoint, so anything with one works.
-Hermes is what this was developed against, and
-[Running the agent on Hermes](hermes-setup.md) covers it end to end - install,
-model, API server, MCP registration.
+1. explicit **--mod-port**;
+2. **--port-file** or **MC_AGENT_PORT_FILE**;
+3. **<--server-dir | MC_AGENT_SERVER_DIR | current directory>/mc-agent-server/port.txt**;
+4. **<--server-dir>/port.txt** when a server directory was explicitly named.
 
-Keep its address and key in a file the loop reads, rather than in your shell
-history:
+If none resolves, the daemon reports an error and keeps watching. It never
+guesses a server port or silently connects to client vantage.
 
-```
-# .env   (git-ignored)
-HERMES_API_BASE=http://127.0.0.1:8642
-HERMES_MODEL=hermes-agent
-HERMES_API_KEY=<the API server key>
-```
+~~~powershell
+mc-bridge run --server-dir "C:/minecraft/server"
+mc-bridge call status
+mc-bridge call capabilities
+~~~
 
-Install the portable [Toolkit Skill](toolkit-skill.md) next: it is what teaches
-the runtime how to discover the Toolkit, resolve a caller by UUID, fetch a
-chat-time context bundle, and query authoritative state. For unattended runs
-where Hermes owns the trigger instead of the loop, see
-[Unattended Hermes](hermes-unattended.md).
+Client vantage is a deliberate legacy opt-in:
 
-## 5. Optional: a lab server
+~~~powershell
+mc-bridge run --vantage client --port-file "C:/minecraft/client/mc-agent/port.txt"
+~~~
 
-`tools/lab_server.py` provisions a headless Fabric server under `labs/<name>/`.
-On the first run it downloads the Fabric server launcher (which in turn
-downloads the vanilla server), Fabric API and Carpet, and caches them in
-`labs/_cache/` - so an offline machine has to be seeded by copying that cache.
+## Harness integration
 
-```bash
-python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet --java <java25>
-python tools/lab_server.py start --name lab-01 --wait 300
-python tools/lab_server.py exec --name lab-01 "list"
-python tools/lab_server.py stop --name lab-01
-```
+For MCP, configure the Harness to spawn **mc-bridge.exe mcp**. This adapter
+connects to the long-running daemon; it does not replace the daemon. For a
+Harness without MCP, use **mc-bridge call** or the loopback JSON-lines API.
 
-It needs Java 25 as well, and it writes an RCON password into
-`labs/<name>/rcon.json`; that is the console the tool uses. Nothing about a lab
-touches your game instance.
+No **mc-agent-loop** installation is required for Codex, Claude Code or another
+user-driven Harness. The loop is an optional compatibility package for its echo
+tests and temporary Hermes HTTP path.
 
-## 6. Did it work?
+## Verify
 
-In order, each step proves a bit more:
-
-| Check | Expected |
+| Check | Expected result |
 | --- | --- |
-| the game log shows `listening on 127.0.0.1:...` | the mod is up |
-| `<gameDir>/mc-agent/port.txt` exists | the mod could write its state |
-| `/mcagent status` in game chat | version, port, connected bridges |
-| `mc-bridge run` then `mc-bridge call state` | `inWorld`, coordinates |
-| `mc-agent-loop run --backend echo --trigger @codex` then `@codex hi` in chat | an echo in chat |
-| `python tools/smoke_offline.py` | the whole stack, no game required |
+| server log | server vantage armed/listening |
+| **mc-agent-server/port.txt** | contains the actual loopback port |
+| **mc-bridge discover** | reports **vantage: server** and its source |
+| **mc-bridge call status** | daemon and mod connected |
+| **mc-bridge call capabilities** | filtered server tool surface |
+| **mc-bridge call player** | structured found/not-found player result |
 
-When something fails, [Troubleshooting](troubleshooting.md) lists the traps in
-the order they usually bite.
+## Removal
 
-## 7. Files and ports worth knowing
-
-| Path or port | What it is |
+| Component | Remove |
 | --- | --- |
-| `<gameDir>/mc-agent/port.txt` | the port the mod actually got |
-| `<gameDir>/mc-agent/events.jsonl` | event history (chat, game, marks, sample lifecycle) |
-| `<gameDir>/mc-agent/samples.jsonl` | recordings from `record_start` |
-| `<gameDir>/mc-agent/snapshots/<name>/` | snapshots: `entities.jsonl` + `meta.json` |
-| `mc-agent-server/` | the same, for the server vantage (a lab writes it into its own directory) |
-| `127.0.0.1:8765` | the bridge's loopback API (default) |
-| `127.0.0.1:25580` | the mod, client vantage |
-| `127.0.0.1:25581` | the mod, server vantage |
-| `.env` | API keys for the loop; git-ignored |
-
-All of it is loopback only. Treat the machine as trusted: the interface can run
-commands as the player, and the lab console can run them as an operator.
-
-## 8. Uninstall
-
-| Piece | Remove |
-| --- | --- |
-| mod | the jar from `<instance>/mods/`, and `<gameDir>/mc-agent/` |
-| Python side | the virtual environment |
-| labs | `labs/<name>/` (each lab is self-contained) |
-
-## 9. Other setups
-
-* **Linux / macOS**: the same commands with `.venv/bin/` instead of
-  `.venv/Scripts/`, and `/`-separated paths. `launch_instance.py` finds Java
-  through `--java`, `JAVA_HOME` or `PATH`.
-* **A dedicated server**: put the same interface mod jar into the server's
-  `mods/` and it serves the server vantage on `mcagent.serverPort`. Note that a
-  server owner has to install it - the client mod alone cannot reach a server's
-  world files.
-* **Air-gapped**: `build.py` needs the instance's `libraries/` and
-  `.fabric/processedMods/`; `pip install` needs wheels; the lab needs its
-  download cache. Seed all three from a connected machine first.
+| Fabric mod | jar from **mods/**; optionally **mc-agent-server/** |
+| Toolkit | its virtual environment and checkout |
+| Harness configuration | the MCP server entry and any webhook secret/route |
+| lab instances | only the chosen directory under **labs/** |

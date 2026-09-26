@@ -4,7 +4,7 @@ Most of these were found the hard way, on a real world, while building the thing
 
 ## The game side
 
-### The bridge says it cannot reach the mod
+### The Toolkit daemon says it cannot reach the mod
 
 ```
 [mc-agent-bridge] cannot reach interface mod on 127.0.0.1:25580; retrying
@@ -16,7 +16,7 @@ Check, in this order:
    `[mc-agent-interface] listening on ...`?
 2. is the game *in a world*? Many primitives (commands, chat, entities) need one.
 3. is another process holding the port? The mod moves to the next free port and
-   writes `port.txt`; point the bridge at it with `--port-file`.
+   writes `port.txt`; point the Toolkit daemon at it with `--port-file`.
 4. is a firewall blocking loopback? (Rare, but a corporate VPN client can.)
 
 ### `/mcagent` says "unknown or incomplete command"
@@ -111,11 +111,13 @@ free one. Read each instance's own `port.txt` rather than assuming 25580/25581.
 
 ## The agent
 
-### The agent answers itself in a loop, or never answers
+### The compatibility loop answers itself, or never answers
 
-The loop ignores chat from the client it is attached to, so a single-player
-session cannot trigger it with its own chat. Either use a second player
-([player identity](player-identity.md)), or use one-shot turns:
+This applies only to the legacy client-vantage `mc-agent-loop`, not to a
+user-driven Harness or the server-vantage webhook design. The loop ignores chat
+from the client it is attached to, so a single-player session cannot trigger it
+with its own chat. Either use a second player ([player identity](player-identity.md)),
+or use one-shot turns:
 `mc-agent-loop once "..."`.
 
 ### Replies are cut off
@@ -123,9 +125,11 @@ session cannot trigger it with its own chat. Either use a second player
 Chat lines are short. `--chunk-size` splits longer answers, `--chunk-delay`
 paces them.
 
-### The model cannot see the game
+### The Harness cannot see the game
 
-The agent needs the bridge's MCP tools, and those tools point at **one** bridge -
-therefore at **one** instance. If the model reports the wrong player's
-coordinates, its MCP server is attached to the wrong bridge; see
+Call `mc_status` and `mc_capabilities` first. If they cannot reach the daemon,
+check that `mc-bridge run` is active and discovered the server-vantage
+`mc-agent-server/port.txt`. If the wrong player is described, call `mc_player`
+with that player's stable UUID (or name as a convenience); one server-vantage
+Toolkit can resolve every online player in its instance. See
 [player identity](player-identity.md).

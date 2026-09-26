@@ -4,7 +4,7 @@
 
 ## 游戏侧
 
-### bridge 说连不上 mod
+### Toolkit daemon 说连不上 mod
 
 ```
 [mc-agent-bridge] cannot reach interface mod on 127.0.0.1:25580; retrying
@@ -82,15 +82,15 @@ mod 会从基准端口往上扫，所以第二个实例会落到下一个空闲�
 
 ## 智能体
 
-### 智能体自己和自己对话，或者永远不回
+### 兼容 loop 自己和自己对话，或者永远不回
 
-loop 会忽略它所附着那个客户端发出的聊天，所以单机会话没法用它自己的聊天触发。要么用第二个玩家（见 [智能体在游戏里是谁](player-identity.md)），要么用一次性模式：
+这只适用于旧客户端视角的 `mc-agent-loop`，不适用于用户主动型 Harness 或服务端视角 webhook 设计。loop 会忽略它所附着那个客户端发出的聊天，所以单机会话没法用它自己的聊天触发。要么用第二个玩家（见 [玩家身份与游戏上下文](player-identity.md)），要么用一次性模式：
 `mc-agent-loop once "..."`。
 
 ### 回复被截断
 
 聊天行很短。`--chunk-size` 负责切分长回答，`--chunk-delay` 控制间隔。
 
-### 模型看不到游戏
+### Harness 看不到游戏
 
-智能体需要 bridge 的 MCP 工具，而这些工具指向**一个** bridge——因此指向**一个**实例。如果模型报出来的是别的玩家的坐标，说明它的 MCP server 接错了 bridge；见 [智能体在游戏里是谁](player-identity.md)。
+先调用 `mc_status` 与 `mc_capabilities`。无法连接守护进程时，检查 `mc-bridge run` 是否正在运行，以及是否发现服务端视角的 `mc-agent-server/port.txt`。描述错玩家时，用稳定 UUID（名字仅作便捷输入）调用 `mc_player`；同一服务端视角 Toolkit 可以解析该实例中的每位在线玩家。见 [玩家身份与游戏上下文](player-identity.md)。

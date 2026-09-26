@@ -1,147 +1,98 @@
-# 把 Hermes 接到 bridge 上
+# Hermes 与无人值守运行
 
-这套框架里的智能体实际是怎么跑起来的：Hermes 是 loop 的后端，bridge 是它的工具面，Minecraft 是世界。
+[English](https://guajun.github.io/mc-agent/hermes-setup/)
 
-!!! info "事件驱动的 Hermes 有独立路径"
-    本页把 Hermes 接成 **loop 的模型后端**：`mc-agent-loop` 拥有聊天触发，并通过
-    Hermes 的 OpenAI 兼容 API 调用它。对于无人值守、由事件触发的运行，Hermes 也
-    可以自己拥有触发——用户在 Hermes Gateway 配置一条 webhook route，加载同一份
-    可移植的 [Toolkit Skill](toolkit-skill.md)，直接使用 Bridge MCP 工具。见
-    [Hermes 无人值守：webhook + Toolkit Skill](hermes-unattended.md)。这条路径验证
-    通过后，loop 的 Hermes 后端将被移除
-    （[mc-agent-loop#3](https://github.com/guajun/mc-agent-loop/issues/3)）。
+Hermes 只是可选 Harness 之一。它没有单独的 Minecraft backend；它与 Codex、
+Claude Code 和其它调用者使用同一套本地 Minecraft Agent Toolkit。
 
-下面全部是 Windows 原生路径；换到 Linux/macOS 只要替换路径。
+## 状态
 
-## 1. 安装 Hermes
+| 部分 | 状态 |
+| --- | --- |
+| 服务端视角 Toolkit、玩家查询和聊天上下文包 | 已实现 |
+| 与接收方无关的签名 webhook 发送端 | 已在 Toolkit 实现 |
+| 便携 Toolkit Skill 与安装指南 | 已实现；见 [Toolkit Skill](toolkit-skill.md) |
+| Hermes webhook route、受限 toolset 与回复投递指南 | 已发布于 [Hermes 无人值守运行](hermes-unattended.md) |
+| 签名 webhook 与 delivery-ID 互操作 | 等待 [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) |
+| mc-agent-loop 中直连 Hermes HTTP backend | 临时兼容路径；移除由 [loop #3](https://github.com/guajun/mc-agent-loop/issues/3) 跟踪 |
 
-官方安装脚本（自带 uv、Python 3.11、Node、ripgrep、ffmpeg）：
+配置已经写入文档，但互操作问题验证完成前，不要把签名端到端 webhook 投递
+当作可运行能力。
 
-```powershell
-iex (irm https://hermes-agent.nousresearch.com/install.ps1)
-```
+## 部署模型
 
-无人值守安装时跳过向导和可选的 computer-use 包：
+Hermes Gateway、Toolkit 与服务端视角 mod endpoint 初期在同一台机器上运行。
+mod 和 Toolkit 留在 loopback；只有 Toolkit forwarder 发出的 HTTPS 请求越过
+该边界。
 
-```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1 -NonInteractive -SkipComputerUse
-```
+~~~text
+服务端聊天 -> mod 捕获 context_id -> Toolkit 事件缓冲
+                                      |
+                                      +-> 签名出站 webhook -> Hermes route
+                                                                  |
+                                                                  v
+Hermes Agent ---------------- 本地 MCP ------------------------> Toolkit
+~~~
 
-文件落在 `%LOCALAPPDATA%\hermes`（`config.yaml`、`.env`、`hermes-agent\`、`bin\hermes.exe`）。不装到系统里，也不需要管理员权限。
+Hermes 负责路由、会话、模型、Skill 订阅与回复目标；Toolkit daemon 负责事件
+转发与游戏连接。双方都不复制对方职责。
 
-> Hermes 要求 Python <3.14，并自带一份 3.11，所以机器上只有更新的解释器也没问题。
+## 今天可用的交互式 Toolkit
 
-## 2. 指向一个模型
+启动守护进程，并按已安装 Hermes 版本支持的 MCP 配置注册适配器：
 
-Hermes 支持的任何 provider 都可以。想复用 Codex 已经在用的模型（走内置 DeepSeek provider 的 `deepseek-flash`）：
+~~~powershell
+mc-bridge run
+# 配置 Hermes 拉起：
+C:/path/to/.venv/Scripts/mc-bridge.exe mcp
+~~~
 
-```powershell
-hermes config set model.provider deepseek
-hermes config set model.default deepseek-flash
-```
+修改 MCP 配置后启动新的 Hermes 会话。先调用 **mc_status** 与
+**mc_capabilities**。当前调用者上下文使用 **mc_player**；只有收到的事件带
+**context_id** 时才使用 **mc_context**。
 
-key 放进 `%LOCALAPPDATA%\hermes\.env`（**不要**写进 `config.yaml`，更不要提交进仓库）：
+按 [安装 Toolkit Skill](toolkit-skill.md) 中已验证的命令安装便携 Skill。
+Hermes 没有原生 **gh skill** target；受支持路径是装进 Hermes 自定义 Skill
+目录。webhook route、受限 MCP toolset 与投递目标见
+[Hermes 无人值守运行](hermes-unattended.md)。
 
-```
-DEEPSEEK_API_KEY=sk-...
-```
+## 配置事件发送端
 
-不起聊天会话也能自检：
+只有同时配置 URL 与 secret 时 Toolkit forwarding 才会启动。凭据放在环境变量
+或受保护 JSON 配置中，不放进命令参数。
 
-```powershell
-hermes status
-```
+~~~powershell
+$env:MC_AGENT_WEBHOOK_URL = "https://<receiver>/hooks/mc-agent"
+$env:MC_AGENT_WEBHOOK_SECRET = "<独立随机密钥>"
+mc-bridge forward --events chat,game,mark,error
+~~~
 
-## 3. 暴露 API server
+接收方必须验证 **X-MC-Agent-Signature**、拒绝过期时间戳，并按
+**X-MC-Agent-Event-Id** 去重。forwarder 不跟随重定向，因此应配置最终 URL。
+限制该 Hermes route 可用的 MCP 工具，并把特权命令授权与玩家身份分开。
 
-loop 是通过 Hermes 的 OpenAI 兼容端点跟它说话的，所以 loop 侧不需要任何 Hermes SDK：
+聊天 payload 可以包含 **context_id**。Agent 应尽快读取它，处理结构化的
+expired/not-found 结果，再按需查询当前状态。回复投递属于 Hermes route；
+forwarder 不会把 Agent 答案发回 Minecraft。
 
-```powershell
-hermes config set API_SERVER_ENABLED true
-```
+## 临时兼容 loop
 
-```
-# %LOCALAPPDATA%\hermes\.env
-API_SERVER_KEY=<随机本地密钥>
-```
+在 webhook/Skill 工作流验证完成前，现有 loop 仍可监听聊天，并通过
+OpenAI-compatible endpoint 调用 Hermes：
 
-```powershell
-hermes gateway        # [API Server] listening on http://127.0.0.1:8642
-```
+~~~powershell
+mc-agent-loop run --backend hermes --env-file .env
+~~~
 
-```powershell
-curl http://localhost:8642/v1/chat/completions `
-  -H "Authorization: Bearer <API_SERVER_KEY>" -H "Content-Type: application/json" `
-  -d '{"model":"hermes-agent","messages":[{"role":"user","content":"ping"}]}'
-```
+默认触发词是 **@agent**。该路径需要 loop 包、模型 API 环境变量和该包所记录的
+客户端视角回复机制。它只为兼容保留，不是目标架构，也不是 Toolkit 必需组件。
 
-这个 key 是有意义的：智能体在这台机器上有终端权限，所以即使只监听 loopback，也要用密钥把端点保护起来。
+## 安全检查表
 
-## 4. 把游戏给它
-
-注册 bridge 的 MCP 前端，模型就拿到了 `mc_state`、`mc_entities`、`mc_command`、`mc_record_start`、`mc_events` 这些工具：
-
-```powershell
-hermes mcp add mc-agent `
-  --command "F:\mc-agent\.venv\Scripts\mc-bridge.exe" `
-  --env MC_AGENT_API_PORT=8765 `
-  --args mcp
-```
-
-如果是两个玩家（见 [智能体在游戏里是谁](player-identity.md)），注册两个 server：智能体的工具描述它自己的身体，你的那个是第二个、有明确命名的窗口：
-
-```powershell
-hermes mcp add mc-agent --command "F:\mc-agent\.venv\Scripts\mc-bridge.exe" `
-  --env MC_AGENT_API_PORT=8766 --args mcp      # 智能体自己的客户端
-hermes mcp add mc-host  --command "F:\mc-agent\.venv\Scripts\mc-bridge.exe" `
-  --env MC_AGENT_API_PORT=8765 --args mcp      # 人类的客户端
-```
-
-`--args` 必须放在最后。命令会先发现工具、问你要不要启用，然后把结果写进 `config.yaml` 的 `mcp_servers`。
-
-注意这个契约：MCP server 是 bridge 守护进程的**客户端**。守护进程持有游戏连接、必须正在运行（`mc-bridge run`）；MCP server 由 Hermes 拉起，连到配置的端口。
-
-## 5. 把 loop 指向 Hermes
-
-`mc-agent-loop` 读三个变量：
-
-```
-HERMES_API_BASE=http://127.0.0.1:8642
-HERMES_MODEL=hermes-agent
-HERMES_API_KEY=<第 3 步里的 API_SERVER_KEY>
-```
-
-把它们放在 meta 仓库旁边一个**未跟踪**的 `.env` 里（`.env` 已 gitignore），然后：
-
-```powershell
-mc-agent-loop run --backend hermes --trigger @codex --env-file .env
-```
-
-`--env-file`（默认 `./.env`）让 key 不出现在命令行里。现在游戏聊天里的 `@codex <任何话>` 会到达模型，而模型可以先看看世界再回答。
-
-单机有一个注意点：loop 会忽略**它自己那个客户端**的玩家名发出的聊天，而它附着的正是这个客户端。所以聊天触发只在**别人**说的时候生效——服务器上的另一个玩家，或第二个跑着 mod 的客户端（见 `mc-agent-interface-mod` 的 README）。单客户端会话请用一次性模式：
-
-```powershell
-mc-agent-loop once "看看周围 64 格内有什么" --sender operator --env-file .env
-```
-
-## 6. 不需要 Minecraft 也能验证
-
-```powershell
-python tools/smoke_offline.py --backend hermes
-```
-
-假 mod、真守护进程、真 loop、真模型。跑通的输出长这样：
-
-```
-[smoke] lines received by the mod: ['STATE', 'STATE', 'STATE',
-        "CHAT Hello! My character's name is Bot - currently in-world and connected."]
-```
-
-第三个 `STATE` 是模型通过 MCP 调了 `mc_state`：工具链路是活的，不是摆设。
-
-## 运维要点
-
-* gateway 是常驻进程，`/v1/chat/completions` 由它提供。改过 `config.yaml` 后要重启它（`hermes gateway restart`），新会话才会看到 MCP server 或模型的变更。
-* 模型变更只对**新**会话生效；已经在跑的智能体保持原来的模型。
-* bridge 守护进程和 loop 是两个进程、两个故障域。重启其中一个不会打断另一个的游戏连接。
+* mod 与 Toolkit 控制 socket 只监听 loopback。
+* 使用独立、高熵 webhook secret。
+* 在解析或路由前验证签名与时间戳。
+* 按 delivery ID 去重，因为重试沿用同一个事件 ID。
+* 只给事件 route 必需的 MCP 工具。
+* UUID/名字只是上下文，不是授权。
+* 在 Hermes 中显式配置回复投递，不从发送者身份推断。
