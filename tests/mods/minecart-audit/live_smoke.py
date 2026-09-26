@@ -465,6 +465,9 @@ def scenario_attack_then_use(name: str, run_id: str, instance: str) -> dict:
     lab("start", "--name", name, "--wait", "300")
     rcon(name, "mcaudit phase init")
     reset_machine(name)
+    # A non-air block above the note block removes the scheduled block event,
+    # so the playNote path (the pending-play contract) is the one exercised.
+    rcon(name, "setblock 0 -58 0 minecraft:stone")
     summon_cart(name, 3.5, 0.5, "apple", 3)
     ensure_bot(name, 0.5)
     rcon(name, "gamemode survival Bot")

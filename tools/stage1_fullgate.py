@@ -1794,6 +1794,10 @@ async def devcap_phase(args: argparse.Namespace) -> int:
         )
         if not (restore_result and restore_result.get("ok") and verify_result and verify_result.get("ok")):
             raise RuntimeError("the devcap memory restore/verify failed")
+        # The live phase can leave dropped items around; the filtered memory
+        # snapshot is about the machine entities, so clear those leftovers.
+        rcon(EXP["name"], "kill @e[type=minecraft:item]")
+        time.sleep(0.5)
         snapshot_result, snapshot_record = await call(api, "snapshot",
                                                       {"name": f"devcap-{facts['runId']}-memory", "radius": 0},
                                                       timeout=600)
@@ -1804,6 +1808,7 @@ async def devcap_phase(args: argparse.Namespace) -> int:
         lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
         lab("start", "--name", EXP["name"], "--wait", "300")
         rcon(EXP["name"], "tick freeze")
+        rcon(EXP["name"], "kill @e[type=minecraft:item]")
         restart_status = rcon(EXP["name"], "mcagent-smoke status")
         start_bridge(EXP["name"], EXP["bridge"])
         api = await connect(EXP["bridge"])
