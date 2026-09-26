@@ -1408,6 +1408,50 @@ def first_cart_uuid_and_slot(snapshot_dir: Path) -> tuple[str, int]:
 # --------------------------------------------------------------------------- package
 
 
+def portable_path(value: Any) -> Any:
+    """Replace the checkout root in a packaging-generated path with ``repo``."""
+    if not isinstance(value, str):
+        return value
+    text = value.replace("\\", "/")
+    root = str(ROOT).replace("\\", "/").rstrip("/")
+    if text.startswith(root + "/"):
+        return "repo/" + text[len(root) + 1:]
+    return text
+
+
+def portable_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: portable_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [portable_value(item) for item in value]
+    return portable_path(value)
+
+
+def _cold_fetch_record(run_dir: Path) -> dict[str, Any] | None:
+    raw = read_json(run_dir / "fetch.json")
+    if not raw or "stdout" not in raw:
+        return None
+    text = str(raw["stdout"])
+    start = text.find("{")
+    if start < 0:
+        return None
+    try:
+        payload = json.loads(text[start:])
+    except ValueError:
+        return None
+    cache = payload.get("cache") or {}
+    return {
+        "url": cache.get("url"),
+        "http_status": cache.get("http_status"),
+        "bytes": cache.get("bytes"),
+        "sha256": cache.get("sha256"),
+        "cache_hit": cache.get("cache_hit"),
+        "seconds": cache.get("seconds"),
+        "cachePath": portable_path(cache.get("path")),
+        "pinnedSha256": "46954828589489f43819623cd42bb9ad6bbd999073f4fcc839d1817421a01387",
+    }
+
+
 def package_suite(args: argparse.Namespace) -> int:
     """Copy a passing suite's reviewable artifacts into the committed evidence dir."""
     suite_dir = Path(args.suite) if Path(args.suite).is_absolute() else (ROOT / args.suite)
@@ -1428,7 +1472,7 @@ def package_suite(args: argparse.Namespace) -> int:
             raise RuntimeError(f"run {entry['runId']} is not ok")
         target = runs_dir / entry["runId"]
         target.mkdir(parents=True)
-        for name in ("program.json", "init-summary.json", "fork.json", "logger.jsonl",
+        for name in ("program.json", "init-summary.json", "fork.json", "logger.jsonl", "fetch.json",
                      "audit-check-gen1.json", "audit-check-gen2.json", "restore-verify-gen1.json",
                      "restore-verify-gen2.json", "verification-gen1.json", "verification-gen2.json",
                      "jar-swap-refusal.json", "fork-2.json", "steps.jsonl"):
@@ -1455,18 +1499,26 @@ def package_suite(args: argparse.Namespace) -> int:
             "instance": run["instance"], "programSha256": run["programSha256"],
             "expectedCartCount": run["expectedCartCount"], "agentUuid": run["agentUuid"],
             "cold": run.get("cold"), "jarIteration": run.get("jarIteration"),
-            "loggerJar": run.get("loggerJar"), "loggerJarIteration": run.get("loggerJarIteration"),
-            "auditJar": run.get("auditJar"), "interfaceJar": run.get("interfaceJar"),
-            "mapWorld": run.get("mapWorld"),
+            "loggerJar": portable_value(run.get("loggerJar")),
+            "loggerJarIteration": portable_value(run.get("loggerJarIteration")),
+            "auditJar": portable_value(run.get("auditJar")),
+            "interfaceJar": portable_value(run.get("interfaceJar")),
+            "mapWorld": portable_path(run.get("mapWorld")),
             "provenanceStart": {"head": run["provenanceStart"]["head"], "clean": run["provenanceStart"]["clean"],
                                 "sources": run["provenanceStart"]["sources"]},
             "provenanceEnd": {"head": run.get("provenanceEnd", {}).get("head"),
                               "clean": run.get("provenanceEnd", {}).get("clean")},
             "sourceWorld": run.get("sourceWorld"),
+            "coldFetch": _cold_fetch_record(run_dir),
             "auditProjection": (
                 "audit-<label>.projected.jsonl is the raw audit log with the periodic cart_sample stream "
                 "removed; it keeps every session/phase/input/cart event used by the verifier. The full raw "
                 "audit files stay in the git-ignored lab directories and their sha256 is pinned per generation."
+            ),
+            "verifierInputs": (
+                "verify-<label>/ is a complete verifier input (run.json + logger.jsonl + audit.jsonl + "
+                "audit-check.json + restore-verify.json); `python tools/rom21_verify.py verify --run "
+                "docs/evidence/rom21-regression/runs/<run-id>/verify-<label>` must exit 0"
             ),
             "generations": [
                 {"label": generation["label"], "ordinal": generation["ordinal"],
@@ -1483,8 +1535,67 @@ def package_suite(args: argparse.Namespace) -> int:
             ],
         }
         write_json(target / "run.json", compact)
-        packaged_runs.append({"runId": run["runId"], "dir": str(target), "config": entry["config"],
-                              "cold": entry["cold"], "jarIteration": entry["jarIteration"]})
+        # A self-verifiable sample per generation: a complete verifier input
+        # directory.  A reviewer runs the offline verifier against the
+        # committed raw logger + projected audit and must get PASS; packaging
+        # itself asserts that before recording the package.
+        verify_dirs: dict[str, str] = {}
+        for generation in run.get("generations", []):
+            label = generation["label"]
+            verify_dir = target / f"verify-{label}"
+            verify_dir.mkdir()
+            projected = target / f"audit-{label}.projected.jsonl"
+            projected_rows = read_jsonl(projected) if projected.is_file() else []
+            sessions = [row.get("session") for row in projected_rows if row.get("type") == "session_start"]
+            fork_path = run_dir / ("fork.json" if label == "gen1" else "fork-2.json")
+            fork_record = read_json(fork_path, {}) or {}
+            verify_manifest = {
+                "format": rv.RUN_FORMAT,
+                "runId": run["runId"], "configId": run["configId"], "instance": run["instance"],
+                "dimension": run["dimension"], "program": run["program"],
+                "programSha256": run["programSha256"], "expectedCartCount": run["expectedCartCount"],
+                "scene": run["scene"], "operations": run["operations"],
+                "loggerSessionOrdinal": generation["ordinal"], "agentUuid": run["agentUuid"],
+                "loggerJar": portable_value(generation["loggerJar"]),
+                "loggerJarIteration": None,
+                "auditJar": portable_value(run["auditJar"]),
+                "expectedOrderHash": fork_record.get("orderHash"),
+                "auditSessionId": str(sessions[-1]) if sessions else None,
+                "sourceWorld": run["sourceWorld"],
+            }
+            write_json(verify_dir / "run.json", verify_manifest)
+            for source_name, target_name in (
+                (f"logger-{label}.jsonl", "logger.jsonl"),
+                (f"audit-{label}.projected.jsonl", "audit.jsonl"),
+            ):
+                source = target / source_name
+                if source.is_file():
+                    shutil.copyfile(source, verify_dir / target_name)
+            for source_name, target_name in (
+                (f"audit-check-{label}.json", "audit-check.json"),
+                (f"restore-verify-{label}.json", "restore-verify.json"),
+            ):
+                source = run_dir / source_name
+                if source.is_file():
+                    shutil.copyfile(source, verify_dir / target_name)
+            report = rv.verify_run(
+                verify_manifest,
+                read_jsonl(verify_dir / "logger.jsonl") if (verify_dir / "logger.jsonl").is_file() else [],
+                projected_rows,
+                audit_check=(read_json(verify_dir / "audit-check.json")
+                             if (verify_dir / "audit-check.json").is_file() else None),
+                restore_verify=(read_json(verify_dir / "restore-verify.json")
+                                if (verify_dir / "restore-verify.json").is_file() else None),
+            )
+            if report["verdict"] != "pass":
+                raise RuntimeError(
+                    f"packaged verifier sample for {run['runId']}/{label} does not pass: {report['problems']}"
+                )
+            verify_dirs[label] = str(verify_dir.relative_to(dest).as_posix())
+        packaged_runs.append({"runId": run["runId"], "dir": target.relative_to(dest).as_posix(),
+                              "config": entry["config"],
+                              "cold": entry["cold"], "jarIteration": entry["jarIteration"],
+                              "verifyInputs": verify_dirs})
     negatives_dir = suite_dir / "negatives"
     if negatives_dir.is_dir():
         target_neg = dest / "negatives"
@@ -1496,6 +1607,16 @@ def package_suite(args: argparse.Namespace) -> int:
         "format": "mc-agent/rom21-evidence@1",
         "suite": {"stamp": suite["stamp"], "startedAt": suite.get("startedAt"), "finishedAt": suite.get("finishedAt")},
         "runs": packaged_runs,
+        "notes": [
+            "These are regression results: real game instances, no model called. The original autonomous "
+            "cold-start capability evidence is docs/evidence/rom20-coldstart.",
+            "Copied raw records (logger/audit/restore/fork/init) are byte-faithful and therefore keep the "
+            "host-local absolute paths the server wrote; package-generated fields use repo-relative paths.",
+            "audit-<label>.projected.jsonl removes only the periodic cart_sample stream; the full raw audit "
+            "hashes are pinned per generation in runs/<run-id>/run.json.",
+            "verify-<label>/ is a complete verifier input; packaging re-ran tools/rom21_verify.py against it "
+            "and required PASS before recording this manifest.",
+        ],
         "committed": {},
     }
     write_json(dest / "manifest.json", manifest)

@@ -1,0 +1,14 @@
+{"at": "2026-09-26T08:17:35Z", "epoch": 1790410655.695, "step": "provenance", "head": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02", "clean": true}
+{"at": "2026-09-26T08:18:58Z", "epoch": 1790410738.78, "step": "fixture", "carts": 4, "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d"}
+{"at": "2026-09-26T08:19:02Z", "epoch": 1790410742.724, "step": "jars", "v1": "3c1dae36590b82a26d0fad8cc5daa08d017ae7d27847c99004170a1c55da71ae", "v1Size": 21530, "v2": "8068999c97870bcdd4d657edd6ded22b7f9f1bed1bba85ec1c3af7bd62e15b90", "v2Size": 21530}
+{"at": "2026-09-26T08:19:03Z", "epoch": 1790410743.398, "step": "fork", "orderHash": "1e902c3c104260f6", "entities": 5}
+{"at": "2026-09-26T08:19:57Z", "epoch": 1790410797.327, "step": "operation", "generation": "gen1", "press": 1, "stack_before": 4, "stack_after": 3, "transient_captures": 1, "void_captures": 1, "elapsed_s": 2.219}
+{"at": "2026-09-26T08:20:00Z", "epoch": 1790410800.308, "step": "operation", "generation": "gen1", "press": 2, "stack_before": 3, "stack_after": 2, "transient_captures": 2, "void_captures": 2, "elapsed_s": 2.257}
+{"at": "2026-09-26T08:20:03Z", "epoch": 1790410803.238, "step": "operation", "generation": "gen1", "press": 3, "stack_before": 2, "stack_after": 1, "transient_captures": 3, "void_captures": 3, "elapsed_s": 2.196}
+{"at": "2026-09-26T08:20:06Z", "epoch": 1790410806.144, "step": "operation", "generation": "gen1", "press": 4, "stack_before": 1, "stack_after": -1, "transient_captures": 4, "void_captures": 4, "elapsed_s": 2.177}
+{"at": "2026-09-26T08:20:13Z", "epoch": 1790410813.852, "step": "jar-swap", "refused": true, "returncode": 2}
+{"at": "2026-09-26T08:21:18Z", "epoch": 1790410878.731, "step": "operation", "generation": "gen2", "press": 1, "stack_before": 4, "stack_after": 3, "transient_captures": 5, "void_captures": 5, "elapsed_s": 2.135}
+{"at": "2026-09-26T08:21:21Z", "epoch": 1790410881.779, "step": "operation", "generation": "gen2", "press": 2, "stack_before": 3, "stack_after": 2, "transient_captures": 6, "void_captures": 6, "elapsed_s": 2.295}
+{"at": "2026-09-26T08:21:24Z", "epoch": 1790410884.644, "step": "operation", "generation": "gen2", "press": 3, "stack_before": 2, "stack_after": 1, "transient_captures": 7, "void_captures": 7, "elapsed_s": 2.15}
+{"at": "2026-09-26T08:21:27Z", "epoch": 1790410887.828, "step": "operation", "generation": "gen2", "press": 4, "stack_before": 1, "stack_after": -1, "transient_captures": 8, "void_captures": 8, "elapsed_s": 2.445}
+{"at": "2026-09-26T08:21:34Z", "epoch": 1790410894.387, "step": "evidence", "copied": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\logger.jsonl"}

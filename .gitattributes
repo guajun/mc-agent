@@ -5,3 +5,7 @@
 # ROM20 cold-start evidence is stored byte-exact (LF JSON/JSONL plus CRLF failure
 # excerpts) so manifest hashes verify without autocrlf conversion
 docs/evidence/rom20-coldstart/** -text
+
+# ROM21 regression evidence is stored byte-exact (LF JSON/JSONL) so the
+# committed-file hashes in its manifest verify without autocrlf conversion
+docs/evidence/rom21-regression/** -text

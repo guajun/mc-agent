@@ -1,0 +1,84 @@
+{
+  "carts": [
+    {
+      "index": 0,
+      "items": [
+        {
+          "slot": 11,
+          "id": "minecraft:gold_ingot",
+          "count": 1
+        },
+        {
+          "slot": 22,
+          "id": "minecraft:redstone",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "id": "minecraft:copper_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "items": [
+        {
+          "slot": 1,
+          "id": "minecraft:sand",
+          "count": 2
+        },
+        {
+          "slot": 5,
+          "id": "minecraft:dirt",
+          "count": 4
+        },
+        {
+          "slot": 17,
+          "id": "minecraft:gold_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "items": [
+        {
+          "slot": 12,
+          "id": "minecraft:copper_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "items": [
+        {
+          "slot": 9,
+          "id": "minecraft:gold_ingot",
+          "count": 4
+        },
+        {
+          "slot": 11,
+          "id": "minecraft:glass",
+          "count": 3
+        },
+        {
+          "slot": 18,
+          "id": "minecraft:redstone",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "items": [
+        {
+          "slot": 13,
+          "id": "minecraft:redstone",
+          "count": 3
+        }
+      ]
+    }
+  ]
+}

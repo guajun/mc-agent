@@ -116,7 +116,15 @@ negative records and in the verifier (`NEGATIVE_CASES`).
 manifest with start/end HEAD, clean state and source/jar hashes, the raw agent
 logger JSONL, the audit log projected of its periodic `cart_sample` stream,
 answer, oracle and verification reports), the negative records and a manifest
-with the committed-file hashes. Raw large files stay under the git-ignored
-`labs/rom21-regression/`; every full raw log hash is pinned in the run
-manifest and the package manifest. The demo reuses only the committed
-artifacts.
+with the committed-file hashes. Each generation also carries a
+`verify-<label>/` directory with a complete verifier input, so a reviewer can
+re-run the offline verifier against the committed raw logger and projected
+audit:
+
+```powershell
+python tools/rom21_verify.py verify --run docs/evidence/rom21-regression/runs/<run-id>/verify-gen1
+```
+
+Raw large files stay under the git-ignored `labs/rom21-regression/`; every
+full raw log hash is pinned in the run manifest and the package manifest. The
+demo reuses only the committed artifacts.
