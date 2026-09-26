@@ -31,8 +31,8 @@
 
 ## 最终验收（main `b54e1e8`，2026-09-26）
 
-三个阶段均已执行、独立评审并合并。Issue #14-#21 已关闭；父 issue #13 仅保持开启，直到本
-文档同步 PR 合并。
+三个阶段均已执行、独立评审并合并。Issue #14-#21 已关闭；父级验收记录见
+[issue #13](https://github.com/guajun/mc-agent/issues/13)。
 
 | 阶段 | Issue | 已合并 PR | 验收证据 | 独立评审 |
 | --- | --- | --- | --- | --- |
@@ -42,8 +42,7 @@
 
 已合并前置 PR：bridge#8、bridge#9、#22-#29、#30、#32、#34。Issue #14-#21 均已带证据关闭
 （bridge#6 通过 bridge PR #9 关闭）。[bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)
-（可选 Hermes webhook 兼容）仍开启，**不**属于本次验收。根 issue #13 仅保持开启，直到本文档
-同步 PR 合并。
+（可选 Hermes webhook 兼容）仍开启，**不**属于本次验收。根 issue #13 记录整条链的最终验收。
 
 源存档在所有验收运行前后均未变化：tree hash `8cd54c86...324a`，40 个文件，11,556,310 字节。
 
@@ -312,7 +311,8 @@ PENDING，绝不是通过。关键记录缺失一律 fail closed。
 
 ## 最终状态
 
-* 子 issue #14-#21 均已带证据关闭；父 issue #13 仅保持开启，直到本文档同步 PR 合并。
+* 子 issue #14-#21 均已带证据关闭；父级验收记录见
+  [issue #13](https://github.com/guajun/mc-agent/issues/13)。
 * [bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)（可选 Hermes webhook 兼容）
   仍开启，不在本次验收范围内。
 * 本次验收不再规划运行时工作。任何新工作都应是新 issue 加新证据包，而不是改写已冻结的包。

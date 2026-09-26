@@ -41,8 +41,8 @@ acceptance section below.
 ## Final acceptance (main `b54e1e8`, 2026-09-26)
 
 All three phases were executed, independently reviewed and merged. Issues
-#14-#21 are closed; the parent #13 is open only until this documentation-sync
-PR merges.
+#14-#21 are closed; the parent acceptance record is
+[issue #13](https://github.com/guajun/mc-agent/issues/13).
 
 | Phase | Issue | Merged PR | Accepted evidence | Independent review |
 | --- | --- | --- | --- | --- |
@@ -54,7 +54,7 @@ Merged prerequisite PRs: bridge#8, bridge#9, #22-#29, #30, #32, #34. Issues
 #14-#21 are closed with evidence (bridge#6 closed through bridge PR #9).
 [bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) (optional
 Hermes webhook compatibility) remains open and is **not** part of this
-acceptance. The root issue #13 stays open only until this docs-sync PR merges.
+acceptance. The root issue #13 records the final acceptance of this chain.
 
 The source save was unchanged through every acceptance run: tree hash
 `8cd54c86...324a`, 40 files, 11,556,310 bytes.
@@ -364,8 +364,8 @@ and the [ROM21 evidence package](evidence/rom21-regression/README.md).
 
 ## Final state
 
-* Child issues #14-#21 are closed with evidence; the parent #13 is open only
-  until this documentation-sync PR merges.
+* Child issues #14-#21 are closed with evidence; the parent acceptance record
+  is [issue #13](https://github.com/guajun/mc-agent/issues/13).
 * [bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) (optional
   Hermes webhook compatibility) remains open and out of scope.
 * No further runtime work is planned for this acceptance. Any new work would be
