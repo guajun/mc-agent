@@ -315,19 +315,19 @@ def main(argv: list[str] | None = None) -> int:
         c(console, "player Bot look 30 180")
         report["botProbe"] = c(console, "data get entity Bot Pos").strip()[:200]
         time.sleep(0.2)
+        # Two synchronous sends with a minimal reply idle: the first command
+        # is processed and answered (or a 50 ms idle elapses) before the
+        # second goes out, so both land in the same or adjacent tick without
+        # any process spawn between them.
         start = time.time()
-        console._send(2, lab_server.Rcon.TYPE_COMMAND, "player Bot attack once")
-        console._send(3, lab_server.Rcon.TYPE_COMMAND, "player Bot use once")
+        attack_reply = console.command("player Bot attack once", idle=0.05)
+        use_reply = console.command("player Bot use once", idle=0.05)
         report["commandSendGapMs"] = round((time.time() - start) * 1000.0, 3)
+        report["attackReply"] = attack_reply[-200:]
+        report["useReply"] = use_reply[-200:]
         time.sleep(1.5)
-        # A fresh connection for the closing commands: the two nowait packets
-        # leave unread replies that must not confuse the next synchronous call.
-        console.close()
-        console = lab_server.open_console(lab_dir)
-        console.connect()
         c(console, "mcaudit phase experiment_end")
         c(console, "mcaudit end")
-        console.close()
         report["events"] = read_jsonl(log)
         report["analysis"] = analyse(report["events"])
         report["rawLogSha256"] = sha256_file(log)
