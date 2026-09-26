@@ -89,11 +89,17 @@ class AnalyseTests(unittest.TestCase):
 
     def test_second_attack_request_cannot_validate_itself_as_use(self) -> None:
         events = base_events(gap_ticks=1)
+        for row in events[2:]:
+            row["seq"] += 2
+            if row.get("requestSeq") == 13:
+                row["requestSeq"] = 15
+            if row.get("attemptSeq") == 14:
+                row["attemptSeq"] = 16
         events[2:2] = [
-            {"seq": 111, "tick": 100, "type": "input_request", "pos": {"x": 0, "y": -59, "z": 0}},
-            {"seq": 112, "tick": 100, "type": "input_attempt", "path": "attack", "requestSeq": 111},
+            {"seq": 12, "tick": 100, "type": "input_request", "pos": {"x": 0, "y": -59, "z": 0}},
+            {"seq": 13, "tick": 100, "type": "input_attempt", "path": "attack", "requestSeq": 12},
         ]
-        events[-1].update(requestSeq=111, attemptSeq=12)
+        events[-1].update(requestSeq=12, attemptSeq=14)
         result = PROBE.analyse(events)
         self.assertFalse(result["noStaleAttackAttribution"])
         self.assertFalse(result["exactlyOneUseProcessed"])

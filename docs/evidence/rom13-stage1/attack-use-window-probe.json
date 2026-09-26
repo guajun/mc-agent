@@ -92,5 +92,18 @@
     "exactly one input_processed (path playNote) and it consumes the useWithoutItem attempt",
     "no processed event is attributed to an attack request/attempt"
   ],
-  "notes": "run on the already-reviewed unchanged audit jar on a fresh disposable void lab; the frozen full-gate run and its provenance are untouched"
+  "notes": "run on the already-reviewed unchanged audit jar on a fresh disposable void lab; the frozen full-gate run and its provenance are untouched",
+  "offlineRevalidation": {
+    "sourceCommit": "f750a2f9e5123bca58b903a816ca6eb292916725",
+    "rawSha256": "9269bce814185fbcf301e6972539dd39895ce0f8c4fa2ab19e636761ef41f5a5",
+    "attackRequestSeqs": [
+      5,
+      7
+    ],
+    "useRequestSeq": 10,
+    "requestGapTicks": 1,
+    "processedCount": 1,
+    "ok": true,
+    "note": "Revalidated preserved live events with all attack requests checked; no runtime mod or full-gate evidence changed."
+  }
 }
