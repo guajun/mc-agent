@@ -1319,8 +1319,10 @@ async def live(args: argparse.Namespace) -> int:
             EXP["name"], "execute if entity @e[type=minecraft:chest_minecart,x=13,y=-53,z=-23,dx=3,dy=4,dz=3]"
         )
         frozen_after = rcon(EXP["name"], "tick query")
-        applied_result_probe = applied.get("result") or {}
-        verified_probe = verified.get("result") or {}
+        # ``applied``/``verified`` are the bridge replies; the wrapper records
+        # are stored separately in facts["stages"]["restore"].
+        applied_result_probe = applied or {}
+        verified_probe = verified or {}
         restore_flags = {
             "chunks_loaded": "Test passed" in seat_probe and _parse_count(cart_probe) > 0,
             "tick_controlled": "frozen" in frozen_before.lower() and "frozen" in frozen_after.lower(),
