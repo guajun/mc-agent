@@ -280,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
         c(console, "mcaudit phase experiment_start")
 
     console = lab_server.open_console(lab_dir)
+    console.connect()
     try:
         for attempt in range(3):
             try:
@@ -289,6 +290,7 @@ def main(argv: list[str] | None = None) -> int:
                 console.close()
                 time.sleep(5.0)
                 console = lab_server.open_console(lab_dir)
+                console.connect()
         else:
             raise RuntimeError("the RCON console could not stay connected for setup")
         # The two commands go out back-to-back on the persistent connection:
