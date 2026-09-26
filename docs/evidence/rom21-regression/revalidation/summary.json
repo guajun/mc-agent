@@ -1,8 +1,8 @@
 {
   "format": "mc-agent/rom21-revalidation@1",
   "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
-  "verifierHead": "b3c09272550b745fe91120ea129479ea77a109be",
-  "verifierSha256": "171aceeef7348e8e01797909d797fa289bb6a54c5e8119fdee0fa76767eae449",
+  "verifierHead": "8f28aea06ba3644fd06485f4338bfeda999da6bf",
+  "verifierSha256": "18bbe6da3511d19c30a936b6b64a5031facd573711b3551cfc18c44f5b4389a4",
   "results": [
     {
       "case": "rom21-20260926T083500Z-a1/verify-gen1",
@@ -127,6 +127,7 @@
       "accepted": true,
       "verdict": "fail",
       "failures": [
+        "run_manifest",
         "logger_session",
         "audit_oracle",
         "agent_operations",
@@ -141,5 +142,5 @@
     }
   ],
   "allAccepted": true,
-  "finishedAt": "2026-09-26T08:42:19Z"
+  "finishedAt": "2026-09-26T08:44:12Z"
 }

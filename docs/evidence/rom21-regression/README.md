@@ -28,7 +28,7 @@ closed. The committed generators and verifier re-verify this package offline.
   original logger jar `e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89`
   (16,778 bytes). The original logger source hashes and the exact regression
   behaviour changes are recorded in
-  [`examples/minecart-rom/regression/logger/PROVENANCE.md`](../../../examples/minecart-rom/regression/logger/PROVENANCE.md);
+  [`examples/minecart-rom/regression/logger/PROVENANCE.md`](https://github.com/guajun/mc-agent/blob/main/examples/minecart-rom/regression/logger/PROVENANCE.md);
   the frozen originals are not modified.
 * Pinned runtime: interface jar `45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f`,
   independent audit jar `7a77e89d72969f23ce7b7c2543bfe992c2a3674171f3eb190a8e7faa8f2ec4ac`
@@ -119,9 +119,10 @@ of the real raw evidence. The per-case records are under `negatives/`.
 ## Post-review revalidation (offline verifier hardening)
 
 The coordinator review of PR #34 reproduced four offline verifier false
-positives at the packaging head `02ee2f9` (they did not invalidate the live
-runs). `tools/rom21_verify.py` was hardened in the later verification-only
-commit `b3c09272550b745fe91120ea129479ea77a109be`:
+positives at the packaging head `02ee2f9`, and the independent review added a
+same-class finding; neither invalidated the live runs. `tools/rom21_verify.py`
+was hardened in the verification-only commits `b3c09272550b745fe91120ea129479ea77a109be`
+and `8f28aea06ba3644fd06485f4338bfeda999da6bf`:
 
 * `logger_armed` must fall inside the selected audit server session and before
   the experiment phase, the first processed input, the first pop and the first
@@ -134,12 +135,19 @@ commit `b3c09272550b745fe91120ea129479ea77a109be`:
   oracle event (accepting the produced `dimension`/`level` aliases);
 * every transient capture must be **strictly before** its matched audit
   removal, independent of the configured `transientMaxDeltaTicks` window
-  (`capture_timing`).
+  (`capture_timing`);
+* the run manifest must carry a non-empty `agentUuid` and every request and
+  processed input operator must equal it (`run_manifest`/`agent_operations`).
 
-The game executions remain `c5fa37b`; no raw log, run manifest or old
-verification report was rewritten. The `revalidation/` directory records the
-offline re-check under the hardened verifier (verifier head/sha256 in each
-record and in `revalidation/summary.json`):
+The evidence README's logger-provenance link is an absolute GitHub URL so
+`mkdocs build --strict` passes (review B1), and the negative-probe evidence
+hash is computed from the retained copy before the server shutdown flush
+(review minor M1; the historical case records keep their earlier informational
+hash while the revalidation records pin the retained-copy sha). The game
+executions remain `c5fa37b`; no raw log, run manifest or old verification
+report was rewritten. The `revalidation/` directory records the offline
+re-check under the hardened verifier (verifier head/sha256 in each record and
+in `revalidation/summary.json`):
 
 * all four committed generation inputs still **PASS**;
 * all eight declared negatives still **fail closed** (each shows its expected
