@@ -254,9 +254,10 @@ def main(argv: list[str] | None = None) -> int:
         "logPath": str(log),
     }
     def c(console: Any, command: str) -> str:
-        # A freshly force-loaded void world can lag behind for a moment; give
-        # each command a generous reply window over the persistent connection.
-        return console.command(command, idle=10.0)
+        # A freshly force-loaded void world can lag behind for a moment, but
+        # the replies themselves are immediate; a long idle here would only
+        # delay the setup while the probe bot is standing in the void.
+        return console.command(command, idle=2.0)
 
     def setup(console: Any) -> None:
         c(console, "forceload add -16 -16 16 16")
@@ -308,6 +309,12 @@ def main(argv: list[str] | None = None) -> int:
         # waiting for the first reply: no process spawn and no round trip
         # between them, so the server processes both in the same server-thread
         # batch (the same or adjacent tick).
+        # Park and aim the bot once more immediately before the pair so the
+        # elapsed setup time cannot leave it falling in the void.
+        c(console, "tp Bot 0.5 -59.0 2.5 180 30")
+        c(console, "player Bot look 30 180")
+        report["botProbe"] = c(console, "data get entity Bot Pos").strip()[:200]
+        time.sleep(0.2)
         start = time.time()
         console._send(2, lab_server.Rcon.TYPE_COMMAND, "player Bot attack once")
         console._send(3, lab_server.Rcon.TYPE_COMMAND, "player Bot use once")
