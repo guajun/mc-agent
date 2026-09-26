@@ -1326,7 +1326,7 @@ def stage_finalize(
         f"- task: `{report['task_file']}` (sha256 `{report['task_sha256']}`)",
         f"- env: `{report['env_file']}` (sha256 `{report['env_sha256']}`)",
         f"- raw agent session (planned): `{env['sessions']['agent_raw']}`",
-        f"- model: `{env['model']['provider']}/{env['model']['model']}` thinking `{env['model']['thinking']}`",
+        f"- model: `{env['model']['model']}` (provider `{env['model']['provider']}`) thinking `{env['model']['thinking']}`",
         f"- preflight: `{preflight.get('overall')}` - `{preflight.get('report')}`",
         "",
         "## Labs",
