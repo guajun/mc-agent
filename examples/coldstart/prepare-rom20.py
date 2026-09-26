@@ -1020,13 +1020,20 @@ def stage_clean(env: dict[str, Any], receipts: Receipts) -> dict[str, Any]:
             raise PrepError(f"port {port} is owned by pid {owner}, not by the recorded bridge pid {pid}")
         if pid and terminate_pid(pid):
             killed.append({"key": key, "pid": pid, "api_port": port})
+    removed: list[str] = []
     for lab_key in ("source", "experiment"):
         lab = env["labs"][lab_key]["name"]
         run([
             env["python"], str(REPO / "tools" / "lab_server.py"), "stop",
             "--name", lab, "--timeout", "120",
         ], timeout=300, check=False)
-    return receipts.write("clean", {"killed_bridges": killed})
+        # a fresh authoritative run must not inherit a previous lab's world,
+        # mods or audit config; the shared download cache stays and is reused.
+        lab_dir = REPO / "labs" / lab
+        if lab_dir.exists():
+            shutil.rmtree(lab_dir)
+            removed.append(lab)
+    return receipts.write("clean", {"killed_bridges": killed, "removed_labs": removed})
 
 
 def start_bridge(env: dict[str, Any], lab_key: str, run_root: Path, receipts: Receipts) -> dict[str, Any]:
