@@ -1,0 +1,287 @@
+{
+  "verdict": "pass",
+  "require_machine": true,
+  "reasons": [],
+  "sessions": [
+    {
+      "id": "s1790404223981",
+      "events": 3,
+      "firstSeq": 1,
+      "lastSeq": 3,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    },
+    {
+      "id": "s1790404594726",
+      "events": 3,
+      "firstSeq": 4,
+      "lastSeq": 6,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    },
+    {
+      "id": "s1790404664247",
+      "events": 288,
+      "firstSeq": 7,
+      "lastSeq": 294,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    },
+    {
+      "id": "s1790404760310",
+      "events": 733,
+      "firstSeq": 295,
+      "lastSeq": 1027,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    }
+  ],
+  "machine_operated": true,
+  "agentOperations": [
+    {
+      "seq": 953,
+      "tick": 2885,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 951,
+      "attemptSeq": 952
+    },
+    {
+      "seq": 963,
+      "tick": 2902,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 961,
+      "attemptSeq": 962
+    },
+    {
+      "seq": 973,
+      "tick": 2918,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 971,
+      "attemptSeq": 972
+    },
+    {
+      "seq": 983,
+      "tick": 2935,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 981,
+      "attemptSeq": 982
+    },
+    {
+      "seq": 993,
+      "tick": 2951,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 991,
+      "attemptSeq": 992
+    }
+  ],
+  "outputs": [
+    {
+      "uuid": "5304524c-6dbf-472e-ad88-bedf9456d95c",
+      "epoch": 1,
+      "exitSeq": 954,
+      "exitTick": 2889,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 1010,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 7,
+          "item": "minecraft:iron_ingot",
+          "count": 5
+        },
+        {
+          "slot": 15,
+          "item": "minecraft:sand",
+          "count": 1
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:gold_ingot",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "uuid": "4431ae3d-f0f4-4f51-9d14-b9a915ec1531",
+      "epoch": 1,
+      "exitSeq": 964,
+      "exitTick": 2906,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 1015,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 0,
+          "item": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 7,
+          "item": "minecraft:glass",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "item": "minecraft:sand",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:glass",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "uuid": "d494cb2c-bdb9-43fc-9e14-314c3a561008",
+      "epoch": 1,
+      "exitSeq": 974,
+      "exitTick": 2922,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 1019,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 7,
+          "item": "minecraft:iron_ingot",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "uuid": "5f2f69ba-c4ff-4cfe-98b1-9f709c241119",
+      "epoch": 1,
+      "exitSeq": 984,
+      "exitTick": 2939,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 1022,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 0,
+          "item": "minecraft:coal",
+          "count": 3
+        },
+        {
+          "slot": 13,
+          "item": "minecraft:redstone",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 26,
+          "item": "minecraft:gold_ingot",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "uuid": "1c23aa8e-81a4-404c-8942-a706fc777d93",
+      "epoch": 1,
+      "exitSeq": 994,
+      "exitTick": 2955,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 1024,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 26,
+          "item": "minecraft:coal",
+          "count": 2
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "stream": {
+      "pass": true,
+      "detail": ""
+    },
+    "run_identity": {
+      "pass": true,
+      "detail": "run=['rom20-20260926T063100Z'] inst=['experiment']"
+    },
+    "sessions": {
+      "pass": true,
+      "detail": "4 session(s); ended=4; open=0; evaluated=s1790404760310"
+    },
+    "completeness": {
+      "pass": true,
+      "detail": "end=complete incomplete=[] truncated=False open=0"
+    },
+    "status_agrees": {
+      "pass": true,
+      "detail": "status snapshot consistent"
+    },
+    "lifecycle": {
+      "pass": true,
+      "detail": "phases valid; experiment windows=1"
+    },
+    "input_chain": {
+      "pass": true,
+      "detail": "5 target processing event(s), all correlated"
+    },
+    "phase_isolation": {
+      "pass": true,
+      "detail": "agent operations confined to the experiment phase"
+    },
+    "machine_operated": {
+      "pass": true,
+      "detail": "5 calibrated agent operation(s); 0 uncalibrated player trigger(s); 0 environment trigger(s)"
+    },
+    "transient_outputs": {
+      "pass": true,
+      "detail": "5 tracked cart(s) checked"
+    },
+    "ordering": {
+      "pass": true,
+      "detail": "5 exit(s) in actual occurrence order"
+    }
+  },
+  "events": 1027,
+  "run": "rom20-20260926T063100Z",
+  "instance": "experiment"
+}
