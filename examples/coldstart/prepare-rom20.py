@@ -1116,7 +1116,7 @@ def stage_finalize(
     bridges = receipts_index.get("bridges") or {}
     preflight = receipts_index.get("preflight-summary") or {}
     source_save = receipts_index.get("source-save") or {}
-    challenge = receipts_index.get("challenge") or {}
+    challenge = fixture.get("challenge") or receipts_index.get("challenge") or {}
 
     # evidence declarations relative to the run-trace dir
     evidence = read_json(run_trace_dir / "evidence.json") or {}
