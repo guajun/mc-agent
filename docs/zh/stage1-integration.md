@@ -11,9 +11,9 @@
 
 ## 完整门禁运行（`tools/stage1_fullgate.py`）
 
-完整门禁驱动在端口 27240-27249 上以六个阶段运行：`live`（fixture 重建、fork + 同 run 守卫恢复、七类失败用例、恢复后机器上的正向审计、四个负例与冻结轨迹）、`identity`（五条 player_context 记录）、`devcap`（工具环境、同尺寸 jar 更新、smoke mod、实例隔离）、`trace`（冻结轨迹到门禁工具轨迹 + verified join）、`smoke`（五套 smoke 套件、真实无 mod 对照实验、版本锁）、`compose`（审计导出、恢复快照与失败用例、bundle 规格、门禁运行）。
+完整门禁驱动在端口 27240-27249 上以六个阶段运行（无 mod 对照使用 27150/27151）：`live`（本 run 三次独立 fixture 初始化、fork + 同 run 守卫恢复、在源副本与恢复副本上执行**有界真实 ROM 标定**：夹具玩家在悬停座上右键夹具音符盒，一个原始箱子矿车越过输出平面并自然落入虚空被移除，随后在同一世界副本上执行无 mod 对照；七类失败用例、真实 hit/miss 身份探针、四个负例与冻结轨迹）、`identity`（五条 player_context 记录）、`devcap`（真实构建/加载/依赖探针、同尺寸 jar 更新、重启后机器实体快照+验证、preflight 派生的工具环境、真实重启/状态隔离与冲突拒绝）、`trace`（冻结轨迹到门禁工具轨迹、因果 join、缺失日志检测）、`smoke`（五套 smoke 套件、无 mod 对照、原始计数器 hook 开销、版本锁）、`compose`（审计导出、恢复快照与失败用例、bundle 规格、门禁运行）。
 
-2026-09-25 通过运行的关键事实：地图 `469548…1387`；三次 init run 一致（`86215e40…`）；恢复 13 个实体，前后顺序哈希均为 `cc76834fd15c0e21`；七类失败用例全部通过；11 条 canonical agent 事件（含 `cart_removed`）；47 次冻结调用、11 条 verified join、0 个未匹配 agent 事件；27 条 evidence index 固定项；源世界 `8cd54c86…` 未改变。
+评审修复运行 `rom13-fullgate-20260926T011803Z` 的关键事实：地图 `469548…1387`；本 run 三次 init 一致（`86215e40…`/`a3ba3757…`，09:19-09:21 本地时间）；恢复 10 个实体并验证（顺序哈希 `2df69346…`）；七类失败用例全部通过（含修复后的 `unverified`）；10 条 canonical agent 事件（两个实例，`input_processed` 走真实 `playNote` 路径）；60 次冻结调用、10 条 verified join（6 条直接 receipt + 4 条有界 tick 链）、0 个未匹配 agent 事件；无 mod 对照一致；hook 开销 101.99 ms（来自原始计数器）；27 条 evidence index 固定项；源世界 `8cd54c86…` 在运行前后分别观测且未改变。
 
 ```bash
 python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity \
@@ -25,7 +25,7 @@ python tools/stage1_fullgate.py live && python tools/stage1_fullgate.py identity
 
 
 !!! warning "不做 ROM 解法"
-    场景只是一个通用音符盒把一摞箱子矿车推入虚空。它是接线验证，不是 ROM，也不是 Agent 运行。这里不写 Agent logger，也不给未来的冷启动喂答案。
+    阶段一只做夹具机器上的有界标定与独立审计（真实输入 -> 输出 -> 虚空移除），不是 ROM 解法，不是 Agent 运行。这里不写 Agent logger，也不给未来的冷启动喂答案。
 
 ## 运行内容
 
