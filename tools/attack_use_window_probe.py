@@ -252,39 +252,57 @@ def main(argv: list[str] | None = None) -> int:
         "driver": driver,
         "logPath": str(log),
     }
-    try:
-        with lab_server.open_console(lab_dir) as console:
-            console.command("forceload add -16 -16 16 16")
-            console.command("fill -3 -60 -3 3 -60 3 minecraft:stone")
-            console.command("setblock 0 -59 0 minecraft:note_block")
-            # A non-air block above keeps vanilla from scheduling the block
-            # event, so the playNote pending contract is the one under test.
-            console.command("setblock 0 -58 0 minecraft:stone")
-            console.command("player Bot spawn at 0.5 -59.0 2.5 facing 180 30 in minecraft:overworld in creative")
-            deadline = time.time() + 60
-            while time.time() < deadline:
-                probe = console.command("data get entity Bot Pos")
-                if "has the following entity data" in probe:
-                    break
-                time.sleep(0.5)
-            else:
-                raise RuntimeError("the probe fake player never spawned")
-            console.command("gamemode survival Bot")
-            console.command("player Bot look 30 180")
-            console.command("mcaudit phase init")
-            console.command("mcaudit phase experiment_start")
-            # The two commands go out back-to-back on the persistent
-            # connection: no process spawn between them, so they land in the
-            # same server-thread batch (same or adjacent tick).
-            start = time.time()
-            attack_reply = console.command("player Bot attack once")
-            use_reply = console.command("player Bot use once")
-            report["attackReply"] = attack_reply[-300:]
-            report["useReply"] = use_reply[-300:]
-            report["commandRoundTripMs"] = round((time.time() - start) * 1000.0, 3)
+    def c(console: Any, command: str) -> str:
+        # A freshly force-loaded void world can lag behind for a moment; give
+        # each command a generous reply window over the persistent connection.
+        return console.command(command, idle=10.0)
+
+    def setup(console: Any) -> None:
+        c(console, "forceload add -16 -16 16 16")
+        time.sleep(1.0)
+        c(console, "fill -3 -60 -3 3 -60 3 minecraft:stone")
+        c(console, "setblock 0 -59 0 minecraft:note_block")
+        # A non-air block above keeps vanilla from scheduling the block event,
+        # so the playNote pending contract is the one under test.
+        c(console, "setblock 0 -58 0 minecraft:stone")
+        c(console, "player Bot spawn at 0.5 -59.0 2.5 facing 180 30 in minecraft:overworld in creative")
+        deadline = time.time() + 120
+        while time.time() < deadline:
+            probe = c(console, "data get entity Bot Pos")
+            if "has the following entity data" in probe:
+                break
             time.sleep(1.0)
-            console.command("mcaudit phase experiment_end")
-            console.command("mcaudit end")
+        else:
+            raise RuntimeError("the probe fake player never spawned")
+        c(console, "gamemode survival Bot")
+        c(console, "player Bot look 30 180")
+        c(console, "mcaudit phase init")
+        c(console, "mcaudit phase experiment_start")
+
+    console = lab_server.open_console(lab_dir)
+    try:
+        for attempt in range(3):
+            try:
+                setup(console)
+                break
+            except (lab_server.RconError, OSError) as error:
+                console.close()
+                time.sleep(5.0)
+                console = lab_server.open_console(lab_dir)
+        else:
+            raise RuntimeError("the RCON console could not stay connected for setup")
+        # The two commands go out back-to-back on the persistent connection:
+        # no process spawn between them, so they land in the same server-thread
+        # batch (same or adjacent tick).
+        start = time.time()
+        attack_reply = c(console, "player Bot attack once")
+        use_reply = c(console, "player Bot use once")
+        report["attackReply"] = attack_reply[-300:]
+        report["useReply"] = use_reply[-300:]
+        report["commandRoundTripMs"] = round((time.time() - start) * 1000.0, 3)
+        time.sleep(1.0)
+        c(console, "mcaudit phase experiment_end")
+        c(console, "mcaudit end")
         report["events"] = read_jsonl(log)
         report["analysis"] = analyse(report["events"])
         report["rawLogSha256"] = sha256_file(log)
@@ -292,6 +310,10 @@ def main(argv: list[str] | None = None) -> int:
         (out / "audit-window.jsonl").write_bytes(log.read_bytes())
         write_json(out / "probe-report.json", report)
     finally:
+        try:
+            console.close()
+        except Exception:  # noqa: BLE001 - closing a broken probe console is best effort
+            pass
         if not args.keep_lab:
             run([sys.executable, str(LAB_SERVER), "stop", "--name", args.lab, "--timeout", "120"])
 
