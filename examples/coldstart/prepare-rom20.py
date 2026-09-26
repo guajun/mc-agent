@@ -1014,12 +1014,19 @@ def stage_clean(env: dict[str, Any], receipts: Receipts) -> dict[str, Any]:
     recorded = read_json(state_file) or {}
     for key, info in recorded.items():
         pid = int(info.get("pid") or 0)
+        listen_pid = int(info.get("listen_pid") or 0)
         port = int(info.get("api_port") or 0)
         owner = port_owner(port) if port else None
-        if owner and owner != pid:
-            raise PrepError(f"port {port} is owned by pid {owner}, not by the recorded bridge pid {pid}")
-        if pid and terminate_pid(pid):
-            killed.append({"key": key, "pid": pid, "api_port": port})
+        candidates = {candidate for candidate in (pid, listen_pid) if candidate}
+        # The venv python.exe launcher starts the real interpreter as a child,
+        # so the spawned pid and the socket owner can differ; both are recorded.
+        if owner and owner not in candidates:
+            raise PrepError(
+                f"port {port} is owned by pid {owner}, not by the recorded bridge pids {sorted(candidates)}"
+            )
+        for candidate in sorted(candidates | ({owner} if owner else set())):
+            if terminate_pid(candidate):
+                killed.append({"key": key, "pid": candidate, "api_port": port})
     removed: list[str] = []
     for lab_key in ("source", "experiment"):
         lab = env["labs"][lab_key]["name"]
@@ -1076,9 +1083,11 @@ def start_bridge(env: dict[str, Any], lab_key: str, run_root: Path, receipts: Re
         time.sleep(2)
     if status is None:
         raise PrepError(f"bridge for {lab['name']} did not report connected within 90s; see {log}")
+    listen_pid = port_owner(lab["bridge_port"])
     return {
         "lab": lab["name"],
         "pid": pid,
+        "listen_pid": listen_pid,
         "api_port": lab["bridge_port"],
         "server_dir": str(lab_dir),
         "log": str(log),
@@ -1092,8 +1101,11 @@ def stage_bridges(env: dict[str, Any], run_root: Path, receipts: Receipts) -> di
         "source": start_bridge(env, "source", run_root, receipts),
         "experiment": start_bridge(env, "experiment", run_root, receipts),
     }
-    write_json(REPO / "labs" / "_bridges.json", {key: {"pid": value["pid"], "api_port": value["api_port"]}
-                                                for key, value in bridges.items()})
+    write_json(REPO / "labs" / "_bridges.json", {
+        key: {"pid": value["pid"], "listen_pid": value.get("listen_pid"),
+              "api_port": value["api_port"]}
+        for key, value in bridges.items()
+    })
     return receipts.write("bridges", {"bridges": bridges})
 
 
@@ -1178,7 +1190,8 @@ def stage_finalize(
     })
     trace_record(env, run_trace_dir, {
         "record": "mark", "name": "bridges_ready", "actor": "operator", "phase": "prepare",
-        "data": {key: {"pid": value.get("pid"), "api_port": value.get("api_port"),
+        "data": {key: {"pid": value.get("pid"), "listen_pid": value.get("listen_pid"),
+                       "api_port": value.get("api_port"),
                        "log": value.get("log"), "source": value.get("source")}
                  for key, value in (bridges.get("bridges") or {}).items()},
     })
@@ -1329,7 +1342,10 @@ def stage_finalize(
         "",
     ]
     for key, value in (bridges.get("bridges") or {}).items():
-        summary_lines.append(f"- {key}: pid {value.get('pid')} api {value.get('api_port')} log `{value.get('log')}`")
+        summary_lines.append(
+            f"- {key}: pid {value.get('pid')} (listen {value.get('listen_pid')}) "
+            f"api {value.get('api_port')} log `{value.get('log')}`"
+        )
     summary_lines += [
         "",
         "## Launch command (coordinator; not executed by the operator)",
