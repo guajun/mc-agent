@@ -74,7 +74,7 @@ def main() -> int:
         "derived run: fixture/preflight paths made absolute for relocation; test_mod points at the fixed "
         "projection; agent logger raw output is the frozen copy. Raw task evidence remains the freeze snapshot."
     )
-    evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    evidence_path.write_text(json.dumps(evidence, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
     run_path = RUN / "run.json"
     run = json.loads(run_path.read_text(encoding="utf-8"))
@@ -87,7 +87,7 @@ def main() -> int:
         "derivation_file": "trajectory-derivation.json",
         "created_at_preserved": run.get("created_at"),
     }
-    run_path.write_text(json.dumps(run, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    run_path.write_text(json.dumps(run, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({k: evidence[k].get("path") if isinstance(evidence[k], dict) else evidence[k] for k in ("agent_logger", "test_mod", "answer", "oracle", "restore")}, indent=2))
     return 0
 

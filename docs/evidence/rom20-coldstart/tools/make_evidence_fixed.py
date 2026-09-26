@@ -55,7 +55,7 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def write_json(path: Path, payload) -> None:
-    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
 
 def iso_from_wall(wall_ms: int) -> str:

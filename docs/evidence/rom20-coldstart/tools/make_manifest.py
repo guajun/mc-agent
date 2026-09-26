@@ -115,7 +115,7 @@ def main() -> int:
         "raw_sources": raw_sources,
         "derived_products": derived_products,
     }
-    (DERIVED / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    (DERIVED / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({
         "freeze_verified": True,
         "raw_sources": len(raw_sources),

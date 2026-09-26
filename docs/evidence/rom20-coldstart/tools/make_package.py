@@ -68,7 +68,7 @@ def main() -> int:
         },
     }
     (PKG / "logger" / "build-provenance.json").write_text(
-        json.dumps(build, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(build, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
     )
 
     manifest = {
@@ -109,7 +109,7 @@ def main() -> int:
         ],
     }
     (PKG / "manifest.json").write_text(
-        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n"
     )
     print("build provenance + manifest written")
     print("committed files:", len(manifest["committed"]))

@@ -253,7 +253,7 @@ def main() -> int:
             "sha256": sha256(trajectory_path),
         },
     }
-    args.out_derivation.write_text(json.dumps(derivation, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    args.out_derivation.write_text(json.dumps(derivation, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({
         "canonical_records": len(merged),
         "original_records": len(original),
