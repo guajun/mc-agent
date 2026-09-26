@@ -1,0 +1,95 @@
+{
+  "schema": "mc-agent/rom20-environment/1",
+  "doc": "Fixed inputs for the meta20 (rom20) operator preparation. This file is tracked; it is operator setup, not agent context. The clean agent context is built from examples/coldstart/task-minecart-rom.md, the generated ENV.md and the generic minecraft-toolkit skill only.",
+  "repo": {
+    "root": "F:/mc-agent-worktrees/rom13/coldstart",
+    "branch": "codex/rom13-coldstart",
+    "base_commit": "ce08fd3bff55e153ea67b7b64db22566c0da838c"
+  },
+  "python": "F:/mc-agent/.venv/Scripts/python.exe",
+  "java": "C:/Users/MSI-NB/AppData/Roaming/.hmcl/java/windows-x86_64/mojang-java-runtime-epsilon/bin/java.exe",
+  "jdk": "C:/Users/MSI-NB/AppData/Roaming/.hmcl/java/windows-x86_64/mojang-java-runtime-epsilon",
+  "pi": {
+    "command": "C:/Users/MSI-NB/.pi/agent/bin/pi.cmd",
+    "version": "0.87.1"
+  },
+  "model": {
+    "provider": "deepseek",
+    "model": "deepseek/deepseek-flash",
+    "thinking": "max"
+  },
+  "bridge": {
+    "worktree": "F:/mc-agent-worktrees/rom13/bridge6",
+    "src": "F:/mc-agent-worktrees/rom13/bridge6/src",
+    "commit": "4116ebb34b60e962e95834791d521b369fd52c65",
+    "wrapper": "labs/_bin/mc-bridge-rom20.cmd"
+  },
+  "agent_loop": {
+    "root": "F:/mc-agent/agent-loop",
+    "commit": "943f90d344a19321e1106ed0f5659eeff0dbb3d2"
+  },
+  "interface_jar": {
+    "path": "F:/mc-agent-worktrees/rom13/meta16/labs/_build/mods/mc-agent-interface-0.6.0.jar",
+    "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f"
+  },
+  "audit_jar": {
+    "path": "F:/mc-agent-worktrees/rom13/fullgate/tests/mods/minecart-audit/dist/mc-minecart-audit-0.1.0.jar",
+    "sha256": "7a77e89d72969f23ce7b7c2543bfe992c2a3674171f3eb190a8e7faa8f2ec4ac"
+  },
+  "map_manifest": "examples/minecart-rom/map-manifest.json",
+  "task_file": "examples/coldstart/task-minecart-rom.md",
+  "skill_source": "skills/minecraft-toolkit",
+  "source_save": "D:/MC/MC_Game/.minecraft/versions/26.2-Fabric/saves/Minecart ROM test",
+  "source_before": "F:/mc-agent-worktrees/rom13/source-before.json",
+  "source_tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+  "source_files": 40,
+  "task_uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+  "sessions": {
+    "agent_raw": "F:/mc-agent-worktrees/rom13/meta20-session.jsonl",
+    "operator_prep_raw": "F:/mc-agent-worktrees/rom13/meta20-prepare-session.jsonl"
+  },
+  "reports": {
+    "prepared_json": "F:/mc-agent-worktrees/rom13/meta20-prepared.json",
+    "prepared_md": "F:/mc-agent-worktrees/rom13/meta20-prepared.md"
+  },
+  "labs": {
+    "source": {
+      "name": "rom20-src",
+      "instance_id": "source",
+      "server_port": 27192,
+      "rcon_port": 27193,
+      "vantage_port": 27191,
+      "bridge_port": 27190
+    },
+    "experiment": {
+      "name": "rom20-exp",
+      "instance_id": "experiment",
+      "server_port": 27196,
+      "rcon_port": 27197,
+      "vantage_port": 27195,
+      "bridge_port": 27194
+    }
+  },
+  "reserved_port_range": [27190, 27199],
+  "audit": {
+    "sample_interval_ticks": 20,
+    "correlation_window_ticks": 2,
+    "cart_types": ["minecraft:chest_minecart"],
+    "input_region": {"name": "note-block", "from": [11, -54, -23], "to": [11, -54, -23]},
+    "stack_region": {"from": [13, -53, -23], "to": [15, -50, -21]},
+    "output_region": {"name": "output", "from": [16, -140, -24], "to": [24, -45, -20]},
+    "provenance_source": {"kind": "source-world", "reference_kind": "lab-world"},
+    "provenance_experiment": {"kind": "fork", "reference_kind": "source-lab-world"}
+  },
+  "challenge": {
+    "carts": 5,
+    "max_slots": 4,
+    "max_count": 5,
+    "require_duplicate_item_ids": true
+  },
+  "cache_reuse": {
+    "mods_from": "F:/mc-agent-worktrees/rom13/fullgate/labs/_cache/mods",
+    "launcher_from": "F:/mc-agent-worktrees/rom13/fullgate/labs/_cache",
+    "fabric_from_lab": "rom20-src"
+  }
+}
