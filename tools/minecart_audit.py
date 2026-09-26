@@ -1125,17 +1125,28 @@ def derive_lifecycle(
     states.append("flush")
 
     # Per-instance files plus append-only contiguity, both from the raw files.
+    # The frozen copies may share one collection directory; what matters is
+    # one distinct file and one distinct instance per exported log.
     sequences = list(entry_sequences or [])
     if not sequences:
         raise SystemExit("lifecycle needs the per-file raw sequences")
-    parents = {str(Path(item["path"]).parent) for item in sequences}
-    per_instance = len(parents) == len(sequences)
+    paths = [str(item["path"]) for item in sequences]
+    instances = [str(item.get("instance_id") or "") for item in sequences]
+    per_instance = (
+        len(set(paths)) == len(sequences)
+        and len(set(instances)) == len(sequences)
+        and all(instances)
+    )
     if not per_instance:
-        raise SystemExit(f"event logs are not per-instance files: {sorted(parents)}")
+        raise SystemExit(f"event logs are not one file per instance: {list(zip(paths, instances))}")
     contiguous = all(item.get("contiguous") for item in sequences)
     if not contiguous:
         raise SystemExit(f"an event file is not append-only contiguous: {sequences}")
-    evidence["per_instance_files"] = {"files": sequences, "distinct_log_dirs": len(parents)}
+    evidence["per_instance_files"] = {
+        "files": sequences,
+        "distinct_files": len(set(paths)),
+        "distinct_instances": len(set(instances)),
+    }
     evidence["ring_buffer"] = {"files": sequences, "contiguous": contiguous}
 
     if not isinstance(missing_log_probe, dict) or missing_log_probe.get("value") is not True:
