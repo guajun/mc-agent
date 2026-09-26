@@ -220,8 +220,9 @@ def main(argv: list[str] | None = None) -> int:
     if provision.returncode != 0:
         raise SystemExit(f"provision failed: {provision.stderr[-500:]}")
     lab_dir = LABS / args.lab
+    run_id = f"{args.lab}-window-{time.strftime('%Y%m%dT%H%M%SZ', time.gmtime())}"
     config = {
-        "runId": f"{args.lab}-window",
+        "runId": run_id,
         "instanceId": args.lab,
         "dimension": "minecraft:overworld",
         "provenance": {"kind": "same-window-probe", "reference": "tools/attack_use_window_probe.py"},
@@ -242,7 +243,7 @@ def main(argv: list[str] | None = None) -> int:
     sys.path.insert(0, str(ROOT / "tools"))
     import lab_server  # noqa: E402
 
-    log = lab_dir / "mc-audit" / f"audit-{config['runId']}.jsonl"
+    log = lab_dir / "mc-audit" / f"audit-{run_id}.jsonl"
     report: dict[str, Any] = {
         "kind": "mc-agent/attack-use-window-probe@1",
         "lab": args.lab,
@@ -275,7 +276,17 @@ def main(argv: list[str] | None = None) -> int:
         else:
             raise RuntimeError("the probe fake player never spawned")
         c(console, "gamemode survival Bot")
+        # Idempotent placement: a fake player saved from an earlier probe can
+        # sit anywhere in the world, so always park it on the pad and aim it.
+        c(console, "tp Bot 0.5 -59.0 2.5 180 30")
         c(console, "player Bot look 30 180")
+        note = c(console, "execute if block 0 -59 0 minecraft:note_block")
+        if "Test passed" not in note:
+            c(console, "setblock 0 -59 0 minecraft:note_block")
+        above = c(console, "execute if block 0 -58 0 minecraft:stone")
+        if "Test passed" not in above:
+            c(console, "setblock 0 -58 0 minecraft:stone")
+        time.sleep(1.0)
         c(console, "mcaudit phase init")
         c(console, "mcaudit phase experiment_start")
 
@@ -299,16 +310,17 @@ def main(argv: list[str] | None = None) -> int:
         # batch (the same or adjacent tick).
         start = time.time()
         console._send(2, lab_server.Rcon.TYPE_COMMAND, "player Bot attack once")
-        console._send(2, lab_server.Rcon.TYPE_COMMAND, "player Bot use once")
+        console._send(3, lab_server.Rcon.TYPE_COMMAND, "player Bot use once")
         report["commandSendGapMs"] = round((time.time() - start) * 1000.0, 3)
-        time.sleep(1.0)
-        try:
-            for _ in range(4):
-                console._read_packet(idle=0.2)
-        except Exception as error:  # noqa: BLE001 - draining is best effort
-            report["drainError"] = f"{type(error).__name__}: {error}"
+        time.sleep(1.5)
+        # A fresh connection for the closing commands: the two nowait packets
+        # leave unread replies that must not confuse the next synchronous call.
+        console.close()
+        console = lab_server.open_console(lab_dir)
+        console.connect()
         c(console, "mcaudit phase experiment_end")
         c(console, "mcaudit end")
+        console.close()
         report["events"] = read_jsonl(log)
         report["analysis"] = analyse(report["events"])
         report["rawLogSha256"] = sha256_file(log)
