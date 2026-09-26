@@ -87,7 +87,7 @@
     ]
   },
   "assertions": [
-    "two live commands over one persistent RCON connection, 122 ms apart (same/adjacent tick)",
+    "two live commands over one persistent RCON connection, ~122 ms apart (same/adjacent tick)",
     "attack request tick 1055, use request tick 1056 -> gap 1 tick <= correlationWindowTicks 2",
     "exactly one input_processed (path playNote) and it consumes the useWithoutItem attempt",
     "no processed event is attributed to an attack request/attempt"

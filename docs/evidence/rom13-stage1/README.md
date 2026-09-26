@@ -21,7 +21,7 @@ them, so a reviewer can spot-check any pinned hash against the raw file.
 `attack-use-window-probe.json` is the compact record of the supplemental
 stage-two prerequisite probe: `tools/attack_use_window_probe.py` (driver
 commit `5f135267947e91910ab70a8740f07c36a481a8a8`, raw log sha256 starts
-`4dff5d51…`) sent a punch and a use over one persistent RCON connection on a
+`9269bce8…`) sent a punch and a use over one persistent RCON connection on a
 fresh disposable lab with the unchanged audit jar. The raw requests are **1
 tick apart** (<= `correlationWindowTicks: 2`), exactly one `input_processed`
 (`playNote`) belongs to the use, and no processed event is attributed to the
