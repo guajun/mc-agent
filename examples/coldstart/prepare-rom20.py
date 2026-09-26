@@ -809,7 +809,13 @@ def stage_fixture(env: dict[str, Any], run_id: str, run_root: Path, operator: Pa
     if fetch.get("extract", {}).get("world_sha256") != manifest["world"]["sha256"]:
         raise PrepError("unpacked world does not match the manifest world hash")
 
-    # 2. reset the preflight lab into the fixture world (stops it first)
+    # 2. enforce the audit mod as a required test mod (lab is stopped; the
+    #    preflight void world is still in place and is replaced next)
+    testmod = provision_test_mod(env, "source", receipts)
+
+    # 3. reset the preflight lab into the fixture world (stops it first); this
+    #    re-provision keeps the required audit mod and labels the world
+    #    "copied save" with its source
     import_result, import_record = run_json([
         env["python"], str(runner), "import", "--lab", source["name"], "--reset",
         "--java", env["java"], "--memory", "3G",
@@ -823,9 +829,12 @@ def stage_fixture(env: dict[str, Any], run_id: str, run_root: Path, operator: Pa
     receipts.log("import-world", import_record["stdout"] + import_record["stderr"])
     if import_result.get("manifest_version") != manifest["version"]:
         raise PrepError("imported world does not carry the pinned manifest version")
-
-    # 3. enforce the audit mod as a required test mod (lab is stopped)
-    testmod = provision_test_mod(env, "source", receipts)
+    lab_state = read_json(REPO / "labs" / source["name"] / "lab.json") or {}
+    if lab_state.get("world") != "copied save" or not lab_state.get("worldSource"):
+        raise PrepError(
+            f"source lab world metadata is {lab_state.get('world')!r}/{lab_state.get('worldSource')!r},"
+            " expected a copied save with a source"
+        )
 
     # 4. audit config before the first fixture start
     audit_config = write_audit_config(env, run_id, "source", str((source_lab_dir / "world").resolve()))
