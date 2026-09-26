@@ -1,17 +1,18 @@
 # Minecart ROM acceptance runbook
 
-This is the parent-level path for [issue #13](https://github.com/guajun/mc-agent/issues/13):
-from tooling readiness ([#14](https://github.com/guajun/mc-agent/issues/14))
-through one audited real-agent cold start
-([#20](https://github.com/guajun/mc-agent/issues/20)) to a frozen real-game
-regression ([#21](https://github.com/guajun/mc-agent/issues/21)). It records
-the **current** state and the exact handoff commands; the detailed contracts
-live in the linked pages.
+This is the parent-level record of the Minecart ROM acceptance chain for
+[issue #13](https://github.com/guajun/mc-agent/issues/13): tooling readiness
+([#14](https://github.com/guajun/mc-agent/issues/14)), one audited real-agent
+cold start ([#20](https://github.com/guajun/mc-agent/issues/20)) and a frozen
+real-game regression ([#21](https://github.com/guajun/mc-agent/issues/21)).
+All three phases were executed, independently reviewed and merged; the child
+issues are closed and the accepted evidence packages are linked below. The
+detailed contracts live in the linked pages.
 
-**This page is not evidence.** A step counts only when it was actually run and
-its raw artifacts are retained. Nothing in this repository may mark an
-unfinished gate or issue as done, and no command below should be reported as a
-pass until the gate or audit prints it.
+**This page is not evidence.** The accepted facts live in the evidence packages
+and the merged PRs; a step counts only when it was actually run and its raw
+artifacts were retained. Nothing here may mark a gate or issue as passed
+without that evidence.
 
 Detailed contracts:
 
@@ -33,36 +34,52 @@ Detailed contracts:
 
 Dependency direction: stage-one evidence is produced by test-side tooling
 **before** #20; #20 adds the agent's own operations, logger and answer; #21
-extracts the reviewed #20 artifacts into a parameterized regression.
+extracts the reviewed #20 artifacts into a parameterized regression. All three
+stages completed under these rules; the accepted evidence is in the final
+acceptance section below.
 
-## Current status (verified 2026-09-26, repo head `9b028d3`)
+## Final acceptance (main `b54e1e8`, 2026-09-26)
 
-| Item | State | Evidence |
+All three phases were executed, independently reviewed and merged. Issues
+#14-#21 are closed; the parent acceptance record is
+[issue #13](https://github.com/guajun/mc-agent/issues/13).
+
+| Phase | Issue | Merged PR | Accepted evidence | Independent review |
+| --- | --- | --- | --- | --- |
+| 1. Toolchain gate | [#14](https://github.com/guajun/mc-agent/issues/14) | [#30](https://github.com/guajun/mc-agent/pull/30) `ce08fd3` | gate **PASS 8/8** (exit 0); run `rom13-fullgate-20260926T044858Z`, executed source `6e009108...`, audit jar `7a77e89d...`; [full-gate summary](evidence/rom13-stage1/full-gate-summary.json), [stage-one evidence README](evidence/rom13-stage1/README.md) | [review 5324700330](https://github.com/guajun/mc-agent/pull/30#pullrequestreview-5324700330) plus the accepted supplemental probe |
+| 2. Audited cold start | [#20](https://github.com/guajun/mc-agent/issues/20) | [#32](https://github.com/guajun/mc-agent/pull/32) `ef05c0b` | one fresh pi session (0.87.1, `deepseek/deepseek-flash`, thinking `max`), 157 tool calls, no task-time human help; the agent's own logger captured 5 real carts; run audit **5/5 PASS**; run `rom20-20260926T063100Z`, executed source `1deb735`; [ROM20 evidence](evidence/rom20-coldstart/README.md) | [review 5325036876](https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325036876) at `1fa769e` |
+| 3. Frozen regression | [#21](https://github.com/guajun/mc-agent/issues/21) | [#34](https://github.com/guajun/mc-agent/pull/34) `b54e1e8` | 3 fresh instances, 2 calibrated programs, 1 cold download, same-size jar iteration (21,530 bytes, new hash, restart + re-restore), 8 negatives (5 live, 3 offline); game execution `c5fa37b`, offline verifier hardened at `8f28aea`; [regression page](rom21-regression.md), [ROM21 evidence](evidence/rom21-regression/README.md) | [review 5325226293](https://github.com/guajun/mc-agent/pull/34#pullrequestreview-5325226293) at `ae5cc96` |
+
+Merged prerequisite PRs: bridge#8, bridge#9, #22-#29, #30, #32, #34. Issues
+#14-#21 are closed with evidence (bridge#6 closed through bridge PR #9).
+[bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) (optional
+Hermes webhook compatibility) remains open and is **not** part of this
+acceptance. The root issue #13 records the final acceptance of this chain.
+
+The source save was unchanged through every acceptance run: tree hash
+`8cd54c86...324a`, 40 files, 11,556,310 bytes.
+
+### Original model capability vs frozen regression
+
+| | Original #20 cold start | #21 regression |
 | --- | --- | --- |
-| stage-one gate tool | merged (#22) | `tools/stage1_gate.py`; `selftest` **152 checks** |
-| cold-start protocol tools | merged (#25) | `tools/coldstart.py`, `harness_preflight.py`, `run_trace.py`, `run_audit.py` |
-| combined integration driver | merged (#28, `2675825`) | `tools/stage1_integration.py`; [stage-one integration run](stage1-integration.md) |
-| full gate acceptance driver | on branch `codex/rom13-fullgate` (PR #30 for #14), review-fix run | `tools/stage1_fullgate.py`; real bounded ROM calibration + no-mod parity + post-restart memory verify; [full gate summary](evidence/rom13-stage1/full-gate-summary.json) |
-| fixture #15 | merged (#27, `8dd75c6`) | `examples/minecart-rom/` |
-| audit mod #18 | merged (#26, `824c15d`) | `tests/mods/minecart-audit/` |
-| live stage-one gate | **PASS 8/8** (exit 0) on branch `codex/rom13-fullgate`, pending human review | [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json) |
-| stage #20 | independently reviewed as a proven-successful cold start; package run audit 5/5 PASS after recording the review resolutions; awaiting final code review | one fresh model session (pi 0.87.1 / deepseek-flash) at `1deb735`; run + own logger + canonical trajectory in [`docs/evidence/rom20-coldstart/README.md`](evidence/rom20-coldstart/README.md); [review 5325010883](https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325010883) |
-| stage #21 | not prepared | - |
-| source save | unchanged through the full gate run | tree hash `8cd54c86...324a` (40 files, 11,556,310 bytes) |
+| What it proves | a fresh model context autonomously researched the machine, wrote its own logger and operated it | the successful recipe reproduces on fresh real instances, with no model |
+| Model involvement | pi 0.87.1 / `deepseek-flash`, thinking `max`, 157 tool calls, no task-time human help | none; a scripted real-game run |
+| Evidence | [ROM20 package](evidence/rom20-coldstart/README.md) (frozen answer and independent oracle) | [ROM21 package](evidence/rom21-regression/README.md) and [regression page](rom21-regression.md) |
+| Reproduce offline | rebuild the logger and re-derive the projection from the frozen raw logs ([ROM20 reproduction](evidence/rom20-coldstart/README.md)) | `python tools/rom21_regression.py selftest`; `python tools/rom21_verify.py verify --run docs/evidence/rom21-regression/runs/<run-id>/verify-gen1` |
+| Reproduce live | not repeatable without a new autonomous session; the frozen package is the evidence | `python tools/rom21_regression.py suite --stamp <new-stamp>` then `python tools/rom21_regression.py negatives` (needs Java 25, game and network) |
+| Demo | - | `python examples/minecart-rom/regression/demo/demo.py` (reuses the committed package) |
 
-Merged prerequisite PRs: bridge#8, bridge#9, #22, #23, #24, #25,
-#26, #27, #28, #29. Issues #16, #17 and bridge#6 are closed with evidence
-comments. The full gate pass above is the acceptance run for #14; only a
-reviewed `pass` authorizes stage two, and the agent does not merge it.
+**Regression results are not model-capability evidence.** The #21 page and
+package say so explicitly; the original #20 evidence stays frozen, the
+calibrated runs never assume the pop order from the spawn order, and no
+empty/duplicate-inventory coverage is claimed.
 
-The historical notes below were written when #15/#18 were still snapshots on
-open branches. They are kept as history; the accepted heads are now merged in
-`main` and are pinned in the full gate summary.
-
-The merged heads above are the accepted inputs for the full gate run. Before
-re-running a recipe, re-resolve them, for example
-`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`, and check that
-the tree still matches the pinned hashes in the full gate summary.
+!!! note "Historical snapshot note (pre-merge)"
+    This page was written while PR #27 and PR #26 were still open and labeled
+    those inspected snapshots `37fb824` and `0e8c15b`. Both are merged now
+    (#27 `8dd75c6`, #26 `824c15d`), and the full-gate run pinned the accepted
+    hashes. Those snapshot labels are historical, not current heads.
 
 !!! note "Tracker history (historical record, 2026-09-25)"
     #14 and #19 were briefly closed right after the tooling PRs merged,
@@ -110,6 +127,9 @@ The one subtle requirement is the trace join:
   smoke call to the audit event (for example the audit command returning the
   sequence it logged, or an explicit `--joins` proof naming the command, the
   operator UUID and the shared clock). Never set `verified: true` by hand.
+* The accepted full-gate run closed this gap and produced the verified joins;
+  its pinned hashes are in the
+  [full-gate summary](evidence/rom13-stage1/full-gate-summary.json).
 
 If a stage-one check can only be satisfied by #20's agent, that is an
 implementation bug in the stage-one evidence path - fix the test-side smoke or
@@ -155,20 +175,17 @@ Defaults and outputs (verified against `stage1_integration.py`):
   `evidence.json`, `visibility.json`); see
   [`docs/evidence/rom13-stage1/README.md`](evidence/rom13-stage1/README.md).
 
-The gaps a re-run must fill from accepted prerequisite output are: the #15
-fixture evidence, the same-run restore artifacts, test-mod completion (manifest,
-negative cases, audit lifecycle, missing-log detection), the stage-one harness
-`tool_environment` and smoke-suite/version-lock/evidence-index set, and the
-verified joins described above.
+The full-gate acceptance run filled these gaps: the merged #15 fixture, the
+same-run restore, test-mod completion, the harness `tool_environment`, the
+smoke/version-lock/evidence-index set and the explicit-proof joins. Its pinned
+hashes are in the [full-gate summary](evidence/rom13-stage1/full-gate-summary.json);
+the earlier `integration-summary.json` stays as the honest `blocked` history.
 
-### 1.3 Fixture (#15, after PR #27 is accepted)
+### 1.3 Fixture (#15, merged)
 
-This recipe was verified against the PR #27 snapshot `37fb824` (2026-09-26);
-after that snapshot the branch was still under repair, so it is **not** on
-`main` yet. Before running, resolve the actual accepted/merged head
-(`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`) and re-check
-the runner flags against that tree. The recipe below is from that inspected
-snapshot tree:
+The fixture runner is merged in `main` (`examples/minecart-rom/`). The accepted
+three-initialization and full-gate evidence used the merged runner; the
+commands below reproduce the fixture flow:
 
 ```powershell
 python examples/minecart-rom/runner/minecart_rom.py fetch --cold
@@ -226,7 +243,8 @@ python tools/stage1_gate.py check labs/rom13-integration/bundle \
 Exit codes `0` pass, `1` fail, `3` blocked, `2` usage. `--skip-source-rehash`
 always blocks; a missing declared artifact blocks; a pass additionally needs
 the coordinator to review the raw evidence (the gate cannot prove that raw
-logs were not fabricated). Only then may #20 start.
+logs were not fabricated). That review happened before stage two: the
+full-gate run passed 8/8 and is the accepted #14 evidence.
 
 ### 1.6 Harness capability (stage-one artifact, no model)
 
@@ -250,12 +268,12 @@ model `deepseek-flash`, provider `deepseek`. `SKIP` never counts as `PASS`.
 
 ## Stage 2: exact recipe for the fresh cold start
 
-Preconditions: stage-one gate PASS reviewed; a new sealed challenge program
-generated for this run (never the public calibration default); the fixture
-ready and validated; the #18 audit mod loaded on both labs; a fresh pi session.
-The fixture runner itself comes with #15 (PR #27; snapshot and head resolution
-in section 1.3) - stage two cannot start before that is accepted. Example ports
-below stay inside the coldstart config's reserved `27190-27199` range.
+This is the reproduction recipe for the accepted #20 run (see the final
+acceptance table). It required a reviewed stage-one pass, a fresh sealed
+challenge different from the public calibration, a validated fixture, the #18
+audit mod on both labs and a fresh pi session; all of that is merged in `main`.
+Example ports below stay inside the coldstart config's reserved `27190-27199`
+range.
 
 ### 2.1 Pinned harness defaults
 
@@ -329,39 +347,29 @@ Copy the exact command flags from
 [auditable cold-start runs](coldstart-protocol.md) when this page and that one
 ever disagree - that page is the contract.
 
-## Stage 3: preconditions (do not start early)
+## Stage 3: accepted regression
 
-#21 may only start after a **reviewed, actually successful** #20 at a pinned
-head. Its acceptance needs real game data each run (no old-log replay, no model
-required), three fresh instances, at least two calibrated programs, at least
-one cold-download path, the negative cases listed in the issue, same-size jar
-iteration with deploy/restart/re-restore, and results labelled separately as
-"frozen regression result" versus "original cold-start capability evidence".
-The stage-2 agent's logger is only written after a real success - never in
-advance.
+#21 is accepted and merged ([#34](https://github.com/guajun/mc-agent/pull/34)
+`b54e1e8`), with the final independent review
+[5325226293](https://github.com/guajun/mc-agent/pull/34#pullrequestreview-5325226293)
+at `ae5cc96`. The preconditions that used to gate it were satisfied: a
+reviewed, actually successful #20; real game data on every run (no old-log
+replay, no model); 3 fresh instances; 2 calibrated programs; 1 cold download;
+the 8 declared negatives; and same-size jar iteration with
+deploy/restart/re-restore. Regression results are kept distinct from the
+original #20 capability evidence in the table above.
 
-## Exact remaining handoff steps
+Reproduction commands and semantics: [rom21-regression.md](rom21-regression.md)
+and the [ROM21 evidence package](evidence/rom21-regression/README.md).
 
-1. Finish review and merge PR #26 (#18) and PR #27 (#15); do not treat either
-   head as accepted before that.
-2. Extend the integration run's bundle with the now-available artifacts:
-   `tool_environment` (from `harness_preflight.py`), `smoke_mod` (generic
-   build/deploy/restart), fixture evidence, same-run restore snapshots/record,
-   test-mod manifest/negative cases/lifecycle, `missing-log-detection`, the
-   smoke/calibration/version-lock/evidence-index set, and verified joins with
-   explicit proof.
-3. Re-run `python tools/stage1_integration.py run` (or `--bundle-only` for
-   frozen inputs), then `stage1_gate.py check ... --source-world ... --report`.
-4. Post the report and raw artifact locations to issue #14; the coordinator
-   reviews hashes and raw logs. Only a reviewed full `pass` authorizes #20.
-5. Keep #14/#19 open (reopened 2026-09-25) until a reviewed full `pass`; do
-   not close either on a tooling merge, and never cite a tracker state as
-   acceptance.
-6. Prepare the fresh #20 environment per section 2 (new challenge, clean
-   context, recorded visibility, no pre-written logger) and run it as a
-   separate pi session once the gate pass is reviewed.
-7. Only after #20 is audited as a real success, extract #21 from its artifacts
-   under the section 3 conditions.
+## Final state
+
+* Child issues #14-#21 are closed with evidence; the parent acceptance record
+  is [issue #13](https://github.com/guajun/mc-agent/issues/13).
+* [bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) (optional
+  Hermes webhook compatibility) remains open and out of scope.
+* No further runtime work is planned for this acceptance. Any new work would be
+  a new issue with a new evidence package, not a rewrite of the frozen ones.
 
 ## Status integrity rules
 
@@ -379,5 +387,7 @@ advance.
 See also: [stage-one integration gate](stage1-gate.md),
 [stage-one integration run](stage1-integration.md),
 [auditable cold-start runs](coldstart-protocol.md),
+[ROM21 regression](rom21-regression.md),
+[audit test mod](minecart-audit.md),
 [mod building](mod-building.md), [lab servers](lab-server.md),
 [fork verification](fork-verify.md), [tools](tools.md).
