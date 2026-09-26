@@ -447,6 +447,8 @@ def verify_run(
         manifest_problems.append("runId is missing")
     if not run.get("instance"):
         manifest_problems.append("instance is missing")
+    if not str(run.get("agentUuid") or "").strip():
+        manifest_problems.append("agentUuid is missing; the task-player identity cannot be skipped")
     try:
         carts = program_carts(run)
         expected = int(run.get("expectedCartCount"))
@@ -616,9 +618,9 @@ def verify_run(
             operations_problems.append(f"seq {row.get('seq')}: request/attempt come from another server session")
         if row.get("operator") is None:
             operations_problems.append(f"seq {row.get('seq')}: processed input carries no operator")
-        if agent_uuid and _operator_uuid(row) != agent_uuid:
+        if _operator_uuid(row) != agent_uuid:
             operations_problems.append(f"seq {row.get('seq')}: operator {_operator_uuid(row)} != {agent_uuid}")
-        if agent_uuid and _operator_uuid(request) != agent_uuid:
+        if _operator_uuid(request) != agent_uuid:
             operations_problems.append(f"seq {request.get('seq')}: request operator is not the task player")
         if row.get("agentOp") is not True:
             operations_problems.append(f"seq {row.get('seq')}: agentOp is not true")

@@ -1371,6 +1371,11 @@ async def run_generation_negative(
     shutil.copyfile(logger_path, run_dir / "logger.jsonl")
     if audit_path.is_file():
         shutil.copyfile(audit_path, run_dir / "audit.jsonl")
+    # Hash the retained copies now: the server's shutdown flush appends a
+    # logger_flushed record after this point, and the evidence hash must name
+    # the artifact that is actually retained.
+    retained_logger_sha = sha256_file(run_dir / "logger.jsonl")
+    retained_audit_sha = sha256_file(run_dir / "audit.jsonl") if (run_dir / "audit.jsonl").is_file() else None
     audit_check = rv.run_audit_check(audit_path) if audit_path.is_file() else {"verdict": "missing"}
     write_json(run_dir / "audit-check.json", audit_check)
     run_manifest = {
@@ -1388,8 +1393,7 @@ async def run_generation_negative(
                            audit_check=audit_check, restore_verify=verified)
     write_json(run_dir / "verification.json", report)
     lab("stop", "--name", exp["name"], "--timeout", "180", check=False)
-    return {"verification": report, "loggerSha256": sha256_file(logger_path),
-            "auditSha256": sha256_file(audit_path) if audit_path.is_file() else None}
+    return {"verification": report, "loggerSha256": retained_logger_sha, "auditSha256": retained_audit_sha}
 
 
 def first_cart_uuid_and_slot(snapshot_dir: Path) -> tuple[str, int]:

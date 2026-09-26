@@ -180,6 +180,24 @@ class VerifierTests(unittest.TestCase):
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("capture_timing", report["failures"])
 
+    def test_synthetic_requires_agent_uuid(self) -> None:
+        run, logger_rows, audit_rows, extras = rv._synthetic_run()
+        mutated = copy.deepcopy(run)
+        mutated.pop("agentUuid")
+        report = rv.verify_run(mutated, logger_rows, audit_rows, **extras)
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("run_manifest", report["failures"])
+
+    def test_synthetic_requires_operator_match(self) -> None:
+        run, logger_rows, audit_rows, extras = rv._synthetic_run()
+        mutated = copy.deepcopy(audit_rows)
+        for row in mutated:
+            if row.get("type") == "input_processed":
+                row["operator"] = {"uuid": "11111111-2222-3333-4444-555555555555", "name": "Other"}
+        report = rv.verify_run(run, logger_rows, mutated, **extras)
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("agent_operations", report["failures"])
+
 
 COMMITTED_SAMPLES = sorted(
     (ROOT / "docs" / "evidence" / "rom21-regression" / "runs").glob("*/verify-*")
@@ -293,6 +311,20 @@ class CommittedSampleTests(unittest.TestCase):
         report = self._verify(audit_rows=audit_rows)
         self.assertEqual(report["verdict"], "fail")
         self.assertIn("audit_oracle", report["failures"])
+
+    def test_real_sample_rejects_missing_agent_identity(self) -> None:
+        run = copy.deepcopy(self.run)
+        run.pop("agentUuid")
+        report = self._verify(run=run)
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("run_manifest", report["failures"])
+        audit_rows = copy.deepcopy(self.audit_rows)
+        for row in audit_rows:
+            if row.get("type") == "input_processed":
+                row["operator"] = {"uuid": "11111111-2222-3333-4444-555555555555", "name": "Other"}
+        report = self._verify(audit_rows=audit_rows)
+        self.assertEqual(report["verdict"], "fail")
+        self.assertIn("agent_operations", report["failures"])
 
     def test_real_sample_rejects_capture_after_removal(self) -> None:
         run = copy.deepcopy(self.run)
