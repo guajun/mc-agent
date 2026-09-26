@@ -8,6 +8,7 @@ on:
       - "tests/**"
       - "examples/smoke-mod/**"
       - "examples/coldstart/**"
+      - "examples/minecart-rom/regression/**"
       - ".github/workflows/tools.yml"
   pull_request:
     paths:
@@ -15,6 +16,7 @@ on:
       - "tests/**"
       - "examples/smoke-mod/**"
       - "examples/coldstart/**"
+      - "examples/minecart-rom/regression/**"
       - ".github/workflows/tools.yml"
   workflow_dispatch:
 
@@ -35,3 +37,5 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Stage-one gate selftest (no Minecraft, no live evidence)
         run: python tools/stage1_gate.py selftest
+      - name: Minecart ROM regression tooling selftest (no Minecraft, no network)
+        run: python tools/rom21_regression.py selftest

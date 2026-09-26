@@ -48,6 +48,7 @@ nav:
       - Stage-one integration gate: stage1-gate.md
       - Stage-one integration run: stage1-integration.md
       - Minecart ROM acceptance runbook: minecart-rom-runbook.md
+      - "Minecart ROM regression (issue #21)": rom21-regression.md
   - Reference:
       - Tools: tools.md
       - Troubleshooting: troubleshooting.md
@@ -91,6 +92,7 @@ plugins:
             Stage-one integration gate: 阶段一集成门禁
             Stage-one integration run: 阶段一集成运行
             Minecart ROM acceptance runbook: Minecart ROM 验收 runbook
+            "Minecart ROM regression (issue #21)": Minecart ROM 回归（issue #21）
             Reference: 参考
             Tools: 工具
             Troubleshooting: 疑难排查

@@ -1,0 +1,195 @@
+{
+  "records": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-a1\\init\\source-ready",
+  "cart_count": 5,
+  "spawn_order": [
+    "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+    "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+    "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+    "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+    "d09386ce-522a-4e38-9b38-a10b395927ce"
+  ],
+  "normalized_hash": "317f116bc4f15f9855585f58e2f72fc75bab34cc216fa0dea3b33ffbd0196198",
+  "tick_order": [
+    "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+    "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+    "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+    "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+    "d09386ce-522a-4e38-9b38-a10b395927ce"
+  ],
+  "tick_order_hash": "f263668cd37f98b4",
+  "rcon_order": [
+    "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+    "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+    "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+    "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+    "d09386ce-522a-4e38-9b38-a10b395927ce"
+  ],
+  "interface": {
+    "order_hash": "93504bf35907122f",
+    "tick": 1315,
+    "mod_version": "0.6.0",
+    "cross_check_ok": true
+  },
+  "machine": {
+    "ok": true,
+    "checks": [
+      {
+        "pos": [
+          11,
+          -54,
+          -23
+        ],
+        "block": "minecraft:note_block[instrument=harp,powered=false]",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -54,
+          -22
+        ],
+        "block": "minecraft:sticky_piston[extended=false,facing=up]",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          12,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          13,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          14,
+          -53,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -52,
+          -22
+        ],
+        "block": "minecraft:redstone_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          14,
+          -52,
+          -22
+        ],
+        "block": "minecraft:powered_rail[powered=false,shape=north_south]",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -51,
+          -22
+        ],
+        "block": "minecraft:sand",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -50,
+          -22
+        ],
+        "block": "minecraft:sand",
+        "ok": true
+      },
+      {
+        "pos": [
+          13,
+          -49,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          11,
+          -48,
+          -22
+        ],
+        "block": "minecraft:sticky_piston[extended=false,facing=east]",
+        "ok": true
+      },
+      {
+        "pos": [
+          12,
+          -48,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          13,
+          -48,
+          -22
+        ],
+        "block": "minecraft:slime_block",
+        "ok": true
+      },
+      {
+        "pos": [
+          12,
+          -47,
+          -22
+        ],
+        "block": "minecraft:redstone_block",
+        "ok": true
+      }
+    ],
+    "note": 20,
+    "note_block": [
+      11,
+      -54,
+      -23
+    ]
+  },
+  "user": {
+    "name": "Romuser",
+    "UUID": "[I; 1052844757, -64534506, -1102594165, -388504211]",
+    "Pos": "[11.5d, -53.6d, -24.5d]",
+    "Rotation": "[0.0f, 50.5055f]",
+    "playerGameType": "1",
+    "RootVehicle": "{Entity: {NoGravity: 1b, Brain: {memories: {}}, Invulnerable: 0b, FallFlying: 0b, ShowArms: 0b, PortalCooldown: 0, AbsorptionAmount: 0.0f, DisabledSlots: 0, DeathTime: 0s, Pose: {}, id: \"minecraft:armor_stand\", Invisible: 1b, UUID: [I; 56334630, -1752543340, -1284258417, -1025525709], Tags: [\"minecart-rom-fixture\"], Motion: [0.0d, 0.0d, 0.0d], Small: 0b, Health: 20.0f, fall_distance: 0.0d, Air: 300s, OnGround: 1b, Marker: 1b, Rotation: [0.0f, 0.0f], current_impulse_context_reset_grace_time: 0, Pos: [11.5d, -53.0d, -24.5d], Fire: 0s, NoBasePlate: 0b, attributes: [{id: \"minecraft:movement_speed\", base: 0.7d}], HurtTime: 0s}, Attach: [I; 56334630, -1752543340, -1284258417, -1025525709]}",
+    "vehicle_uuid": "035b9926-978a-4f94-b373-c58fc2dfb833"
+  },
+  "validation": {
+    "ok": true,
+    "problems": [],
+    "normalized_hash": "317f116bc4f15f9855585f58e2f72fc75bab34cc216fa0dea3b33ffbd0196198",
+    "tick_order_hash": "f263668cd37f98b4",
+    "cart_count": 5
+  }
+}

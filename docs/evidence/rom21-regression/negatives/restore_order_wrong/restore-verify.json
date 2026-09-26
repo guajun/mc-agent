@@ -1,0 +1,12 @@
+{
+  "error": {
+    "method": "verify",
+    "params": {
+      "directory": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\negatives\\restore_order_wrong\\snapshot",
+      "target": "rom21-neg-20260926t083500z-exp"
+    },
+    "ok": false,
+    "error": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\negatives\\restore_order_wrong\\snapshot cannot be restored: 1 blocking issue(s). Nothing was sent to the game. [order_hash] meta.json: orderHash=93504bf35907122f but the file hashes to fb547f98c8bb0114",
+    "seconds": 0.001
+  }
+}

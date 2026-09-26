@@ -17,6 +17,82 @@ ROOT = Path("F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z")
 FREEZE = ROOT / "operator" / "post-task-freeze"
 DERIVED = ROOT / "operator" / "post-task-derived"
 
+#: The semantic reviews the independent PR #32 review resolved.  The
+#: packaging tools must never label a run PASS unless the audit itself says
+#: PASS *and* every one of these is recorded as resolved; a future
+#: regeneration with a PENDING or partial audit fails closed instead.
+REQUIRED_REVIEW_IDS = (
+    "machine_operated.causality",
+    "logger_armed_before_activation.running",
+    "answer_correct.oracle_independence",
+)
+
+#: Honest annotations for the three host-derived pins that predate the final
+#: post-review audit/verifier reruns (review #32, non-blocking note 1).  The
+#: pinned values are the manifest-generation-time host snapshots; the
+#: *committed* copies listed in the package manifest are authoritative.
+HOST_SNAPSHOT_NOTES = {
+    "run/audit/audit.json": (
+        "host snapshot at manifest generation; the post-review audit rerun produced host "
+        "sha256 e5e341398064ca4984eb452045c2c3d30d03d793ac4ee25c53eb77de62d6a74f (same 5-PASS "
+        "content, later `at`). The committed verification/audit.json "
+        "(sha256 0285923bb70ecc9427c8e05dfa05a4e4530207c4eaf4bf92c17149e0d38a8911) is authoritative."
+    ),
+    "run/audit/audit.md": (
+        "host snapshot at manifest generation; the post-review rerun produced host "
+        "sha256 9e51e21e96201242ddab5e2305136d247a212c978b7594e6985b484840b90cf8. The committed "
+        "verification/audit.md (sha256 977ce197e3f0d368451038a1c30d808530f8865f6759ef98712754f0d2b507fc) "
+        "is authoritative."
+    ),
+    "evidence/minecart-audit-check.json": (
+        "host snapshot at manifest generation (old CRLF render, sha256 "
+        "f608bc12af6373951453bcfb05e40c79976e1d7ab23c573573c7feb3f5c73819); the final host file "
+        "(LF, sha256 73bdd6d6361e124b5c40ea339397011e47e64bf6737f7e5d8022c09ab1effffc) is byte-equal "
+        "to the committed verification/minecart-audit-check.json and is authoritative."
+    ),
+}
+
+
+def assert_audit_resolved(run_dir: Path) -> dict:
+    """Fail closed unless the run audit is PASS and every required review is resolved."""
+    audit = json.loads((run_dir / "audit" / "audit.json").read_text(encoding="utf-8"))
+    reviews = [
+        json.loads(line)
+        for line in (run_dir / "reviews.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    problems: list[str] = []
+    if audit.get("overall") != "PASS":
+        problems.append(f"run audit overall is {audit.get('overall')!r}, not PASS")
+    failed_flags = [flag.get("flag") for flag in audit.get("flags") or [] if flag.get("status") != "PASS"]
+    if failed_flags:
+        problems.append(f"audit flags not PASS: {failed_flags}")
+    by_id = {str(review.get("id")): review for review in reviews}
+    for review_id in REQUIRED_REVIEW_IDS:
+        review = by_id.get(review_id)
+        if review is None:
+            problems.append(f"required review {review_id!r} is missing from reviews.jsonl")
+        elif review.get("status") != "resolved":
+            problems.append(f"required review {review_id!r} is {review.get('status')!r}, not resolved")
+    if problems:
+        raise SystemExit("refusing to stamp an accepted-run label: " + "; ".join(problems))
+    return {
+        "overall": audit["overall"],
+        "flag_count": len(audit.get("flags") or []),
+        "reviews_resolved": list(REQUIRED_REVIEW_IDS),
+    }
+
+
+def apply_host_snapshot_notes(products: list[dict]) -> list[dict]:
+    annotated: list[dict] = []
+    for product in products:
+        note = next(
+            (value for suffix, value in HOST_SNAPSHOT_NOTES.items() if str(product["path"]).endswith(suffix)),
+            None,
+        )
+        annotated.append(dict(product, host_snapshot_note=note) if note else product)
+    return annotated
+
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -40,6 +116,7 @@ def main() -> int:
 
     run = json.loads((FREEZE / "run-as-agent-left" / "run.json").read_text(encoding="utf-8"))
     derivation = json.loads((DERIVED / "run" / "trajectory-derivation.json").read_text(encoding="utf-8"))
+    audit_assertion = assert_audit_resolved(DERIVED / "run")
 
     raw_sources = [
         entry(FREEZE / "agent-session.jsonl", "frozen pi session (282 records, 157 tool calls)"),
@@ -84,6 +161,7 @@ def main() -> int:
         entry(DERIVED / "failures" / "first-spawn-romuser-console-excerpt.txt", "host-local console excerpt for the first-spawn failure (not frozen)"),
         entry(DERIVED / "failures" / "failure-evidence.json", "failure evidence provenance and hashes"),
     ]
+    derived_products = apply_host_snapshot_notes(derived_products)
 
     failure_facts = json.loads((DERIVED / "failures" / "failure-evidence.json").read_text(encoding="utf-8"))
     host_local_sources = [
@@ -143,7 +221,10 @@ def main() -> int:
                 "logger_armed_before_activation.running",
                 "answer_correct.oracle_independence",
             ],
-            "audit_after_resolution": "5/5 PASS",
+            "audit_after_resolution": (
+                f"{audit_assertion['flag_count']}/{audit_assertion['flag_count']} PASS"
+            ),
+            "audit_assertion": audit_assertion,
         },
         "freeze_manifest_sha256": sha256(FREEZE / "manifest.json"),
         "raw_sources": raw_sources,

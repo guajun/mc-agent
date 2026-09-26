@@ -1,0 +1,25 @@
+{
+  "kind": "live-negative",
+  "case": "restore_order_wrong",
+  "expectedCheck": "restore_verified",
+  "failClosed": true,
+  "bridgeRefusedOrderHash": true,
+  "sourceNegativeRecord": "negatives/restore_order_wrong/negative.json",
+  "verdict": "fail",
+  "failures": [
+    "run_manifest",
+    "logger_session",
+    "audit_oracle",
+    "agent_operations",
+    "causal_joins",
+    "transient_captures",
+    "natural_void_captures",
+    "inventory_matches_program",
+    "restore_verified",
+    "source_world",
+    "answer_matches_oracle"
+  ],
+  "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+  "verifierHead": "8f28aea06ba3644fd06485f4338bfeda999da6bf",
+  "verifierSha256": "18bbe6da3511d19c30a936b6b64a5031facd573711b3551cfc18c44f5b4389a4"
+}
