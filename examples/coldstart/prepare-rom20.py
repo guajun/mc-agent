@@ -120,7 +120,7 @@ class Receipts:
         path = self.dir / "receipts" / f"{name}.json"
         record = {"at": utc_now(), "name": name, **payload}
         write_json(path, record)
-        return {"path": str(path), "sha256": sha256_file(path)}
+        return {**record, "receipt_path": str(path), "receipt_sha256": sha256_file(path)}
 
     def log(self, name: str, text: str) -> dict[str, Any]:
         path = self.dir / "logs" / f"{name}.log"
