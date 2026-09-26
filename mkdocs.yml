@@ -1,5 +1,5 @@
 site_name: Minecraft Agent Toolkit
-site_description: Harness-neutral, server-vantage tools for Minecraft Agents.
+site_description: Connect your AI agent to Minecraft. Install, inspect your world, and run tools.
 site_url: https://guajun.github.io/mc-agent/
 repo_url: https://github.com/guajun/mc-agent
 repo_name: guajun/mc-agent
@@ -7,12 +7,16 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 strict: true
 
+extra_css:
+  - stylesheets/extra.css
+
 theme:
   name: material
   features:
-    - navigation.sections
+    - navigation.indexes
     - navigation.top
     - content.code.copy
+    - content.tabs.link
     - search.suggest
     - search.highlight
     - toc.follow
@@ -30,30 +34,32 @@ theme:
 
 nav:
   - Home: index.md
-  - Installation: install.md
-  - Getting started: getting-started.md
-  - Concepts:
-      - Architecture and terminology: concepts.md
-      - Who is the agent in game: player-identity.md
-      - Forking a live world: protocol-snapshot.md
-      - Auditable cold-start runs: coldstart-protocol.md
-  - Guides:
-      - Running the agent on Hermes: hermes-setup.md
+  - Install and first run: getting-started.md
+  - Architecture: concepts.md
+  - Tools: tools.md
+  - Advanced guides:
+      - advanced.md
       - Installing the Toolkit Skill: toolkit-skill.md
       - "Unattended Hermes: webhook + Skill": hermes-unattended.md
+      - Running the agent on Hermes: hermes-setup.md
+      - Who is the agent in game: player-identity.md
+      - Forking a live world: protocol-snapshot.md
       - Headless lab servers: lab-server.md
       - Building a mod for a lab: mod-building.md
-      - "Audit test mod (read-only evidence)": minecart-audit.md
       - Checking a fork: fork-verify.md
-      - Stage-one integration gate: stage1-gate.md
-      - Stage-one integration run: stage1-integration.md
-      - Minecart ROM acceptance runbook: minecart-rom-runbook.md
+      - Experiments and validation:
+          - Auditable cold-start runs: coldstart-protocol.md
+          - "Audit test mod (read-only evidence)": minecart-audit.md
+          - Stage-one integration gate: stage1-gate.md
+          - Stage-one integration run: stage1-integration.md
+          - Minecart ROM acceptance runbook: minecart-rom-runbook.md
+      - Design history:
+          - "0001: agent interface and bridge": rfc/0001-agent-interface.md
+          - "0002: programmable tool calls": rfc/0002-programmable-tool-calls.md
   - Reference:
-      - Tools: tools.md
+      - Installation reference: install.md
       - Troubleshooting: troubleshooting.md
-  - RFCs:
-      - "0001: agent interface and bridge": rfc/0001-agent-interface.md
-      - "0002: programmable tool calls": rfc/0002-programmable-tool-calls.md
+      - Documentation development: contributing-docs.md
 
 plugins:
   - search
@@ -68,11 +74,18 @@ plugins:
           name: English
         - locale: zh
           name: 中文
-          site_description: 面向任意 Harness 的 Minecraft 服务端视角工具包。
+          site_description: 让 AI 智能体连接 Minecraft：安装、读取世界、调用工具。
           theme:
             language: zh
           nav_translations:
             Home: 首页
+            Install and first run: 安装与首次运行
+            Architecture: 架构方案
+            Advanced guides: 进阶指南
+            Experiments and validation: 实验与验收
+            Design history: 设计历史
+            Installation reference: 安装参考
+            Documentation development: 文档开发
             Installation: 安装
             Getting started: 快速开始
             Concepts: 概念
@@ -99,6 +112,7 @@ plugins:
 markdown_extensions:
   - admonition
   - attr_list
+  - md_in_html
   - tables
   - toc:
       permalink: true

@@ -1,9 +1,10 @@
-# 安装
+# 安装参考
 
 [English](https://guajun.github.io/mc-agent/install/)
 
-[快速开始](getting-started.md) 是最短可运行路径。本页记录版本、部署位置、
-发现规则和卸载方式。
+**第一次安装？请从[安装与首次运行](getting-started.md)开始。**
+那里提供各系统的命令、mod 复制、连接检查和 MCP 配置。
+本页记录部署设置、升级、发现规则和卸载方式。
 
 ## 要求与部署位置
 
@@ -18,10 +19,9 @@ mod socket 与 Toolkit API 只监听 loopback 是部署假设，不是需要绕�
 
 ## Fabric mod
 
-~~~powershell
-git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py --minecraft-dir <实例> --version 26.2-Fabric --jdk <jdk25>
-~~~
+请使用[mod 构建与安装步骤](getting-started.md#1-install-the-game-mod)。
+包含 `versions/` 和 `libraries/` 的构建资源根目录可能与实际运行实例目录不同，
+首次运行指南解释了这两个路径。
 
 把构建出的 jar 和 Fabric API 放进服务端或客户端实例的 **mods/**。同一个 jar
 同时包含客户端和服务端入口。Toolkit 默认使用服务端入口，包括单机世界里的
@@ -40,20 +40,18 @@ python mc-agent-interface-mod/build.py --minecraft-dir <实例> --version 26.2-F
 
 ## Toolkit（`mc-agent-bridge`）
 
-~~~powershell
-git clone https://github.com/guajun/mc-agent-bridge
-python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
-~~~
+按 Windows 或 macOS/Linux 使用 [Toolkit 安装命令](getting-started.md#2-install-the-toolkit)。
 
 只需要守护进程、CLI 或 JSON-lines API 时可不装 MCP extra。可编辑安装在
 checkout 中 pull 即升级；删除虚拟环境即可卸载。
 
+以下命令假设虚拟环境已激活。也可以像首次运行指南一样，从工作目录使用完整的
+`.venv/Scripts/mc-bridge`（Windows）或 `.venv/bin/mc-bridge`（macOS/Linux）路径。
 验证可执行文件：
 
 ~~~powershell
-.venv/Scripts/mc-bridge --help
-.venv/Scripts/mc-bridge discover
+mc-bridge --help
+mc-bridge discover --server-dir "C:/minecraft/server"
 ~~~
 
 ## 服务端视角发现
@@ -70,6 +68,11 @@ checkout 中 pull 即升级；删除虚拟环境即可卸载。
 
 ~~~powershell
 mc-bridge run --server-dir "C:/minecraft/server"
+~~~
+
+保持常驻进程运行，在使用同一环境的第二个终端中检查：
+
+~~~powershell
 mc-bridge call status
 mc-bridge call capabilities
 ~~~
@@ -82,7 +85,8 @@ mc-bridge run --vantage client --port-file "C:/minecraft/client/mc-agent/port.tx
 
 ## Harness 集成
 
-使用 MCP 时，让 Harness 拉起 **mc-bridge.exe mcp**。此适配器连接长期运行的
+使用 MCP 时，参考 [MCP 设置与配置示例](getting-started.md#4-connect-your-agent)，
+让 Harness 通过绝对路径拉起 **mc-bridge mcp**。此适配器连接长期运行的
 守护进程，不能替代守护进程。不支持 MCP 的 Harness 使用 **mc-bridge call**
 或 loopback JSON-lines API。
 

@@ -1,90 +1,104 @@
-# Minecraft Agent Toolkit
+---
+hide:
+  - toc
+---
 
-Give an Agent an authoritative, local tool surface for a Minecraft world without
-putting model or Harness logic inside the game.
+# Give your agent a Minecraft world
 
-[中文](https://guajun.github.io/mc-agent/zh/)
+**Read the world. Run commands. Build repeatable experiments.**
 
-## One Toolkit, any Harness
+Minecraft Agent Toolkit connects your AI agent to Minecraft through local tools.
+Use your existing agent application, or try the tools from a terminal first.
+
+<div class="landing-actions" markdown>
+
+[Install and try it](getting-started.md){ .md-button .md-button--primary }
+[See the tools](tools.md){ .md-button }
+
+</div>
+
+## What you can do
+
+<div class="grid cards" markdown>
+
+- **Understand the world**
+
+    Read authoritative world state, find online players, and inspect nearby entities.
+
+    Try: “Summarize the current world and online players.”
+
+- **Act through tools**
+
+    Run Minecraft commands and read their results from your agent or terminal.
+
+    Try: “List the online players.”
+
+- **Make experiments repeatable**
+
+    Capture entity-order snapshots, fork worlds, and check restoration.
+
+    [Explore world forks →](protocol-snapshot.md)
+
+- **Use your preferred agent**
+
+    Connect an MCP client such as Codex, Claude Code or Hermes. Agents with shell
+    access can also use the CLI. Your app supplies the model and conversation.
+
+    [Connect your agent →](getting-started.md#4-connect-your-agent)
+
+</div>
+
+## Get connected in four steps
+
+**Before you start:** Minecraft 26.2, Fabric Loader 0.19+, Fabric API, JDK 25,
+Python 3.11+, and Git. Keep Minecraft, the Toolkit and the agent on the same
+machine. Start with a single-player world or an existing dedicated Fabric server.
+
+1. **Install the Fabric mod.** Build it from source, copy the jar into `mods/`, and open your world.
+2. **Install the Toolkit.** Clone `mc-agent-bridge` and install it into a Python virtual environment.
+3. **Check the connection.** Start the daemon in one terminal; run `status`, `capabilities` and `state` in another.
+4. **Connect your agent.** Register the MCP adapter, then ask the agent to describe your world.
+
+The [step-by-step guide](getting-started.md) includes Windows and macOS/Linux
+commands, path examples, MCP settings and expected results. The first connection
+check does not need an AI model. Installation currently includes building the
+mod; there is no all-in-one installer in this guide.
+
+<div class="landing-actions" markdown>
+
+[Start the installation](getting-started.md){ .md-button .md-button--primary }
+[Already installed? Check your connection](getting-started.md#3-check-the-connection){ .md-button }
+
+</div>
+
+## How it works
 
 ```text
-user -> Harness ---------------- MCP / CLI -------------------+
-                                                             |
-game chat -> context bundle -> signed webhook -> Harness     |
-                                                             v
-Minecraft server <-> server-vantage Fabric mod <-> Minecraft Agent Toolkit daemon
+You → Agent application → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft world
+       (the Harness)       MCP / CLI + daemon         server view
 ```
 
-The normal path starts with a user in Codex, Claude Code or another Harness.
-The Harness and Toolkit run on the same machine and the Harness pulls the live
-player or world context it needs.
+| Piece | Its job |
+| --- | --- |
+| Agent application (Harness) | Runs your model and conversation; decides which tools to call. |
+| Toolkit (`mc-agent-bridge`) | Provides the `mc-bridge` command and MCP tools; keeps the connection to Minecraft alive. |
+| Fabric mod | Reads server-side world state and executes requested operations, including in single-player. |
 
-The unattended path starts with an event. The server-vantage mod captures the
-sender's identity, transform and view when chat is received; the event carries
-a short-lived `context_id`. The optional Toolkit forwarder sends selected events
-to a separately configured receiver such as Hermes. That Harness then reads the
-bundle and uses the same Toolkit as every other caller.
+The Toolkit daemon runs while you play. Your agent's MCP adapter connects to it.
+Game-control connections stay on the local machine, and available tools are
+discovered from the connected mod.
 
-!!! info "Implementation status"
-    Server-vantage tools, player lookup, chat-time context bundles and the
-    receiver-neutral signed webhook sender and portable
-    [Toolkit Skill](toolkit-skill.md) are implemented. The
-    [Hermes unattended guide](hermes-unattended.md) documents the receiver,
-    route and delivery setup, but signed end-to-end delivery remains blocked by
-    [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7).
-    The older `mc-agent-loop` remains a compatibility path, not a required
-    Toolkit component.
+[Architecture and deployment details →](concepts.md)
 
-## Components
+## Find your next step
 
-| Name | Runs where | Responsibility |
-| --- | --- | --- |
-| **Minecraft Agent Toolkit** | beside the Harness and mod endpoint | the `mc-agent-bridge` package: daemon, CLI, JSON-lines API, MCP adapter and webhook forwarder |
-| **Toolkit daemon** | local Python process | the long-running `mc-bridge run` process; formerly called the Bridge daemon |
-| **Fabric mod** | dedicated server or single-player integrated server | exposes authoritative state and actions over loopback |
-| **Harness** | same machine as the Toolkit | runs the Agent, owns sessions and decides what to do |
-| **Skill** | loaded by a Harness | portable instructions for operating the Toolkit; no protocol or session code |
-| **agent-loop** | optional legacy process | listens for chat and calls the temporary Hermes or echo backend |
+| I want to… | Go to |
+| --- | --- |
+| Install, upgrade or change the game path | [Installation reference](install.md) |
+| Fix a failed connection | [First-run help](getting-started.md#something-didnt-work) · [Troubleshooting](troubleshooting.md) |
+| Teach my agent the Toolkit workflow | [Optional Toolkit Skill](toolkit-skill.md) |
+| Set up events, unattended agents or experiments | [Advanced guides](advanced.md) |
 
-There is no Codex backend, Claude Code backend or Hermes-specific game API.
-Harnesses share the same Toolkit.
-
-## Quick start
-
-```powershell
-# Install the Toolkit (the mc-agent-bridge repository).
-git clone https://github.com/guajun/mc-agent-bridge
-python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
-
-# After installing the Fabric mod and starting Minecraft:
-.venv/Scripts/mc-bridge run
-.venv/Scripts/mc-bridge call status
-.venv/Scripts/mc-bridge call capabilities
-.venv/Scripts/mc-bridge call state
-```
-
-The default is the server vantage. It discovers
-`<server-dir>/mc-agent-server/port.txt`; it never silently falls back to a
-client endpoint. A Harness can spawn `mc-bridge mcp`, while a shell or a
-Harness without MCP can use `mc-bridge call`.
-
-[Getting started :material-arrow-right:](getting-started.md){ .md-button .md-button--primary }
-[Architecture and terms :material-arrow-right:](concepts.md){ .md-button }
-[Installation :material-arrow-right:](install.md){ .md-button }
-
-## Documentation
-
-* [Getting started](getting-started.md) - server-vantage setup and first calls
-* [Installation](install.md) - versions, deployment and discovery
-* [Architecture and terminology](concepts.md) - component boundaries and both invocation modes
-* [Toolkit commands and MCP tools](tools.md) - current surface and capability discovery
-* [Installing the Toolkit Skill](toolkit-skill.md) - one portable Skill for supported Harnesses
-* [Hermes and unattended operation](hermes-unattended.md) - webhook route, restricted tools and delivery status
-* [Hermes compatibility backend](hermes-setup.md) - the temporary agent-loop path
-* [Player identity](player-identity.md) - caller context, fake players and legacy client identities
-* [Forking a live world](protocol-snapshot.md) - snapshots and restore
-* [Headless lab servers](lab-server.md) - isolated experiment instances
-* [Auditable cold-start runs](coldstart-protocol.md) - Harness execution and evidence contract
-* [Troubleshooting](troubleshooting.md) - connection and context failures
-* [RFCs](rfc/0001-agent-interface.md) - historical decisions and superseding plans
+Unattended Hermes is an advanced integration with a pending signed-delivery
+issue. Its [setup and status](hermes-unattended.md) are separate from the
+interactive setup above.
