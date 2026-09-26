@@ -2112,12 +2112,17 @@ def smoke_phase(args: argparse.Namespace) -> int:
     identity_records = len((facts.get("stages", {}).get("identity") or {}).get("records") or [])
     restore = facts.get("stages", {}).get("restore") or {}
     restore_ok = bool((restore.get("verified") or {}).get("ok")) and bool((restore.get("applied") or {}).get("ok"))
-    restart_logs = sorted((EVIDENCE / "devcap").glob("isolation-*.log"))
+    restart_logs = [
+        path for path in sorted((EVIDENCE / "devcap").glob("isolation-*.log")) if "conflict" not in path.name
+    ]
+    lab_boot_log = EVIDENCE / "devcap" / "isolation-rom13-src.log"
+    if not lab_boot_log.is_file() and restart_logs:
+        lab_boot_log = restart_logs[0]
     suites.append({"name": "smoke_offline", "command": "python tools/smoke_offline.py",
                    "status": "pass" if offline.returncode == 0 else "fail", "checks": 1, "log_ref": str(offline_log)})
     suites.append({"name": "lab_boot", "command": "tools/lab_server.py start --name rom13-src --wait 300",
                    "status": "pass" if restart_logs else "fail", "checks": 1,
-                   "log_ref": str(restart_logs[0]) if restart_logs else str(LOGS)})
+                   "log_ref": str(lab_boot_log) if restart_logs else str(LOGS)})
     suites.append({"name": "fake_player_mcp", "command": "mc-bridge call player (live seat probe)",
                    "status": "pass" if identity_records >= 5 else "fail", "checks": identity_records,
                    "log_ref": str(EVIDENCE / "bundle" / "artifacts" / "player_context" / "identity-records.jsonl")})
