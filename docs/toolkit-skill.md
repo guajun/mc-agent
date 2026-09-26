@@ -129,5 +129,5 @@ you load it into an agent.
 
 The skill is one half of the event-driven setup. The other half is a
 user-configured Hermes webhook route that loads this skill and restricts the
-route to the Bridge MCP toolset: see
+route to the Toolkit MCP toolset: see
 [Unattended Hermes: webhook + Toolkit Skill](hermes-unattended.md).

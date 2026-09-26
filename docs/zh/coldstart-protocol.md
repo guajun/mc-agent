@@ -18,7 +18,7 @@ mc-agent 新增模型客户端或会话后端：模型归 Harness，证据归 ru
 
 首轮冷启动使用**用户手动启动、带普通开发工具的 Harness**（终端、文件读写、源码/依赖
 获取、可构建的 JDK，以及 bridge JSON CLI 或 MCP）。受限的 Hermes webhook route
-**不能**充当这个 Harness：它的 per-route `toolsets` 刻意只暴露 Bridge MCP，
+**不能**充当这个 Harness：它的 per-route `toolsets` 刻意只暴露 Toolkit MCP，
 没有终端和文件工具，route 上的智能体无法自己写、编译、安装 logger。Webhook 是后续
 可选路径，见 [Hermes 无人值守](hermes-unattended.md)。
 

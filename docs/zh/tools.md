@@ -1,130 +1,78 @@
-# 工具
+# Toolkit 工具
 
-本仓库里的一切都是"某个原语之上的薄工具"。如果这里没有你要的东西，答案通常是 `mc-bridge call <方法>`，而不是再写一个程序。
+[English](https://guajun.github.io/mc-agent/tools/)
 
-## 仓库结构
+Minecraft Agent Toolkit 由 **mc-agent-bridge** 实现。实时 **capabilities**
+结果才是权威来源：MCP 工具面会根据已连接 mod 与视角进行筛选。
 
-```
-mc-agent/                  本仓库：文档、工具、RFC
-mc-agent-interface-mod/    Fabric mod（客户端 + 服务端 vantage）
-mc-agent-bridge/           守护进程、本地 API、MCP 前端
-mc-agent-loop/             智能体 loop 与它的后端
-```
+## CLI
 
-## mc-bridge
-
-守护进程与它的客户端。
-
-| 命令 | 作用 |
+| 命令 | 用途 |
 | --- | --- |
-| `mc-bridge run` | 起守护进程：持有游戏连接、提供本地 API |
-| `mc-bridge run --api-port 8766 --port-file labs/<lab>/mc-agent-server/port.txt` | 接到实验室实例而不是默认实例 |
-| `mc-bridge call <方法> [json]` | 对运行中的守护进程发一次调用 |
-| `mc-bridge watch --events chat,game` | 以 JSON 行流式输出事件 |
-| `mc-bridge mcp` | 以 MCP（stdio）暴露工具，供智能体运行时使用 |
+| **mc-bridge discover** | 不启动守护进程，解释服务端视角端口发现 |
+| **mc-bridge run** | 持有 mod 连接并提供 loopback API |
+| **mc-bridge call <方法> [json]** | 对守护进程发一次 JSON 调用 |
+| **mc-bridge watch --events chat,game** | 流式读取缓冲/实时事件 |
+| **mc-bridge mcp** | 通过 MCP 向 Harness 暴露 Toolkit |
+| **mc-bridge forward --events ...** | 把选定事件发给一个已配置的签名 webhook |
 
-方法：`status`、`capabilities`、`state`、`player`、`context`、`entities`、`screen`、`command`、`command_output`、`chat`、`mark`、`wait`、`record_start`、`record_stop`、`connect`、`world`、`lan`、`snapshot`、`snapshots`、`fork`、`restore`、`order`、`save`、`events`、`stop`。
+先运行 **status** 和 **capabilities**。常见服务端视角方法：
 
-本地 API 是换行分隔的 JSON，所以任何能开 socket 的东西都能用它——见 [bridge README](https://github.com/guajun/mc-agent-bridge)。
-
-## MCP 工具
-
-把 bridge 注册为 MCP server 后，智能体运行时看到的东西。
-
-| 工具 | 用来做什么 |
+| 方法 | 用途 |
 | --- | --- |
-| `mc_status`、`mc_capabilities` | 连上了吗、这个实例会什么 |
-| `mc_state` | 玩家在哪、血量、维度、tick |
-| `mc_player` | 某个玩家的服务端上下文——身份、维度、位置、朝向、眼睛与视线目标（按 UUID） |
-| `mc_context` | 聊天事件 `context_id` 背后冻结的上下文包 |
-| `mc_entities` | **摘要版**实体列表：按类型计数 + 最近的 N 个 |
-| `mc_command` | 发一条命令 |
-| `mc_command_output` | 发一条命令**并读回它的回答**——关心回答时用这个 |
-| `mc_chat` | 在聊天里说话 |
-| `mc_record_start` / `mc_record_stop` | 逐 tick 采样写入 `samples.jsonl` |
-| `mc_wait` | 阻塞到游戏推进了 N 个 tick |
-| `mc_mark` | 往事件流里打标记（实验开始/结束） |
-| `mc_screen`、`mc_connect`、`mc_world`、`mc_lan` | 客户端当前界面、加入服务器、打开存档、把世界开放到局域网 |
-| `mc_snapshot`、`mc_snapshots`、`mc_fork`、`mc_restore`、`mc_order` | 分叉活世界并校验还原 |
-| `mc_events` | 从游标开始重放缓冲的事件 |
+| **status**、**capabilities** | 连接、发现与支持的工具面 |
+| **state** | 权威世界/tick 状态 |
+| **player** | 按 UUID 或名字解析在线玩家，返回实时上下文/视角 |
+| **context** | 按 context ID 读取有界聊天时刻上下文包 |
+| **entities** | 附近实体 |
+| **command**、**command_output** | 发命令；后者还等待回答 |
+| **events** | 从游标重放缓冲事件 |
+| **save** | 报告世界存档元数据 |
+| **snapshot**、**snapshots** | 捕获/列出实体顺序快照 |
+| **fork**、**restore**、**verify**、**order** | 复制并验证世界分叉 |
+| **wait**、**mark**、**stop** | 等待、标记和守护进程控制 |
 
-`mc_entities` 刻意返回摘要：真实世界里半径 64 格会回 256 KB 的 JSON，模型没法有效阅读。想看更多就传 `types=` 过滤并调大 `limit`。
+**screen**、**chat**、**connect**、**world**、**lan** 和录制等客户端专属方法
+只有显式选择客户端视角，且 mod 公布对应能力时才出现。
 
-!!! info "服务端视角 Toolkit 与它的 Skill"
-    bridge 就是接收方中立的服务端视角 Toolkit：`player` 和 `context` 已在工具面里，
-    分别提供每个玩家的上下文与聊天瞬间的上下文包；`capabilities` 会如实报告连接的
-    mod 支持哪些操作。接口 mod 0.6.0 已经发出这两个能力；bridge 0.4.1
-    （[PR #8](https://github.com/guajun/mc-agent-bridge/pull/8)）把视线射线保留在
-    `player.view`。智能体的工作流写在可移植的
-    [Toolkit Skill](toolkit-skill.md) 里；某个具体连接能做什么，以
-    `mc-bridge call capabilities`（或 `mc_capabilities`）为准。想让它由游戏事件
-    无人值守地触发，见 [Hermes 无人值守](hermes-unattended.md)。
+## MCP
 
-## mc-agent-loop
+MCP 工具使用 **mc_** 前缀，例如 **mc_status**、**mc_capabilities**、
+**mc_player**、**mc_context**、**mc_state**、**mc_entities**、
+**mc_command_output**、**mc_events**、**mc_snapshot**。MCP 进程只是连接已运行
+守护进程的适配器，不持有游戏连接。
 
-| 命令 | 作用 |
+Harness 应：
+
+1. 调用 **mc_status** 与 **mc_capabilities**；
+2. 任务需要玩家上下文时解析相关玩家；
+3. 只读取任务所需的实时世界数据；
+4. 事件提供 context ID 时尽快调用 **mc_context**；
+5. 把身份视为上下文，而不是命令授权。
+
+## 事件转发
+
+可选 forwarder 与接收方无关。它为每个出站 POST 签名、重试临时失败，并复用
+稳定 event ID 供接收方去重。URL 与 secret 来自环境或受保护配置文件。它不
+运行模型、不管理会话，也不投递 Agent 回复。
+
+见 [Hermes 与无人值守运行](hermes-setup.md) 和
+[Toolkit 参考](https://github.com/guajun/mc-agent-bridge#forwarding-events-to-a-webhook)。
+
+## 仓库工具
+
+| 工具 | 用途 |
 | --- | --- |
-| `mc-agent-loop run --backend hermes --trigger @codex` | 常驻，响应聊天 |
-| `mc-agent-loop once "<提示>" --backend hermes` | 跑一轮，不需要聊天触发 |
-| `mc-agent-loop backends` | 可用的后端：`hermes`、`echo` |
+| **lab_server.py** | 供应并控制无头 Fabric 实验室 |
+| **fork_verify.py** | 检查、还原并比较世界分叉 |
+| **fake_player.py** | 创建并驱动 Carpet 假人 |
+| **game_cmd.py** | 运行游戏命令并打印反馈 |
+| **mcp_probe.py** | 对运行中的 Toolkit 调一个 MCP 工具 |
+| **launch_instance.py** | 不通过 GUI 启动器启动客户端 |
+| **smoke_offline.py** | 旧 daemon/agent-loop 路径的兼容测试 |
 
-常用参数：`--env-file .env`（让 key 不出现在命令行里）、`--reply-mode command --reply-command 'execute as <名字> run say {text}'`（让智能体用自己的名义说话，见 [智能体在游戏里是谁](player-identity.md)）、`--trigger`、`--ignore-sender`、`--cooldown`、`--chunk-size`、`--history`。
+## 旧 agent-loop
 
-## tools/
-
-让三条轨道真正可用的程序。它们都很薄：只是在组合上面的原语。
-
-| 工具 | 作用 |
-| --- | --- |
-| `smoke_offline.py` | 对着假 mod 跑整套链路，可带模型也可不带 |
-| `launch_instance.py` | 直接启动游戏实例，不需要图形启动器；支持 `--world`、`--username`、`--jvm-property mcagent.autoConnect=host:port` |
-| `lab_server.py` | 供给、启动、停止、`exec`、`identity`、`verify` 一个无头 Fabric 实验室（RCON 控制台，纯标准库） |
-| `build_mod.py` | 对着实验室自己的服务端/依赖库/API jar 编译 Fabric mod，输出确定性 jar 与构建元数据 |
-| `fork_verify.py` | `inspect` 录制、按顺序 `restore`、`check` 实验室是否复现、`diff` 两次录制逐实体对比 |
-| `fake_player.py` | 生成、驱动、查询 Carpet 假人——不需要第二个客户端就有身体 |
-| `game_cmd.py` | 执行一条游戏命令并打印它产生的反馈 |
-| `mcp_probe.py` | 像智能体一样调用某一个 MCP 工具 |
-| `stage1_evidence.py` | 把 #16 身份、#18 审计 JSONL 与 #19 轨迹记录无损投影到门禁 schema（校验生命周期/请求链接/capturedPath），并独立校验与收集已合并的 bridge#6 恢复证据；缺口如实报告，不制造事实 |
-| `stage1_integration.py` | 在端口 27240-27249 上可复现的双 lab 通用集成：构建/部署、重启隔离、同大小 jar 更新、响亮失败探针、轨迹、门禁包与结论 |
-| `stage1_gate.py` | issue #14 的失败关闭式阶段一证据门禁：校验前置证据包，重算哈希/顺序/源存档状态，缺证据绝不通过 |
-| `harness_preflight.py` | 检查固定的 Harness/model 契约：终端、文件、源码获取、JDK 构建、bridge CLI/MCP、保留端口与真实实验室，证据全部带哈希 |
-| `run_trace.py` | 开启一次冷启动运行，快照智能体可见的文档/Skill，并记录工具轨迹（调用、返回、阶段、产物、pi 会话导入、显式审查结论） |
-| `run_audit.py` | 对照五个必要事实判定一次运行（`machine_operated`、`logger_armed_before_activation`、`transient_outputs_captured`、`agent_read_log`、`answer_correct`），附证据引用、必须审查项与失败分类 |
-
-例子：
-
-```bash
-python tools/fake_player.py spawn deepseek 103 95 52
-python tools/fake_player.py action deepseek jump
-python tools/fake_player.py say "来自智能体的问候" --as deepseek
-python tools/fake_player.py status deepseek
-
-python tools/lab_server.py provision --name lab-01 --void --fabric-api --carpet
-python tools/lab_server.py exec --name lab-01 "tick freeze"
-python tools/lab_server.py identity --name lab-01 --json
-python tools/build_mod.py --source examples/smoke-mod --lab lab-01 --out labs/build/smoke-mod.jar
-
-python tools/fork_verify.py diff "<录制 A>" "<录制 B>"
-
-python tools/stage1_gate.py list
-python tools/stage1_gate.py selftest
-
-python tools/harness_preflight.py run --config examples/coldstart/harness-pi.json \
-    --out labs/coldstart/preflight
-python tools/run_trace.py init --run-dir labs/coldstart/run-01 \
-    --task-file examples/coldstart/task-minecart-rom.md --harness pi --model <model>
-python tools/run_trace.py import-pi --run-dir labs/coldstart/run-01 --session "$PI_SESSION_FILE"
-python tools/run_trace.py review --run-dir labs/coldstart/run-01 \
-    --id machine_operated.causality --status resolved --by <审查者> \
-    --evidence trajectory:c2-noteblock
-python tools/run_audit.py run --run-dir labs/coldstart/run-01
-```
-
-## 协议
-
-| 协议 | 位于 | 参考 |
-| --- | --- | --- |
-| interface protocol v1 | mod 与 bridge 之间 | [mod README](https://github.com/guajun/mc-agent-interface-mod) |
-| 本地 JSON-lines API | bridge 与其它一切之间 | [bridge README](https://github.com/guajun/mc-agent-bridge) |
-| 快照 / 分叉协议 | mod、bridge 与实验室工具之间 | [分叉一个活的世界](protocol-snapshot.md) |
-| 冷启动运行协议 | Harness、测试侧、智能体 logger 与审计 | [可审计的冷启动运行](coldstart-protocol.md) |
+**mc-agent-loop** 不属于 Toolkit 工具面。它仍是可选兼容监听器，包含 **echo**
+与临时 **hermes** backend，默认聊天触发词是 **@agent**。Codex 与 Claude
+Code 作为用户主动型 Harness 运行，不能再描述为 loop backend。

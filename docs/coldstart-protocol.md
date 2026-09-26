@@ -23,7 +23,7 @@ record facts.
 The first cold start uses a **user-launched harness with ordinary development
 tools** (a terminal, file read/write, source and dependency fetching, a JDK to
 build, and the bridge JSON CLI or MCP). The restricted Hermes webhook route is
-*not* that harness: its per-route `toolsets` deliberately expose the Bridge MCP
+*not* that harness: its per-route `toolsets` deliberately expose the Toolkit MCP
 server only, with no terminal or file tools, so an agent on that route cannot
 write, compile and install its own logger. Webhook delivery is a later,
 optional path; see [Unattended Hermes](hermes-unattended.md).

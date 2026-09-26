@@ -2,12 +2,12 @@
 
 The event-driven way to run Hermes against Minecraft: a game event wakes a
 Hermes agent run that loads the portable [Toolkit Skill](toolkit-skill.md) and
-acts through the Bridge MCP server. This replaces the old shape where
+acts through the Toolkit MCP server. This replaces the old shape where
 `mc-agent-loop --backend hermes` owned the trigger **and** a copy of the Hermes
 session/model logic.
 
 ```
-server-vantage mod ──events──► mc-bridge (daemon)
+server-vantage mod ──events──► Toolkit daemon (`mc-bridge run`)
                                    │  JSON-lines API on 127.0.0.1:8765
                                    ▼
                         mc-bridge forward  ──signed POST──►  Hermes Gateway
@@ -28,7 +28,7 @@ server-vantage mod ──events──► mc-bridge (daemon)
 - **Hermes Gateway, the Toolkit (daemon + forwarder), and the server-vantage mod
   endpoint run on the same machine.** The forwarder makes an outbound HTTP
   request to loopback; nothing inbound is exposed.
-- The mod socket and the bridge API stay on loopback (`127.0.0.1`), and the
+- The mod socket and the Toolkit API stay on loopback (`127.0.0.1`), and the
   Hermes webhook listener binds loopback too. Do not port-forward any of them.
 - **mc-agent adds no Hermes API/model client.** Hermes owns the session, the
   model calls, and the conversation; the Toolkit is a model-free tool surface.
@@ -37,21 +37,19 @@ server-vantage mod ──events──► mc-bridge (daemon)
 
 ## Status of the pieces
 
-The Skill and the Hermes side of this guide are ready now. The end-to-end flow
-depends on the Toolkit work tracked in the plan
-[mc-agent#8](https://github.com/guajun/mc-agent/issues/8):
+The portable Skill, server-vantage operations, context bundles and
+receiver-neutral forwarder are implemented. These issue links record where the
+pieces landed:
 
 | Piece | Where |
 | --- | --- |
-| signed event forwarder (`mc-bridge forward`) | [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2) |
-| toolkit surface: `player`, `context`, `save` operations | [mc-agent-bridge#1](https://github.com/guajun/mc-agent-bridge/issues/1) |
-| server-side player context (`PLAYER`) | [mc-agent-interface-mod#1](https://github.com/guajun/mc-agent-interface-mod/issues/1) |
-| chat-time context cache (`context_id`) | [mc-agent-interface-mod#2](https://github.com/guajun/mc-agent-interface-mod/issues/2) |
+| signed event forwarder (`mc-bridge forward`) | implemented by [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2) |
+| Toolkit surface: `player`, `context`, `save` operations | implemented by [mc-agent-bridge#1](https://github.com/guajun/mc-agent-bridge/issues/1) |
+| server-side player context (`PLAYER`) | shipped in interface mod 0.6.0; tracked by [mod #1](https://github.com/guajun/mc-agent-interface-mod/issues/1) |
+| chat-time context cache (`context_id`) | shipped in interface mod 0.6.0; tracked by [mod #2](https://github.com/guajun/mc-agent-interface-mod/issues/2) |
 
-Until those ship, `mc-bridge call capabilities` reports the context operations
-as unsupported (with the dependency named), and an installed bridge may not have
-`mc-bridge forward` at all. The Skill handles that: it reports the gap instead
-of inventing a fallback.
+The installed mod's `capabilities` response remains authoritative. The Skill
+reports a missing or older operation instead of inventing a fallback.
 
 !!! danger "Signature and delivery-ID compatibility"
 
@@ -66,7 +64,7 @@ of inventing a fallback.
     `401 Invalid signature`. For the flow to work, the forwarder must also emit
     the Hermes-compatible header names (or Hermes must learn the
     `X-MC-Agent-*` scheme); that change belongs to
-    [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2).
+    [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7).
     Until it lands, use the verification steps below to check reachability, and
     expect the signed delivery to fail closed.
 
@@ -80,7 +78,7 @@ of inventing a fallback.
     game commands twice. The forwarder must also emit a Hermes-compatible
     delivery-id header (for example `webhook-id: <eventId>`) for retries to
     deduplicate; that is part of the same
-    [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2)
+    [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)
     change.
 
 ## 1. Install the shared Skill into Hermes
@@ -94,11 +92,11 @@ gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:LOCALAPPDATA\herm
 hermes skills list        # minecraft-toolkit | (no category) | local | enabled
 ```
 
-## 2. Register the Bridge MCP server
+## 2. Register the Toolkit MCP server
 
-Skip this if `hermes mcp list` already shows the bridge from
+Skip this if `hermes mcp list` already shows the Toolkit from
 [Running the agent on Hermes](hermes-setup.md). The MCP server is a *client* of
-the bridge daemon, so the daemon must be running (`mc-bridge run`) and the
+the Toolkit daemon, so the daemon must be running (`mc-bridge run`) and the
 server is spawned by Hermes per run:
 
 ```powershell
@@ -108,7 +106,7 @@ hermes mcp add mc-agent `
   --args mcp
 ```
 
-`--args` must be last. Keep this server's tool set as the full Bridge surface;
+`--args` must be last. Keep this server's tool set as the full Toolkit surface;
 the route restriction in step 5 decides what a route can actually reach.
 
 ## 3. Enable the Hermes webhook platform on loopback
@@ -166,12 +164,12 @@ hermes webhook subscribe mc-chat `
 A chat event whose sender could not be captured carries no `context_id`; the
 agent must report that instead of inventing one.
 
-## 5. Restrict the route to the Bridge MCP toolset
+## 5. Restrict the route to the Toolkit MCP toolset
 
 Webhook runs do **not** get the full CLI toolset by default: Hermes deliberately
 constrains them (web search, web extract, vision, clarify) because webhook
-payloads can contain untrusted text. To let this route use the Bridge - and
-only the Bridge - set a per-route `toolsets` list. This is a deliberate manual
+payloads can contain untrusted text. To let this route use the Toolkit - and
+only the Toolkit - set a per-route `toolsets` list. This is a deliberate manual
 edit: `hermes webhook subscribe` has no `--toolsets` flag so an agent-created
 subscription cannot self-grant tools.
 
@@ -185,7 +183,7 @@ Add one key to the `mc-chat` route in
     "secret": "<dedicated route secret>",
     "prompt": "In-game chat from {sender}: {data.text}\nContext id: {context_id} ...",
     "skills": ["minecraft-toolkit"],
-    "toolsets": ["mc-agent"],          // ← the Bridge MCP server, nothing else
+    "toolsets": ["mc-agent"],          // ← the Toolkit MCP server, nothing else
     "deliver": "log",
     "profile": "default"
   }
@@ -194,13 +192,13 @@ Add one key to the `mc-chat` route in
 
 `mc-agent` is the MCP server name from step 2. A route-level list **replaces**
 the platform's webhook toolset for that route's runs, so the run gets the
-Bridge tools and no terminal/file/web/computer-use tools. The adapter
+Toolkit tools and no terminal/file/web/computer-use tools. The adapter
 hot-reloads the subscriptions file on the next request, so no restart is needed
 after this edit; re-running `hermes webhook subscribe` rebuilds the route and
 drops the key, so re-add it after changing the route.
 
 !!! note "This is not the cold-start development harness"
-    A restricted route gets the Bridge MCP server only - no terminal, file,
+    A restricted route gets the Toolkit MCP server only - no terminal, file,
     source-fetch or build tools. An agent that needs to write, compile and
     install its own logger cannot do that through this route. The first
     Minecart ROM cold start therefore runs on a user-launched harness with
@@ -216,7 +214,7 @@ drops the key, so re-add it after changing the route.
 
 ## 6. Start the forwarder
 
-The forwarder subscribes to the bridge event stream and POSTs selected events
+The forwarder subscribes to the Toolkit event stream and POSTs selected events
 to the route URL. Credentials come from the environment or a config file, never
 from command-line flags, so they cannot land in shell history:
 
@@ -228,7 +226,7 @@ mc-bridge forward --events chat
 
 Forwarding is off until both the URL and the secret are set. Keep `--events
 chat` (or a narrower list) so the route only wakes on events it accepts; the
-forwarder's default filters are `chat,game,mark,error`. The bridge daemon must
+forwarder's default filters are `chat,game,mark,error`. The Toolkit daemon must
 already be running and connected to the server-vantage mod.
 
 ## 7. Verify the flow
@@ -245,20 +243,20 @@ available. Each line names the evidence to look for.
 | 5 | retries stay idempotent | a retried delivery of the same `eventId` answers `{"status":"duplicate"}` and starts no second run, so game commands execute once |
 | 6 | the run loaded the Skill | the gateway log shows the `mc-chat` run and `minecraft-toolkit` in the loaded skill set |
 | 7 | the context bundle was fetched | the run calls `mc_context` with the event's `context_id` (or reports `not_found`/`expired` accurately) |
-| 8 | the Bridge was used | the run calls at least one Bridge tool through the server vantage (`mc_capabilities`, `mc_state`, `mc_player`, ...) |
+| 8 | the Toolkit was used | the run calls at least one Toolkit tool through the server vantage (`mc_capabilities`, `mc_state`, `mc_player`, ...) |
 | 9 | the answer was delivered | the response appears at the `--deliver` target (with `log`, in the gateway log) |
 | 10 | the toolset is restricted | a prompt-injection attempt in chat cannot reach terminal/file tools; only `mc-agent` tools are available to the run |
 
 For a slower end-to-end check without the transport, send an in-game chat while
 watching `mc-bridge watch` and the gateway log; the same three things - Skill,
-`context_id`, Bridge tool - must appear in the run.
+`context_id`, Toolkit tool - must appear in the run.
 
 ## Delivery behaviour
 
 - The run's answer goes where the route says: `--deliver` plus
   `--deliver-chat-id` (or `deliver_extra.chat_id`). `log` is the default and the
   right first target; switch to a real platform when the flow is proven.
-- To answer **inside the game**, the agent uses the Bridge `command` operation
+- To answer **inside the game**, the agent uses the Toolkit `command` operation
   (for example `say <text>`, or `execute as <player> run say <text>` when the
   reply should come from a player identity). Server-vantage connections have no
   `chat` capability - `mc_chat` is client-only - so do not expect the model to
@@ -273,7 +271,7 @@ watching `mc-bridge watch` and the gateway log; the same three things - Skill,
 
 - Use a **dedicated per-route secret**. Do not use `INSECURE_NO_AUTH` in a real
   deployment; it disables signature checks and is only for local testing.
-- Keep the listener on `127.0.0.1`, as in step 3. Keep the mod and Bridge APIs
+- Keep the listener on `127.0.0.1`, as in step 3. Keep the mod and Toolkit APIs
   on loopback as well; the forwarder is outbound-only.
 - A valid HMAC signature authenticates the *sender*, not the *content*. Chat
   text can carry injected instructions, so keep the route's toolset restricted
@@ -300,7 +298,7 @@ the old backend stays for the loop/API-server workflow.
 | `401 Invalid signature` | secret mismatch, or a sender that Hermes does not recognize - see the compatibility note above |
 | `{"status":"ignored"}` | the event type is filtered out (`--events`); `hermes webhook test` is labeled `test` |
 | the route never fires | the gateway is not running, `host`/`port` differ from the forwarder URL, or the forwarder is not subscribed |
-| the run has no Bridge tools | `toolsets` was dropped (re-subscribe) or names an unknown server; re-add `["mc-agent"]` and check `hermes mcp list` |
+| the run has no Toolkit tools | `toolsets` was dropped (re-subscribe) or names an unknown server; re-add `["mc-agent"]` and check `hermes mcp list` |
 | the Skill did not load | `hermes skills list` does not show `minecraft-toolkit`, or the `--skills` name differs from the skill's `name:` |
 | `context` answers `not_found`/`expired` | the bundle TTL passed or the id was mistyped; use a fresh event, and never substitute another player's context |
 | the forwarder cannot start | `MC_AGENT_WEBHOOK_URL`/`MC_AGENT_WEBHOOK_SECRET` are missing, or its URL is not `http(s)` |

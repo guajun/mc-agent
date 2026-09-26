@@ -1,159 +1,120 @@
 # 快速开始
 
-这一页带你从零走到"智能体能回答一个关于你世界的问题"，再往前走一步：得到一个可以做实验的实验室实例。下面每条命令都在 Minecraft 26.2 / Windows 上真实跑过；换平台只需改路径。
+[English](https://guajun.github.io/mc-agent/getting-started/)
 
-## 需要什么
+本指南先启动服务端视角的 Minecraft Agent Toolkit，用 CLI 验证，再通过 MCP
+接入 Harness。
 
-| | |
-| --- | --- |
-| **Minecraft** | 26.2 + **Fabric Loader 0.19+** + **Fabric API** |
-| **Java** | 25（游戏自带的那份运行时就可以） |
-| **Python** | 3.11+，用于 bridge、loop 和工具 |
-| **智能体运行时** | 本项目是对着 [Hermes](hermes-setup.md) 开发的；任何能调 MCP 或 HTTP 的东西也行 |
+## 要求
 
-## 1. 把各部分装上
+* Minecraft 26.2、Fabric Loader 0.19+ 与 Fabric API
+* Java 25
+* Python 3.11+
+* 一台加载 interface mod 的独立 Fabric 服务端，或加载它的单机集成服务端
 
-安装只做一次，细节在 [安装说明](install.md)：mod jar 放进 `<实例>/mods/`，bridge 和 loop 装进同一个虚拟环境。简版：
+第一次检查不需要 Harness。Codex、Claude Code、Hermes 和其它调用者都使用
+同一套 Toolkit，不需要项目维护专用 backend。
 
-mod 直接对着游戏自己的（未混淆）jar 编译——不需要 Gradle，也不需要反编译：
+## 1. 编译并安装 Fabric mod
 
-```bash
+~~~powershell
 git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py \
-    --minecraft-dir "C:/Users/me/AppData/Roaming/.minecraft" \
-    --version 26.2-Fabric \
-    --jdk "C:/Program Files/Java/jdk-25"
-```
+python mc-agent-interface-mod/build.py --minecraft-dir <实例> --version 26.2-Fabric --jdk <jdk25>
+~~~
 
-把 `dist/mc-agent-interface-<版本>.jar` 和 Fabric API 一起放进 `<实例>/mods/`，启动游戏。日志里应该能看到：
+把 **dist/** 中的 jar 与 Fabric API 一起放进实例的 **mods/**，再启动服务端或
+单机世界。服务端入口把实际端口写入
+**<server-dir>/mc-agent-server/port.txt**。
 
-```
-[mc-agent-interface] initialized, dir=<实例>/mc-agent basePort=25580
-[mc-agent-interface] listening on 127.0.0.1:25580
-```
+## 2. 安装 Toolkit
 
-mod 会把实际拿到的端口写进 `<实例>/mc-agent/port.txt`。25580 被占用时它会自动往后退一格，bridge 通过那个文件找到它。
-
-!!! tip "游戏里现就可以用"
-    mod 自带客户端指令，不需要 bridge 就能自检：
-
-    ```
-    /mcagent status      版本、端口、已连接的 bridge 数、tick
-    /mcagent state       坐标、速度、血量、维度
-    /mcagent entities 32 32 格内的实体列表
-    /mcagent record start 200 32    连续采样 200 tick 写入 samples.jsonl
-    ```
-
-## 2. 装 bridge 和 loop
-
-```bash
+~~~powershell
 git clone https://github.com/guajun/mc-agent-bridge
-git clone https://github.com/guajun/mc-agent-loop
 python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
-```
+.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
+~~~
 
-`[mcp]` 是可选的：不装也有守护进程、CLI 和本地 API。
+只有使用 MCP 的 Harness 才需要 MCP extra；守护进程、CLI 和 JSON-lines API
+本身不需要它。
 
-## 3. 起 bridge
+## 3. 启动并检查 Toolkit
 
-!!! tip "单机本来就有两个 vantage"
-    同一个 jar 在你玩单机时同时提供客户端 vantage（25580）**和**服务端 vantage（25581），因为世界跑在同一进程里的集成服务端上。下面的一切——权威状态、快照、分叉——在单机里都能用，不需要另外开服务器。
+从 server directory 启动守护进程，或显式指定目录：
 
-```bash
+~~~powershell
 .venv/Scripts/mc-bridge run
-```
+.venv/Scripts/mc-bridge run --server-dir "C:/path/to/server"
+~~~
 
-```
-[mc-agent-bridge] local API on 127.0.0.1:8765
-[mc-agent-bridge] connected to interface mod on port 25580
-```
+另开 shell：
 
-游戏没开它也会一直重试，所以什么时候起都行；游戏可以随便开关，不会打断它。另开一个终端：
-
-```bash
+~~~powershell
+.venv/Scripts/mc-bridge call status
+.venv/Scripts/mc-bridge call capabilities
 .venv/Scripts/mc-bridge call state
-.venv/Scripts/mc-bridge call entities '{"radius": 32}'
-.venv/Scripts/mc-bridge call chat '{"message": "来自外部的问候"}'
-.venv/Scripts/mc-bridge watch --events chat,game      # 实时事件流
-```
+~~~
 
-## 4. 给它一个大脑
+**status** 解释发现与连接状态；**capabilities** 才是当前 mod 支持哪些操作的
+权威来源。默认发现绝不会猜端口，也不会回退到客户端视角。
 
-loop 把聊天变成后端的一轮对话。想先看它跑通，不需要模型：
+常用服务端视角调用：
 
-```bash
-.venv/Scripts/mc-agent-loop run --backend echo --trigger @codex
-```
+~~~powershell
+.venv/Scripts/mc-bridge call player '{"player":"<uuid-or-name>"}'
+.venv/Scripts/mc-bridge call entities '{"radius":32}'
+.venv/Scripts/mc-bridge call command_output '{"command":"list"}'
+.venv/Scripts/mc-bridge call events '{"since":0,"limit":20}'
+~~~
 
-在游戏聊天里打 `@codex 你好`，游戏会自己回声一句——这证明链路是通的：聊天进、后端出、回复再回到聊天。
+持久身份优先使用 UUID，名字只是便捷方式。返回的玩家身份是上下文，不是执行
+特权命令的授权。
 
-要接真模型，就起 Hermes 并让 loop 指过去（见 [用 Hermes 运行智能体](hermes-setup.md)）：
+## 4. 接入用户主动型 Harness
 
-```bash
-.venv/Scripts/mc-agent-loop run --backend hermes --trigger @codex --env-file .env
-```
+让 Harness 拉起：
 
-无人值守、由事件驱动的运行，也可以让 Hermes 自己拥有触发：用户在 Hermes
-Gateway 配置一条 webhook route，加载可移植的 [Toolkit Skill](toolkit-skill.md)，
-直接调 Bridge MCP 工具。见 [Hermes 无人值守](hermes-unattended.md)。
+~~~text
+C:/path/to/.venv/Scripts/mc-bridge.exe mcp
+~~~
 
-loop 会忽略自己发出的消息（否则它会和自己无限对话），所以单机世界里触发必须来自别人：另一个玩家，或者智能体自己的玩家（见 [智能体在游戏里是谁](player-identity.md)）。单客户端场景用一次性模式：
+MCP 适配器是已经运行的守护进程的客户端。新 Harness 会话应先调用
+**mc_status** 和 **mc_capabilities**，再使用 **mc_player**、**mc_state**、
+**mc_entities**、**mc_command_output** 或其它已公布工具。
 
-```bash
-.venv/Scripts/mc-agent-loop once "看看周围 64 格内有什么" \
-    --sender operator --backend hermes --env-file .env
-```
+游戏外用户请求没有聊天快照。先用 **mc_player** 确认目标玩家，再只读取任务
+需要的额外实时上下文。
 
-## 5. 没有游戏也能验证
+## 5. 理解游戏内事件
 
-仓库里带了一个假 mod，可以单独测接缝：
+服务端聊天事件可以包含 **context_id** 与精简上下文摘要。应在过期前读取完整
+有界上下文包：
 
-```bash
-python tools/smoke_offline.py                     # echo 后端，不用模型
-python tools/smoke_offline.py --backend hermes    # 真模型、真工具
-```
+~~~powershell
+.venv/Scripts/mc-bridge call context '{"id":"<context_id>"}'
+~~~
 
-第二条会跑真正的整条链——守护进程、loop、MCP、模型——只是把游戏换成了替身。它是判断"问题出在你的配置还是游戏"最快的方法。
+默认缓存 256 个包，保留 300 秒。过期或未知 ID 会返回结构化状态；新的世界
+状态始终可通过普通 Toolkit 调用获得。
 
-## 6. 给智能体一个实验室
+无人值守模式下，**mc-bridge forward** 可以把选定事件发给一个签名 webhook。
+接收方/Harness 路由、回复投递和授权是单独配置。当前实现状态见
+[Hermes 与无人值守运行](hermes-setup.md)。
 
-做研究时你想要的实例是：没有人、不渲染、可确定性步进。一条命令加一次启动：
+## 6. 兼容路径
 
-```bash
-python tools/lab_server.py provision --name my-lab --void --fabric-api --carpet \
-    --mod-jar mc-agent-interface-mod/dist/mc-agent-interface-0.5.2.jar \
-    --java <java25>
-python tools/lab_server.py start --name my-lab --wait 300
-python tools/lab_server.py exec --name my-lab "tick freeze"
-```
+客户端视角必须显式选择：
 
-实验室以 mod 的**服务端 vantage** 监听 `labs/my-lab/mc-agent-server/port.txt` 里的端口（默认 25581，占用则顺延）。把 bridge 接上去，它说同一套工具：
+~~~powershell
+mc-bridge run --vantage client --port-file "C:/path/to/mc-agent/port.txt"
+~~~
 
-```bash
-.venv/Scripts/mc-bridge run --api-port 8766 \
-    --port-file labs/my-lab/mc-agent-server/port.txt
-.venv/Scripts/mc-bridge --api-port 8766 call state
-```
+只有屏幕状态、打开本地存档或加入服务器等客户端专属操作才需要它。旧的
+**mc-agent-loop** 仍可用于兼容和测试，默认触发词是 **@agent**；用户主动型
+Harness 不需要它，其 Hermes 模型 backend 也计划移除。
 
-## 7. 把一个活世界分叉进去
+## 下一步
 
-实验室的意义在于：你可以把**正在运行的世界**整个带走，包括实体的 tick 顺序。
-
-```bash
-# 对着活实例的服务端 vantage
-.venv/Scripts/mc-bridge --api-port 8767 call fork '{"name": "before", "radius": 64}'
-
-# 在实验室里还原，并证明顺序没丢
-python tools/fork_verify.py inspect "<分叉目录>"
-python tools/fork_verify.py restore "<分叉目录>" --apply --api-port 8766
-python tools/fork_verify.py check   "<分叉目录>" --api-port 8766 --radius 0
-```
-
-`check` 会对实验室重新取样并比对顺序哈希：`MATCH` 意味着隔离实例里实体的 tick 顺序和你分叉的那个世界一致。完整配方（包括那些容易踩错的地方）见 [分叉一个活的世界](protocol-snapshot.md)。
-
-## 接下来
-
-* [整体结构](concepts.md) —— 这样你会把新代码放进正确的层
-* [工具](tools.md) —— 其余的工具箱
-* [疑难排查](troubleshooting.md) —— 收集好的坑
+* [安装](install.md)：发现规则、升级和安全边界
+* [架构与术语](concepts.md)：组件职责
+* [Toolkit 工具](tools.md)：当前 CLI/MCP 工具面
+* [分叉一个活的世界](protocol-snapshot.md)：快照与还原

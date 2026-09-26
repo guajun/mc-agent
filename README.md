@@ -1,198 +1,117 @@
-# mc-agent
+# Minecraft Agent Toolkit
 
-Infrastructure for letting agent runtimes observe and act inside a Minecraft
-client - generically. No cannons, no sulfur cubes, no use-case logic in the
-core: the framework moves data and the agent decides what it means.
+Harness-neutral infrastructure for letting an Agent observe and act in a
+Minecraft world from the server's authoritative point of view.
 
-📖 **[Documentation site](https://guajun.github.io/mc-agent/)** ([中文](https://guajun.github.io/mc-agent/zh/)) -
-installation, a guided tour, the mental model, and the traps.
+**[Documentation](https://guajun.github.io/mc-agent/)** ·
+**[中文文档](https://guajun.github.io/mc-agent/zh/)**
 
-## Install
+## Architecture
 
-```bash
-# the mod: build against your own instance, then copy the jar into mods/
-python mc-agent-interface-mod/build.py --minecraft-dir <instance> \
-    --version 26.2-Fabric --jdk <jdk25>
+`mc-agent-bridge` is the **Minecraft Agent Toolkit**. The repository still
+ships the `mc-bridge` CLI for compatibility, and `mc-bridge run` starts the
+Toolkit daemon (historically called the Bridge daemon). Toolkit and Bridge are
+not two layers, and neither is a backend for Codex, Claude Code or Hermes.
 
-# the Python side: the loop depends on the bridge, so one environment for both
-python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
-
-# run
-.venv/Scripts/mc-bridge run
+```text
+user -> Harness (Codex / Claude Code / another MCP client)
+             |
+             | MCP or mc-bridge call
+             v
+    Minecraft Agent Toolkit daemon <-> server-vantage Fabric mod <-> Minecraft server
+             ^
+             | optional signed event webhook
+             |
+       unattended Harness (for example Hermes)
 ```
 
-Needs Minecraft 26.2 with Fabric Loader 0.19+ and Fabric API, plus Java 25 and
-Python 3.11+. The full instructions - versions, upgrades, uninstalls, where
-everything lands - are on the [Installation](https://guajun.github.io/mc-agent/install/) page.
+The Harness and Toolkit run on the same machine. That can be a dedicated game
+server or the computer running a single-player world's integrated server. The
+mod and Toolkit listen on loopback; do not publish their control ports.
 
-## Modules
+There are two ways to start work:
 
-Three independent repositories, one job each:
+* **User-driven Harness.** The user starts Codex, Claude Code or another
+  Harness. The Harness calls the Toolkit to resolve the caller and read only
+  the live world context it needs.
+* **Unattended Harness.** A separately configured receiver such as Hermes is
+  awakened by the Toolkit's optional signed webhook, then calls the same
+  Toolkit. A chat event can carry a short-lived `context_id` for the sender's
+  identity, position and view at message receipt.
 
-| Module | Role | Repository |
+The portable [Toolkit Skill](docs/toolkit-skill.md), receiver-neutral webhook
+sender and [Hermes unattended setup guide](docs/hermes-unattended.md) are
+published. Signed end-to-end Hermes delivery still fails closed until the
+header and delivery-ID interoperability tracked in
+[mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) lands.
+
+## Components
+
+| Term | Responsibility | Repository |
 | --- | --- | --- |
-| **interface mod** | game adapter: a versioned local interface inside the client | [mc-agent-interface-mod](https://github.com/guajun/mc-agent-interface-mod) |
-| **bridge** | agent-agnostic bridge: owns the mod connection, serves a loopback API and an optional MCP front-end | [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge) |
-| **agent loop** | the active side: listen for chat, wake a backend, reply | [mc-agent-loop](https://github.com/guajun/mc-agent-loop) |
+| **Toolkit** | The `mc-agent-bridge` package: daemon, CLI, JSON-lines API, MCP adapter and optional webhook forwarder | [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge) |
+| **Toolkit daemon** | The long-running `mc-bridge run` process; “Bridge daemon” is its historical name | part of the Toolkit |
+| **Fabric mod** | Authoritative server-side facts and primitives inside Minecraft | [mc-agent-interface-mod](https://github.com/guajun/mc-agent-interface-mod) |
+| **Harness** | Runs the Agent and decides when and how to use tools | Codex, Claude Code, Hermes, or another caller |
+| **Skill** | Portable operating instructions for a Harness; no transport or session logic | [`skills/minecraft-toolkit`](skills/minecraft-toolkit/SKILL.md) |
+| **agent-loop** | Legacy compatibility listener for chat-driven Hermes/echo runs | [mc-agent-loop](https://github.com/guajun/mc-agent-loop) |
 
-```
- agent runtime            bridge daemon             interface mod        Minecraft
- ┌───────────────┐       ┌──────────────┐          ┌─────────────┐      ┌─────────┐
- │ Hermes / Codex│─chat─►│ loop / MCP   │◄─lines──►│ TCP 25580   │◄────►│ client  │
- │ your own loop │◄events│ JSONL 8765   │          │ events.jsonl│      │ 26.2    │
- └───────────────┘       └──────────────┘          └─────────────┘      └─────────┘
-```
+## Quick Start
 
-The same bridge serves every runtime: swap the agent without touching the game,
-restart the agent without dropping the game connection.
+Requirements: Minecraft 26.2 with Fabric Loader 0.19+ and Fabric API, Java 25,
+and Python 3.11+.
 
-## Why not MCP alone
+```powershell
+git clone https://github.com/guajun/mc-agent-interface-mod
+python mc-agent-interface-mod/build.py --minecraft-dir <instance> `
+  --version 26.2-Fabric --jdk <jdk25>
 
-MCP servers are spawned by the agent, so nothing in the game can wake an agent
-through them. Event-driven behaviour needs a resident listener on the agent's
-side; that is the loop, and MCP stays an optional *pull* interface. See
-[RFC 0001](docs/rfc/0001-agent-interface.md).
-
-## Open questions live in the issue tracker
-
-Design discussion that is not settled is filed as an issue rather than decided
-in code. Phase 1 ships the plumbing; later phases are not designed yet, on
-purpose.
-
-- [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - implemented, closed; what is still open moved to [#4](https://github.com/guajun/mc-agent/issues/4), [#5](https://github.com/guajun/mc-agent/issues/5), [#6](https://github.com/guajun/mc-agent/issues/6), [#7](https://github.com/guajun/mc-agent/issues/7)
-- [RFC 0002 - programmable tool calls (running agent-written code in the game)](docs/rfc/0002-programmable-tool-calls.md) - deferred, not implemented; the decision is in [concepts.md](docs/concepts.md)
-- [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
-  server, MCP tools, and the end-to-end check
-- [Installing the Toolkit Skill](docs/toolkit-skill.md) - one portable Agent
-  Skill for every harness, installed with `gh skill install`
-- [Unattended Hermes](docs/hermes-unattended.md) - webhook-triggered runs that
-  load the same Skill without the loop's Hermes backend
-- [Who is the agent, in game?](docs/player-identity.md) - second client,
-  Carpet fake players, and when to want a server-side adapter
-- [Lab servers the agent raises itself](docs/lab-server.md) - `tools/lab_server.py`:
-  a headless Fabric server per experiment, provisioned and commanded over RCON
-- [Auditable cold-start runs](docs/coldstart-protocol.md) - the environment
-  contract, tool-trajectory sink and evidence-based judgement for a real agent
-  run
-
-## Quick start
-
-With the pieces from [Install](#install) in place and the game running:
-
-```bash
-mc-bridge run                                    # owns the game connection
-mc-bridge call state                             # look at the world
-mc-agent-loop run --backend hermes --trigger @codex
-```
-
-Now `@codex <anything>` in game chat reaches the backend, and the backend can
-read or change the world through `mc_state`, `mc_entities`, `mc_command`,
-`mc_record_start` and friends. No model to hand? `--backend echo` answers with an
-echo, and `mc-bridge watch` shows the raw event stream.
-
-## Verify the wiring without the game
-
-```bash
-python tools/smoke_offline.py                     # echo backend: checks the plumbing
-python tools/smoke_offline.py --backend hermes    # real model through the Hermes API server
-```
-
-Runs the real `mc-bridge run` and `mc-agent-loop run` processes against a
-stand-in for the in-game mod, then checks state passthrough, chat-triggered
-replies and event replay. With `--backend hermes` the reply comes from the
-model, and it can call the `mc_*` MCP tools - which is the whole stack except
-Minecraft itself. Keep the Hermes API key in `.env` next to this README.
-
-The bridge in this test listens on the default port 8765 so the `mc-agent` MCP
-server registered with Hermes can reach it.
-
-Two more tools for driving things by hand:
-
-```bash
-python tools/launch_instance.py --minecraft-dir <instance> --version 26.2-Fabric --world <level>
-python tools/mcp_probe.py mc_entities --arg radius=64 --arg types=sulfur_cube
-```
-
-`launch_instance.py` starts the client without the GUI launcher (HMCL has no
-CLI), so an agent can bring up its own game. `mcp_probe.py` calls one MCP tool
-against the running bridge, which is how the agent-facing summaries are tested.
-
-## Working locally
-
-The recommended layout puts the four checkouts side by side, with one virtual
-environment at the root:
-
-```
-mc-agent/                  this repository (docs, RFCs, tools)
-mc-agent/.venv/            python -m venv .venv
-mc-agent/interface-mod/    mc-agent-interface-mod
-mc-agent/bridge/           mc-agent-bridge
-mc-agent/agent-loop/       mc-agent-loop
-```
-
-```bash
+git clone https://github.com/guajun/mc-agent-bridge
 python -m venv .venv
-.venv/Scripts/python -m pip install -e "bridge[mcp]" -e agent-loop    # Windows
-.venv/bin/python     -m pip install -e "bridge[mcp]" -e agent-loop    # POSIX
+.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
 
-.venv/Scripts/mc-bridge.exe run
-.venv/Scripts/mc-agent-loop.exe run --backend hermes --trigger @codex
+# Start Minecraft with the mod installed, then start the Toolkit daemon.
+.venv/Scripts/mc-bridge run
+.venv/Scripts/mc-bridge call status
+.venv/Scripts/mc-bridge call capabilities
+.venv/Scripts/mc-bridge call state
 ```
 
-The mod writes its `port.txt` into `<gameDir>/mc-agent/`, so a client on the
-same machine finds the game without extra configuration; `--mod-port` or
-`--port-file` override that.
+`mc-bridge run` discovers `<server-dir>/mc-agent-server/port.txt` and uses the
+server vantage by default. Register `.venv/Scripts/mc-bridge.exe mcp` with a
+Harness for MCP, or use `mc-bridge call <method> [json]` from any shell.
 
-## Phase 1 scope
+Start with `status` and `capabilities`; the live capability list is authoritative.
+For a player-specific request use the stable UUID when possible:
 
-In scope, and shipped:
-
-* a versioned, generic interface inside the client (state, entities, command,
-  chat, recording, waiting, markers, events);
-* a bridge that owns the connection and re-serves it on loopback, with event
-  replay;
-* an agent loop that turns chat into backend turns;
-* a Hermes-first backend, with an echo stub for tests and offline plumbing checks.
-
-Explicitly out of scope for now:
-
-* any use-case logic (experiments, cannons, analysis);
-* a mandatory always-on deterministic runtime - the agent may start, wait and
-  stop things itself;
-* new game-side abstractions beyond the interface above;
-* phases 2+ - they will be designed later, in RFCs.
-
-## Design principles
-
-1. **Decoupled by default.** Each module is useful alone; the seams are the wire
-   protocol and the loopback API.
-2. **One connection owner.** Exactly one process talks to the game.
-3. **The agent is the actor.** The bridge is a tool, not a scheduler; things
-   happen because an agent asked for them.
-4. **No use-case logic in the core.** If it only matters for one experiment, it
-   lives in that experiment.
-
-## Repositories
-
-```
-mc-agent/            meta: docs and RFCs (this repo)
-mc-agent-interface-mod/   Fabric client mod
-mc-agent-bridge/          Python bridge, CLI and MCP front-end
-mc-agent-loop/            Python agent loop and backends
+```powershell
+mc-bridge call player '{"player":"<uuid-or-name>"}'
+mc-bridge call entities '{"radius":32}'
+mc-bridge call command_output '{"command":"list"}'
 ```
 
-## Working on the docs
+See [Getting started](https://guajun.github.io/mc-agent/getting-started/)
+for MCP setup, deployment layouts and the status of event-driven operation.
 
-The site is MkDocs Material, built from `docs/` (English) and `docs/zh/`
-(Chinese) by `mkdocs-static-i18n`; `mkdocs.yml` and `requirements-docs.txt` at
-the repository root configure it, and `.github/workflows/pages.yml` builds and
-deploys it on every push that touches the docs.
+## Repository Scope
 
-```bash
+This repository contains the cross-project documentation, RFC history and
+standalone utilities. It does not contain a Codex or Claude Code backend, model
+client or conversation/session manager. The Toolkit reports facts and executes
+requested primitives; the Harness retains judgement and authorization policy.
+
+The older client-vantage and `mc-agent-loop` workflows remain available for
+compatibility and testing, but they are not the default architecture. The
+default chat trigger in the loop is `@agent`, not a Harness name.
+
+## Documentation Development
+
+```powershell
 .venv/Scripts/pip install -r requirements-docs.txt
-.venv/Scripts/python -m mkdocs serve        # http://127.0.0.1:8000
+.venv/Scripts/python -m mkdocs serve
 ```
+
+The site is built from `docs/` and `docs/zh/` with strict MkDocs link checking.
 
 ## License
 

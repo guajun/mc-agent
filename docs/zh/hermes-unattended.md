@@ -1,12 +1,12 @@
 # Hermes 无人值守：webhook + Toolkit Skill
 
 事件驱动地让 Hermes 跑在 Minecraft 上的方案：游戏事件唤醒一次 Hermes 运行，
-运行加载可移植的 [Toolkit Skill](toolkit-skill.md)，再通过 Bridge MCP 行动。
+运行加载可移植的 [Toolkit Skill](toolkit-skill.md)，再通过 Toolkit MCP 行动。
 它取代旧的形态——`mc-agent-loop --backend hermes` 既拥有触发、又保留一份
 Hermes 会话/模型逻辑。
 
 ```
-服务端视角 mod ──事件──► mc-bridge（守护进程）
+服务端视角 mod ──事件──► Toolkit daemon（`mc-bridge run`）
                             │  JSON-lines API 于 127.0.0.1:8765
                             ▼
                  mc-bridge forward  ──签名 POST──►  Hermes Gateway
@@ -26,7 +26,7 @@ Hermes 会话/模型逻辑。
 
 - **Hermes Gateway、Toolkit（守护进程 + forwarder）和服务端视角 mod 端点跑在
   同一台机器上。** forwarder 只向 loopback 发出站 HTTP 请求，不暴露任何入站端口。
-- mod socket 和 bridge API 保持在 loopback（`127.0.0.1`），Hermes 的 webhook
+- mod socket 和 Toolkit API 保持在 loopback（`127.0.0.1`），Hermes 的 webhook
   监听也绑 loopback。不要给其中任何一个做端口转发。
 - **mc-agent 不新增 Hermes 模型 API 调用。** 会话、模型调用和对话归 Hermes；
   Toolkit 是不含模型的工具面。
@@ -35,19 +35,18 @@ Hermes 会话/模型逻辑。
 
 ## 各部分的落地状态
 
-Skill 和本页的 Hermes 侧现在就可以用。端到端流程依赖
-[mc-agent#8](https://github.com/guajun/mc-agent/issues/8) 计划里的 Toolkit 工作：
+便携 Skill、服务端视角操作、上下文包和与接收方无关的 forwarder 均已实现。
+以下 issue 链接记录各部分的落地位置：
 
 | 部分 | 位置 |
 | --- | --- |
-| 签名事件 forwarder（`mc-bridge forward`） | [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2) |
-| toolkit 操作面：`player`、`context`、`save` | [mc-agent-bridge#1](https://github.com/guajun/mc-agent-bridge/issues/1) |
-| 服务端玩家上下文（`PLAYER`） | [mc-agent-interface-mod#1](https://github.com/guajun/mc-agent-interface-mod/issues/1) |
-| 聊天瞬间的上下文缓存（`context_id`） | [mc-agent-interface-mod#2](https://github.com/guajun/mc-agent-interface-mod/issues/2) |
+| 签名事件 forwarder（`mc-bridge forward`） | 由 [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2) 实现 |
+| Toolkit 操作面：`player`、`context`、`save` | 由 [mc-agent-bridge#1](https://github.com/guajun/mc-agent-bridge/issues/1) 实现 |
+| 服务端玩家上下文（`PLAYER`） | 已随 interface mod 0.6.0 发布；由 [mod #1](https://github.com/guajun/mc-agent-interface-mod/issues/1) 跟踪 |
+| 聊天瞬间上下文缓存（`context_id`） | 已随 interface mod 0.6.0 发布；由 [mod #2](https://github.com/guajun/mc-agent-interface-mod/issues/2) 跟踪 |
 
-在这些落地之前，`mc-bridge call capabilities` 会把上下文相关操作报为不支持
-（并给出依赖项），已安装的 bridge 甚至可能还没有 `mc-bridge forward`。Skill 对此
-的处理是：如实报告缺口，绝不编造兜底。
+已安装 mod 的 `capabilities` 回包仍是权威来源。缺少操作或版本较旧时，Skill
+会如实报告缺口，绝不编造兜底。
 
 !!! danger "签名与投递 ID 的兼容性"
 
@@ -60,7 +59,7 @@ Skill 和本页的 Hermes 侧现在就可以用。端到端流程依赖
     带 secret 的 route 会以 `401 Invalid signature` 拒绝这类 POST。要让流程真正
     跑通，forwarder 必须同时发出 Hermes 兼容的请求头（或者让 Hermes 认识
     `X-MC-Agent-*`）；这个改动属于
-    [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2)。
+    [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)。
     在它落地之前，可以用下面的验证步骤检查可达性，并预期签名投递会失败关闭
     （fail closed）。
 
@@ -71,7 +70,7 @@ Skill 和本页的 Hermes 侧现在就可以用。端到端流程依赖
     forwarder 会重试同一个事件；Hermes 看到的是新的投递 ID，于是又起一次独立的
     agent 运行，同一批游戏命令可能执行两次。forwarder 必须同时发出 Hermes 兼容的
     投递 ID 头（例如 `webhook-id: <eventId>`）才能让重试去重——这同样属于
-    [mc-agent-bridge#2](https://github.com/guajun/mc-agent-bridge/issues/2)
+    [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)
     的改动。
 
 ## 1. 把共享 Skill 装进 Hermes
@@ -85,10 +84,10 @@ gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:LOCALAPPDATA\herm
 hermes skills list        # minecraft-toolkit | （无分类）| local | enabled
 ```
 
-## 2. 注册 Bridge MCP server
+## 2. 注册 Toolkit MCP server
 
 如果 `hermes mcp list` 里已经有[用 Hermes 运行智能体](hermes-setup.md)注册的
-bridge，可以跳过。MCP server 是 bridge 守护进程的*客户端*：守护进程必须先跑着
+Toolkit，可以跳过。MCP server 是 Toolkit daemon 的*客户端*：daemon 必须先跑着
 （`mc-bridge run`），server 由 Hermes 在每次运行时拉起：
 
 ```powershell
@@ -98,7 +97,7 @@ hermes mcp add mc-agent `
   --args mcp
 ```
 
-`--args` 必须放在最后。这个 server 保留完整的 Bridge 工具面；route 实际能用到
+`--args` 必须放在最后。这个 server 保留完整的 Toolkit 工具面；route 实际能用到
 多少由第 5 步的限制决定。
 
 ## 3. 在 loopback 上启用 Hermes webhook 平台
@@ -150,11 +149,11 @@ hermes webhook subscribe mc-chat `
 
 发送者无法捕获的聊天事件不带 `context_id`；智能体必须如实说明，不能自己编一个。
 
-## 5. 把 route 限制到 Bridge MCP toolset
+## 5. 把 route 限制到 Toolkit MCP toolset
 
 webhook 运行**默认拿不到完整的 CLI 工具集**：Hermes 刻意收窄它（网页搜索、网页
 抓取、视觉、追问），因为 webhook payload 可能包含不可信文本。要让这个 route 能用
-Bridge——且只能用 Bridge——给 route 设一份 `toolsets`。这是刻意设计的手工编辑：
+Toolkit——且只能用 Toolkit——给 route 设一份 `toolsets`。这是刻意设计的手工编辑：
 `hermes webhook subscribe` 没有 `--toolsets` 参数，这样智能体自己创建的订阅
 无法自我提权。
 
@@ -168,7 +167,7 @@ Bridge——且只能用 Bridge——给 route 设一份 `toolsets`。这是刻�
     "secret": "<该 route 专用的 secret>",
     "prompt": "In-game chat from {sender}: {data.text}\nContext id: {context_id} ...",
     "skills": ["minecraft-toolkit"],
-    "toolsets": ["mc-agent"],          // ← 只有第 2 步的 Bridge MCP server
+    "toolsets": ["mc-agent"],          // ← 只有第 2 步的 Toolkit MCP server
     "deliver": "log",
     "profile": "default"
   }
@@ -176,12 +175,12 @@ Bridge——且只能用 Bridge——给 route 设一份 `toolsets`。这是刻�
 ```
 
 `mc-agent` 就是第 2 步的 MCP server 名。route 级的列表会**替换**该 route 运行的
-平台 webhook toolset，因此这次运行只有 Bridge 工具，没有 terminal/file/web/
+平台 webhook toolset，因此这次运行只有 Toolkit 工具，没有 terminal/file/web/
 computer-use。适配器会在下一次请求时热加载订阅文件，改完不用重启；但重新执行
 `hermes webhook subscribe` 会重建 route 并丢掉这个键，改完 route 后要重新加上。
 
 !!! note "这不是冷启动的开发 Harness"
-    受限 route 只有 Bridge MCP server——没有终端、文件、源码获取或构建工具。
+    受限 route 只有 Toolkit MCP server——没有终端、文件、源码获取或构建工具。
     需要自己写、编译、安装 logger 的智能体无法通过这条 route 完成。首轮
     Minecart ROM 冷启动因此采用带普通开发工具、由用户手动启动的 Harness；
     webhook 投递只是后续可选路径：见[可审计的冷启动运行](coldstart-protocol.md)。
@@ -194,7 +193,7 @@ computer-use。适配器会在下一次请求时热加载订阅文件，改完�
 
 ## 6. 启动 forwarder
 
-forwarder 订阅 bridge 事件流，把选定事件 POST 到 route URL。凭据来自环境变量或
+forwarder 订阅 Toolkit 事件流，把选定事件 POST 到 route URL。凭据来自环境变量或
 配置文件，绝不用会进 shell 历史的命令行参数：
 
 ```powershell
@@ -205,7 +204,7 @@ mc-bridge forward --events chat
 
 URL 和 secret 两者齐备之前转发是关闭的。保持 `--events chat`（或更窄的列表），
 让 route 只被它接受的事件唤醒；forwarder 默认过滤 `chat,game,mark,error`。
-bridge 守护进程必须已经在跑，并且连着服务端视角 mod。
+Toolkit daemon 必须已经在跑，并且连着服务端视角 mod。
 
 ## 7. 验证流程
 
@@ -220,12 +219,12 @@ bridge 守护进程必须已经在跑，并且连着服务端视角 mod。
 | 5 | 重试保持幂等 | 同一个 `eventId` 的重试投递得到 `{"status":"duplicate"}`，不会起第二次运行，游戏命令只执行一次 |
 | 6 | 运行加载了 Skill | gateway 日志显示 `mc-chat` 运行，且加载的技能集里有 `minecraft-toolkit` |
 | 7 | 取到了上下文包 | 运行用事件里的 `context_id` 调 `mc_context`（或如实报告 `not_found`/`expired`） |
-| 8 | 用上了 Bridge | 运行至少调到一个服务端视角 Bridge 工具（`mc_capabilities`、`mc_state`、`mc_player`……） |
+| 8 | 用上了 Toolkit | 运行至少调到一个服务端视角 Toolkit 工具（`mc_capabilities`、`mc_state`、`mc_player`……） |
 | 9 | 结果投递成功 | 回答出现在 `--deliver` 目标（用 `log` 时在 gateway 日志里） |
 | 10 | toolset 确实受限 | 聊天里的提示注入无法触达 terminal/file；这次运行只有 `mc-agent` 工具 |
 
 想不依赖传输做一次慢速端到端检查：一边 `mc-bridge watch`、一边看 gateway 日志，
-然后在游戏里发一条聊天；三样东西——Skill、`context_id`、Bridge 工具——都要出现在
+然后在游戏里发一条聊天；三样东西——Skill、`context_id`、Toolkit 工具——都要出现在
 这次运行里。
 
 ## 投递行为
@@ -233,7 +232,7 @@ bridge 守护进程必须已经在跑，并且连着服务端视角 mod。
 - 运行的回答去 route 指定的地方：`--deliver` 加 `--deliver-chat-id`（或
   `deliver_extra.chat_id`）。默认的 `log` 是最合适的第一站；流程验证后再换真实
   平台。
-- 要在**游戏内**回答，智能体用 Bridge 的 `command` 操作（例如 `say <text>`；
+- 要在**游戏内**回答，智能体用 Toolkit 的 `command` 操作（例如 `say <text>`；
   希望以玩家身份发言时用 `execute as <player> run say <text>`）。服务端视角连接
   没有 `chat` 能力——`mc_chat` 只属于客户端视角——所以不要期待模型以客户端身份
   说话。见[智能体在游戏里是谁](player-identity.md)。
@@ -245,7 +244,7 @@ bridge 守护进程必须已经在跑，并且连着服务端视角 mod。
 
 - 使用**每个 route 专用的 secret**。真实部署不要用 `INSECURE_NO_AUTH`；它会关闭
   签名校验，只适合本地测试。
-- 按第 3 步把监听器绑在 `127.0.0.1`；mod 和 Bridge API 也留在 loopback；
+- 按第 3 步把监听器绑在 `127.0.0.1`；mod 和 Toolkit API 也留在 loopback；
   forwarder 只出站。
 - HMAC 签名认证的是*发送方*，不是*内容*。聊天文本可能夹带注入指令，所以保持
   route 的 toolset 受限（第 5 步）、prompt 模板只点名需要的字段、破坏性或对外的
@@ -269,7 +268,7 @@ bridge 守护进程必须已经在跑，并且连着服务端视角 mod。
 | `401 Invalid signature` | secret 不一致，或发送方的请求头 Hermes 不认识——见上面的兼容性说明 |
 | `{"status":"ignored"}` | 事件类型被 `--events` 过滤了；`hermes webhook test` 的类型是 `test` |
 | route 一直不触发 | gateway 没跑、`host`/`port` 与 forwarder 的 URL 不一致，或 forwarder 没订阅上 |
-| 运行里没有 Bridge 工具 | `toolsets` 被重建时丢掉了，或 server 名不对；重新加上 `["mc-agent"]`，查 `hermes mcp list` |
+| 运行里没有 Toolkit 工具 | `toolsets` 被重建时丢掉了，或 server 名不对；重新加上 `["mc-agent"]`，查 `hermes mcp list` |
 | Skill 没加载 | `hermes skills list` 里没有 `minecraft-toolkit`，或 `--skills` 的名字与 Skill 的 `name:` 不一致 |
 | `context` 回答 `not_found`/`expired` | 上下文包的 TTL 过了，或 id 写错；用新事件，绝不用别的玩家的上下文顶替 |
 | forwarder 起不来 | 缺 `MC_AGENT_WEBHOOK_URL`/`MC_AGENT_WEBHOOK_SECRET`，或 URL 不是 `http(s)` |

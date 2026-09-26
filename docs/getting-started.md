@@ -1,191 +1,126 @@
 # Getting started
 
-This page takes you from nothing to an agent that can answer a question about
-your world, and then to a lab instance you can experiment on. Every command here
-has been run against Minecraft 26.2 on Windows; the same steps work on other
-platforms with the paths changed.
+[中文](https://guajun.github.io/mc-agent/zh/getting-started/)
 
-## What you need
+This guide brings up the server-vantage Minecraft Agent Toolkit and exercises
+it first from the CLI, then from a Harness over MCP.
 
-| | |
-| --- | --- |
-| **Minecraft** | 26.2 with **Fabric Loader 0.19+** and **Fabric API** |
-| **Java** | 25 (the version the game itself ships with is fine) |
-| **Python** | 3.11+ for the bridge, the loop and the tools |
-| **An agent runtime** | [Hermes](hermes-setup.md) is what this was built against; anything that can call MCP or HTTP works too |
+## Requirements
 
-## 1. Install the pieces
+* Minecraft 26.2, Fabric Loader 0.19+ and Fabric API
+* Java 25
+* Python 3.11+
+* a dedicated Fabric server or a single-player client whose integrated server
+  loads the interface mod
 
-Everything is installed once, from
-[Installation](install.md) - the mod jar into `<instance>/mods/`, the bridge
-and the loop into one virtual environment. The short version:
+A Harness is optional for the first check. Codex, Claude Code, Hermes and other
+callers all use the same Toolkit; none needs a project-specific backend.
 
-The mod compiles against the game's own (unobfuscated) jar - no Gradle, no
-decompiler:
+## 1. Build and install the Fabric mod
 
-```bash
+~~~powershell
 git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py \
-    --minecraft-dir "C:/Users/me/AppData/Roaming/.minecraft" \
-    --version 26.2-Fabric \
-    --jdk "C:/Program Files/Java/jdk-25"
-```
+python mc-agent-interface-mod/build.py --minecraft-dir <instance> --version 26.2-Fabric --jdk <jdk25>
+~~~
 
-Copy `dist/mc-agent-interface-<version>.jar` into `<instance>/mods/` next to
-Fabric API, then start the game. In the log you should see:
+Copy the jar from **dist/** next to Fabric API in the instance's **mods/**
+directory and start the server or single-player world. The server entrypoint
+writes the chosen port to **<server-dir>/mc-agent-server/port.txt**.
 
-```
-[mc-agent-interface] initialized, dir=<instance>/mc-agent basePort=25580
-[mc-agent-interface] listening on 127.0.0.1:25580
-```
+## 2. Install the Toolkit
 
-The mod writes the port it actually got into `<instance>/mc-agent/port.txt`. If
-something else holds 25580 it moves to the next free port, and the bridge finds
-it through that file.
-
-!!! tip "In game, right now"
-    The mod adds client-side commands, so you can check the interface without any
-    of the rest:
-
-    ```
-    /mcagent status      mod version, port, connected bridges, tick
-    /mcagent state       position, velocity, health, dimension
-    /mcagent entities 32 entity list within 32 blocks
-    /mcagent record start 200 32    sample 200 ticks into samples.jsonl
-    ```
-
-## 2. Install the bridge and the loop
-
-```bash
+~~~powershell
 git clone https://github.com/guajun/mc-agent-bridge
-git clone https://github.com/guajun/mc-agent-loop
 python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
-```
+.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
+~~~
 
-`[mcp]` is optional: without it you still get the daemon, the CLI and the
-loopback API.
+The MCP extra is required only for Harnesses that use MCP. The daemon, CLI and
+JSON-lines API work without it.
 
-## 3. Run the bridge
+## 3. Start and inspect the Toolkit
 
-!!! tip "Single player already has both vantages"
-    The same jar gives you the client vantage (25580) *and* the server vantage
-    (25581) while you play single player, because the world runs on an integrated
-    server inside the same process. Everything below - authoritative state,
-    snapshots, forking - works there without any server to set up.
+Run the daemon from the server directory, or name that directory explicitly:
 
-```bash
+~~~powershell
 .venv/Scripts/mc-bridge run
-```
+.venv/Scripts/mc-bridge run --server-dir "C:/path/to/server"
+~~~
 
-```
-[mc-agent-bridge] local API on 127.0.0.1:8765
-[mc-agent-bridge] connected to interface mod on port 25580
-```
+In another shell:
 
-It keeps trying while the game is closed, so start it whenever; the game can come
-and go without disturbing it. In another shell:
-
-```bash
+~~~powershell
+.venv/Scripts/mc-bridge call status
+.venv/Scripts/mc-bridge call capabilities
 .venv/Scripts/mc-bridge call state
-.venv/Scripts/mc-bridge call entities '{"radius": 32}'
-.venv/Scripts/mc-bridge call chat '{"message": "hello from outside"}'
-.venv/Scripts/mc-bridge watch --events chat,game      # live event stream
-```
+~~~
 
-## 4. Give it a mind
+**status** explains discovery and connection state. **capabilities** is the
+authority for operations supported by the installed mod. Default discovery
+never guesses a port or falls back to client vantage.
 
-The loop turns chat into backend turns. The quickest way to see it work needs no
-model at all:
+Useful server-vantage calls:
 
-```bash
-.venv/Scripts/mc-agent-loop run --backend echo --trigger @codex
-```
+~~~powershell
+.venv/Scripts/mc-bridge call player '{"player":"<uuid-or-name>"}'
+.venv/Scripts/mc-bridge call entities '{"radius":32}'
+.venv/Scripts/mc-bridge call command_output '{"command":"list"}'
+.venv/Scripts/mc-bridge call events '{"since":0,"limit":20}'
+~~~
 
-Type `@codex hello` in game chat and the game will answer itself with an echo.
-That proves the plumbing: chat in, backend out, reply back into chat.
+Prefer UUID for durable identity; a name is a convenience. Treat the result as
+context, not as permission to run privileged commands.
 
-For a real model, start Hermes and point the loop at it - see
-[Running the agent on Hermes](hermes-setup.md):
+## 4. Connect a user-driven Harness
 
-```bash
-.venv/Scripts/mc-agent-loop run --backend hermes --trigger @codex --env-file .env
-```
+Configure the Harness to spawn:
 
-For unattended, event-driven runs Hermes can own the trigger as well: a
-user-configured webhook route loads the portable
-[Toolkit Skill](toolkit-skill.md) and calls the Bridge MCP tools directly. See
-[Unattended Hermes](hermes-unattended.md).
+~~~text
+C:/path/to/.venv/Scripts/mc-bridge.exe mcp
+~~~
 
-The loop ignores its own messages (otherwise it would answer itself forever), so
-in a single-player world the trigger has to come from somebody else - another
-player, or the agent's own player as described in
-[Who is the agent in game](player-identity.md). For the single-client case there
-is one-shot mode:
+The MCP adapter is a client of the already-running daemon. In a new Harness
+session, call **mc_status** and **mc_capabilities** before using **mc_player**,
+**mc_state**, **mc_entities**, **mc_command_output** or another advertised tool.
 
-```bash
-.venv/Scripts/mc-agent-loop once "look around and tell me what is within 64 blocks" \
-    --sender operator --backend hermes --env-file .env
-```
+A user request made outside the game does not have a chat snapshot. Resolve the
+intended player with **mc_player**, then fetch only the additional live context
+needed for the task.
 
-## 5. Check it without a game
+## 5. Understand in-game events
 
-The repository ships a fake mod so the seams can be tested on their own:
+Server chat events can include **context_id** and a compact context summary.
+Fetch the full bounded bundle while it is still live:
 
-```bash
-python tools/smoke_offline.py                     # echo backend, no model
-python tools/smoke_offline.py --backend hermes    # real model, real tools
-```
+~~~powershell
+.venv/Scripts/mc-bridge call context '{"id":"<context_id>"}'
+~~~
 
-The second one drives the actual stack - daemon, loop, MCP, model - against a
-stand-in for the game, and is the fastest way to tell whether a problem is in
-your setup or in the game.
+The default cache holds 256 bundles for 300 seconds. An expired or unknown ID
+returns a structured status. Fresh state remains available through normal
+Toolkit calls.
 
-## 6. Give the agent a lab
+For unattended operation, **mc-bridge forward** can send selected events to one
+signed webhook. Receiver/Harness routing, reply delivery and authorization are
+separate configuration. See [Hermes and unattended operation](hermes-setup.md)
+for current implementation status.
 
-For research you want an instance the agent owns: no humans, no rendering,
-deterministic stepping. That is one command plus a server start:
+## 6. Compatibility paths
 
-```bash
-python tools/lab_server.py provision --name my-lab --void --fabric-api --carpet \
-    --mod-jar mc-agent-interface-mod/dist/mc-agent-interface-0.5.2.jar \
-    --java <java25>
-python tools/lab_server.py start --name my-lab --wait 300
-python tools/lab_server.py exec --name my-lab "tick freeze"
-```
+The client vantage is opt-in:
 
-The lab listens with the mod's **server vantage** on the port in
-`labs/my-lab/mc-agent-server/port.txt` (25581 by default, or the next free one).
-Attach a bridge to it and it speaks the same tools:
+~~~powershell
+mc-bridge run --vantage client --port-file "C:/path/to/mc-agent/port.txt"
+~~~
 
-```bash
-.venv/Scripts/mc-bridge run --api-port 8766 \
-    --port-file labs/my-lab/mc-agent-server/port.txt
-.venv/Scripts/mc-bridge --api-port 8766 call state
-```
+Use it only for client-only operations such as screen state, opening a local
+save or joining a server. The old **mc-agent-loop** remains available for
+compatibility and tests. Its default trigger is **@agent**; it is not required
+for a user-driven Harness and is planned to lose its Hermes model backend.
 
-## 7. Fork a live world into it
+## Next steps
 
-The point of the lab is that you can take a *running* world with you, including
-the entity tick order:
-
-```bash
-# against the live instance's server vantage
-.venv/Scripts/mc-bridge --api-port 8767 call fork '{"name": "before", "radius": 64}'
-
-# restore it into the lab and prove the order survived
-python tools/fork_verify.py inspect "<fork directory>"
-python tools/fork_verify.py restore "<fork directory>" --apply --api-port 8766
-python tools/fork_verify.py check   "<fork directory>" --api-port 8766 --radius 0
-```
-
-`check` re-snapshots the lab and compares the order hash with the recording:
-`MATCH` means the isolated instance ticks its entities in the same order as the
-world you forked. The full recipe, including the parts that are easy to get
-wrong, is in [Forking a live world](protocol-snapshot.md).
-
-## Where to next
-
-* [How it fits together](concepts.md) - so you put new code in the right layer
-* [Tools](tools.md) - the rest of the toolbelt
-* [Troubleshooting](troubleshooting.md) - the traps, collected
+* [Installation](install.md) for discovery, upgrades and security boundaries
+* [Architecture and terminology](concepts.md) for component ownership
+* [Toolkit tools](tools.md) for the current CLI/MCP surface
+* [Forking a live world](protocol-snapshot.md) for snapshots and restoration
