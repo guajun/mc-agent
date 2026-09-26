@@ -75,6 +75,18 @@ class AnalyseTests(unittest.TestCase):
         self.assertFalse(analysis["ok"])
         self.assertEqual(len(analysis["attackProcessed"]), 1)
 
+    def test_use_request_follows_the_processed_and_use_without_item_link(self) -> None:
+        events = base_events(gap_ticks=2)
+        # The useItemOn attempt can still point at the attack request (the use
+        # playNote has not happened yet); the processed event names the real
+        # use request two ticks later.
+        events[2]["requestSeq"] = 10
+        analysis = PROBE.analyse(events, correlation_window=2)
+        self.assertEqual(analysis["useRequestSeq"], 13)
+        self.assertEqual(analysis["requestGapTicks"], 2)
+        self.assertTrue(analysis["withinWindow"])
+        self.assertTrue(analysis["ok"])
+
     def test_double_counted_use_fails_closed(self) -> None:
         analysis = PROBE.analyse(base_events(double_use=True), correlation_window=2)
         self.assertFalse(analysis["exactlyOneUseProcessed"])

@@ -127,17 +127,27 @@ def analyse(events: list[dict[str, Any]], correlation_window: int = CORRELATION_
         return earlier[-1] if earlier else None
 
     attack_request = next((linked_request(row) for row in attack_attempts if linked_request(row)), None)
-    # Prefer attempts that carry an explicit requestSeq: the useItemOn attempt
-    # can precede the use's playNote, so its nearest-earlier fallback would
-    # otherwise resolve to the attack request.
-    use_request = next(
-        (
-            linked_request(row)
-            for row in use_attempts
-            if isinstance(row.get("requestSeq"), int) and row.get("requestSeq") in request_by_seq
-        ),
-        None,
-    )
+    # The use request is the one the state-changing processing actually
+    # consumed. The useItemOn attempt can still point at the attack's request
+    # (the use's own playNote has not happened yet), so prefer the processed
+    # event's requestSeq and then the useWithoutItem attempt's explicit link.
+    use_request = None
+    for row in processed:
+        request_seq = row.get("requestSeq")
+        if isinstance(request_seq, int) and request_seq in request_by_seq:
+            use_request = request_by_seq[request_seq]
+            break
+    if use_request is None:
+        use_request = next(
+            (
+                linked_request(row)
+                for row in use_attempts
+                if row.get("path") == "useWithoutItem"
+                and isinstance(row.get("requestSeq"), int)
+                and row.get("requestSeq") in request_by_seq
+            ),
+            None,
+        )
     if use_request is None:
         use_request = next((linked_request(row) for row in use_attempts if linked_request(row)), None)
     attack_seqs = {int(row["seq"]) for row in attack_attempts}
