@@ -28,6 +28,26 @@ path. The optional legacy `mc-agent-loop` is described in the Hermes guide.
 
 ## Integration and evidence
 
+### Verified example: Minecart ROM { #verified-example }
+
+[Issue #13](https://github.com/guajun/mc-agent/issues/13) and its child issues
+#14–#21 are complete. All three stages were run, independently reviewed and
+merged on 2026-09-26:
+
+| Stage | Accepted result | Evidence and reproduction |
+| --- | --- | --- |
+| Toolchain readiness | Live gate **8/8 PASS** | [Acceptance runbook](minecart-rom-runbook.md) |
+| Autonomous agent cold start | Agent-written logger, 5 operated/captured carts, **5/5 audit PASS** | [Original cold-start evidence](evidence/rom20-coldstart/README.md) |
+| Frozen real-game regression | **3 fresh instances, 2 programs, 1 cold download, 8 negatives** | [Regression guide](rom21-regression.md) · [Committed evidence](evidence/rom21-regression/README.md) |
+
+The cold start records the original autonomous model run. The regression reuses
+its successful recipe without a model and is evidence of repeatability. The
+[runbook](minecart-rom-runbook.md) separates offline verification, the recorded
+demo and fresh live-game runs. Optional Hermes webhook compatibility remains a
+separate follow-up.
+
+### Technical runbooks
+
 These are developer and experiment runbooks; they are not required to install
 the Toolkit or connect an agent.
 
@@ -36,6 +56,7 @@ the Toolkit or connect an agent.
 - [Stage-one integration gate](stage1-gate.md)
 - [Stage-one integration run](stage1-integration.md)
 - [Minecart ROM acceptance runbook](minecart-rom-runbook.md)
+- [Minecart ROM regression](rom21-regression.md)
 
 ## Design and contributing
 

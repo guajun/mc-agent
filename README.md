@@ -19,6 +19,11 @@ application, or try the tools directly from a terminal.
 Available operations depend on the connected mod. The agent checks `capabilities`
 before using them. Your agent application supplies the model and conversation.
 
+**Verified example:** [Minecart ROM](docs/minecart-rom-runbook.md) completed all
+three acceptance stages on 2026-09-26: a live toolchain gate, an autonomous agent
+cold start, and regression on fresh game instances. See the guide for evidence
+and reproduction; the scripted regression is distinct from the autonomous run.
+
 ## Install and make your first connection
 
 **You need:** Minecraft **26.2**, Fabric Loader **0.19+**, Fabric API,

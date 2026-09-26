@@ -48,6 +48,10 @@ Minecraft Agent Toolkit 通过本机工具连接 AI 智能体与 Minecraft。
 
 </div>
 
+**已通过实机验收：** [Minecart ROM](minecart-rom-runbook.md) 已于 2026-09-26
+完成工具链门禁、智能体自主冷启动和全新实例回归。
+[查看结果与复现入口 →](advanced.md#verified-example)
+
 ## 四步完成连接
 
 **开始前准备：** Minecraft 26.2、Fabric Loader 0.19+、Fabric API、JDK 25、

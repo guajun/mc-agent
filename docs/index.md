@@ -48,6 +48,10 @@ Use your existing agent application, or try the tools from a terminal first.
 
 </div>
 
+**Verified in a real game:** [Minecart ROM](minecart-rom-runbook.md) completed
+its toolchain gate, autonomous agent cold start and fresh-instance regression
+on 2026-09-26. [See the results and reproduction paths →](advanced.md#verified-example)
+
 ## Get connected in four steps
 
 **Before you start:** Minecraft 26.2, Fabric Loader 0.19+, Fabric API, JDK 25,

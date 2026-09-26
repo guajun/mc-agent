@@ -28,6 +28,23 @@
 
 ## 集成与证据
 
+### 已验收案例：Minecart ROM { #verified-example }
+
+[Issue #13](https://github.com/guajun/mc-agent/issues/13) 及子任务 #14–#21 已完成。
+三个阶段均于 2026-09-26 完成实测、独立审查并合并：
+
+| 阶段 | 验收结果 | 证据与复现 |
+| --- | --- | --- |
+| 工具链就绪 | 实机完整门禁 **8/8 PASS** | [总运行手册](minecart-rom-runbook.md) |
+| 智能体自主冷启动 | 自写 logger，实际操作并捕获 5 辆矿车，**5/5 审计 PASS** | [原始冷启动证据](evidence/rom20-coldstart/README.md) |
+| 成功产物固化为实机回归 | **3 个新实例、2 种程序、1 次冷下载、8 个负例** | [回归指南](rom21-regression.md) · [已提交证据](evidence/rom21-regression/README.md) |
+
+冷启动记录原始模型自主运行；回归不调用模型，复用成功配方验证可重复性。
+[总运行手册](minecart-rom-runbook.md)分别提供离线复验、已有结果 Demo 和全新实机运行入口。
+可选的 Hermes webhook 兼容仍是独立跟进项。
+
+### 技术运行手册
+
 以下是开发和实验验收手册，安装 Toolkit、接入智能体时无需阅读。
 
 - [可审计的冷启动运行](coldstart-protocol.md)
@@ -35,6 +52,7 @@
 - [阶段一集成门禁](stage1-gate.md)
 - [阶段一集成运行](stage1-integration.md)
 - [Minecart ROM 验收手册](minecart-rom-runbook.md)
+- [Minecart ROM 回归](rom21-regression.md)
 
 ## 设计与贡献
 
