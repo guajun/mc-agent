@@ -1,0 +1,10 @@
+/* Keep homepage actions separated when they wrap on narrow screens. */
+.md-typeset .landing-actions > p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.md-typeset .landing-actions .md-button {
+  text-align: center;
+}

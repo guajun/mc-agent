@@ -1,9 +1,10 @@
-# Installation
+# Installation reference
 
 [中文](https://guajun.github.io/mc-agent/zh/install/)
 
-[Getting started](getting-started.md) is the shortest working path. This page
-records versions, placement, discovery and removal.
+**First installation? Follow [Install and first run](getting-started.md).** It
+includes OS-specific commands, mod copying, connection checks and MCP settings.
+This page covers deployment settings, upgrades, discovery and removal.
 
 ## Requirements and placement
 
@@ -19,10 +20,9 @@ the Internet.
 
 ## Fabric mod
 
-~~~powershell
-git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py --minecraft-dir <instance> --version 26.2-Fabric --jdk <jdk25>
-~~~
+Use the [mod build and installation steps](getting-started.md#1-install-the-game-mod).
+The build resource root (containing `versions/` and `libraries/`) can differ from
+the running instance directory. The first-run guide explains both paths.
 
 Copy the built jar and Fabric API into the server or client instance's
 **mods/** directory. The same jar has client and server entrypoints. The
@@ -43,21 +43,21 @@ are no longer needed.
 
 ## Toolkit (`mc-agent-bridge`)
 
-~~~powershell
-git clone https://github.com/guajun/mc-agent-bridge
-python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
-~~~
+Use the [Toolkit installation commands](getting-started.md#2-install-the-toolkit)
+for Windows or macOS/Linux.
 
 Use **pip install -e mc-agent-bridge** without the MCP extra when only the
 daemon, CLI or JSON-lines API is needed. An editable install upgrades with a
 pull in that checkout; delete the virtual environment to uninstall it.
 
+The commands below assume the virtual environment is active. Alternatively use
+the explicit `.venv/Scripts/mc-bridge` (Windows) or `.venv/bin/mc-bridge`
+(macOS/Linux) executable from your working folder, as in the first-run guide.
 Verify the executable:
 
 ~~~powershell
-.venv/Scripts/mc-bridge --help
-.venv/Scripts/mc-bridge discover
+mc-bridge --help
+mc-bridge discover --server-dir "C:/minecraft/server"
 ~~~
 
 ## Server-vantage discovery
@@ -74,6 +74,11 @@ guesses a server port or silently connects to client vantage.
 
 ~~~powershell
 mc-bridge run --server-dir "C:/minecraft/server"
+~~~
+
+Leave the daemon running. In a second terminal, using the same environment:
+
+~~~powershell
 mc-bridge call status
 mc-bridge call capabilities
 ~~~
@@ -86,7 +91,8 @@ mc-bridge run --vantage client --port-file "C:/minecraft/client/mc-agent/port.tx
 
 ## Harness integration
 
-For MCP, configure the Harness to spawn **mc-bridge.exe mcp**. This adapter
+For MCP, use the [MCP settings and example configuration](getting-started.md#4-connect-your-agent).
+Configure the Harness to spawn **mc-bridge mcp** from its absolute path. This adapter
 connects to the long-running daemon; it does not replace the daemon. For a
 Harness without MCP, use **mc-bridge call** or the loopback JSON-lines API.
 

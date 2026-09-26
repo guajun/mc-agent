@@ -328,18 +328,19 @@ python tests/mods/minecart-audit/stage1_evidence.py
 
 reads the two live evidence sets, exports the artifacts, assembles a partial
 live bundle with the real run/instance/port/source-world fields, and runs the
-gate on it. The latest run reports `independent_test_mod: pass` with the
+gate on it. The historical partial-bundle run reports `independent_test_mod: pass` with the
 assertions *input -> processing -> output chain* and *negative cases rejected*
 while the overall bundle stays `blocked` on the other prerequisites' missing
 artifacts. That is deliberately not a gate pass: #15's fixture and the other
-checks are owned by their own work.
+checks are owned by their own work. The later combined gate passed **8/8** and
+the full issue #13 chain is accepted; see the [acceptance runbook](minecart-rom-runbook.md).
 
 ## Limitations
 
 * This is instrumentation, not an adversarial sandbox. It does not promise to
   resist same-privilege malicious code; it records evidence for review.
-* The actual ROM map and deterministic fixture initialization are still
-  [#15](https://github.com/guajun/mc-agent/issues/15)'s work; every run here
+* The actual ROM map and deterministic fixture initialization were delivered by
+  [#15](https://github.com/guajun/mc-agent/issues/15); the historical component runs here
   uses generic void-lab fixtures. The combined bridge/restore run does prove
   the restored-copy audit coverage, but it is not fixture integration.
 * Joining tool calls to `input_*` events is

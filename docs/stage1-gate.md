@@ -20,12 +20,22 @@ every check passes                                      -> pass
 Exit codes: `0` pass, `1` fail, `3` blocked, `2` usage. A script cannot mistake
 "prerequisites are not ready" for success.
 
-## Status (2026-09-26, this branch)
+## Accepted status (2026-09-26)
+
+The combined live gate passed **8/8**, was independently reviewed and merged in
+[PR #30](https://github.com/guajun/mc-agent/pull/30). Issue #14 is complete.
+The subsequent autonomous cold start and fresh-instance regression are also
+accepted; [issue #13's runbook](minecart-rom-runbook.md) links all three stages,
+reviews and evidence. See the [live integration run](stage1-integration.md) for
+the gate execution record.
+
+### Development baseline (historical)
 
 * Gate tooling, schema and offline selftest are implemented; `selftest` passes
   **152 checks** (no game, no live evidence involved).
-* **No live prerequisite evidence exists yet**, so `check` on any real bundle is
-  `blocked`. This document deliberately does not claim a gate pass.
+* At the initial tooling stage, no combined live prerequisite evidence existed
+  and the partial bundles were `blocked`. That historical state was superseded
+  by the accepted full-gate run above; missing evidence still blocks new runs.
 * Independent baseline recorded while the gate was developed: the read-only hash
   of the source save (`Minecart ROM test` under the 26.2-Fabric instance) is
   `8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a`

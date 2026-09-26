@@ -1,86 +1,105 @@
-# Minecraft Agent Toolkit
+---
+hide:
+  - toc
+---
 
-为 Minecraft 世界提供服务端权威视角的本地工具面，同时不把模型或
-Harness 逻辑塞进游戏。
+# 让你的智能体走进 Minecraft 世界
 
-[English](https://guajun.github.io/mc-agent/)
+**读取世界、执行命令、开展可重复的实验。**
 
-## 一套 Toolkit，任意 Harness
+Minecraft Agent Toolkit 通过本机工具连接 AI 智能体与 Minecraft。
+沿用你熟悉的智能体应用，也可以先在终端体验，不必先配置模型。
+
+<div class="landing-actions" markdown>
+
+[安装并开始体验](getting-started.md){ .md-button .md-button--primary }
+[查看工具能力](tools.md){ .md-button }
+
+</div>
+
+## 可以做什么？
+
+<div class="grid cards" markdown>
+
+- **了解世界**
+
+    读取服务端的权威世界状态，查找在线玩家，检查附近实体。
+
+    试着说：“概括当前世界状态和在线玩家。”
+
+- **通过工具执行操作**
+
+    从智能体或终端执行 Minecraft 命令，并读取命令结果。
+
+    试着说：“列出当前在线玩家。”
+
+- **重复和校验实验**
+
+    采集实体顺序快照，分叉世界，检查恢复结果。
+
+    [了解世界分叉 →](protocol-snapshot.md)
+
+- **沿用你的智能体应用**
+
+    接入 Codex、Claude Code、Hermes 等 MCP 客户端；有终端权限的智能体也能使用 CLI。
+    模型与对话由你的应用提供。
+
+    [接入智能体 →](getting-started.md#4-connect-your-agent)
+
+</div>
+
+**已通过实机验收：** [Minecart ROM](minecart-rom-runbook.md) 已于 2026-09-26
+完成工具链门禁、智能体自主冷启动和全新实例回归。
+[查看结果与复现入口 →](advanced.md#verified-example)
+
+## 四步完成连接
+
+**开始前准备：** Minecraft 26.2、Fabric Loader 0.19+、Fabric API、JDK 25、
+Python 3.11+ 和 Git。Minecraft、Toolkit 和智能体运行在同一台机器。
+可以从一个单机世界开始，也可以使用已有的独立 Fabric 服务端。
+
+1. **安装 Fabric mod。** 从源码构建，将 jar 放入 `mods/`，进入世界。
+2. **安装 Toolkit。** 克隆 `mc-agent-bridge`，安装到 Python 虚拟环境。
+3. **检查连接。** 一个终端运行常驻进程，另一个终端依次检查 `status`、`capabilities` 和 `state`。
+4. **接入智能体。** 注册 MCP 适配器，让智能体描述你的世界。
+
+[逐步安装指南](getting-started.md)提供 Windows 与 macOS/Linux 命令、路径示例、
+MCP 配置和成功标志。首次连接检查不需要 AI 模型。
+目前安装仍包含 mod 源码构建，指南尚未提供全自动安装器。
+
+<div class="landing-actions" markdown>
+
+[开始安装](getting-started.md){ .md-button .md-button--primary }
+[已经装好？检查连接](getting-started.md#3-check-the-connection){ .md-button }
+
+</div>
+
+## 架构方案
 
 ```text
-用户 -> Harness ---------------- MCP / CLI -------------------+
-                                                             |
-游戏聊天 -> 上下文包 -> 签名 webhook -> Harness              |
-                                                             v
-Minecraft 服务端 <-> 服务端视角 Fabric mod <-> Minecraft Agent Toolkit daemon
+你 → 智能体应用 → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft 世界
+     (Harness)       MCP / CLI + 常驻进程       服务端视角
 ```
 
-常规路径由用户在 Codex、Claude Code 或其它 Harness 中主动发起。
-Harness 与 Toolkit 在同一台机器上；Harness 按需拉取实时玩家或世界上下文。
+| 组件 | 负责什么 |
+| --- | --- |
+| 智能体应用（Harness） | 运行模型和对话，决定调用哪些工具。 |
+| Toolkit（`mc-agent-bridge`） | 提供 `mc-bridge` 命令和 MCP 工具，保持与 Minecraft 的连接。 |
+| Fabric mod | 读取服务端世界状态并执行请求；单机世界也适用。 |
 
-无人值守路径由事件发起。服务端视角 mod 在收到聊天时捕获发送者的身份、
-位置和视角，事件携带一个短期有效的 `context_id`。可选的 Toolkit
-forwarder 把选定事件发给用户单独配置的接收方，例如 Hermes。该 Harness
-随后读取上下文包，并使用与其它调用者完全相同的 Toolkit。
+使用期间保持 Toolkit 常驻进程运行，智能体的 MCP 适配器会连接它。
+游戏控制连接仅限本机；实际可用工具从连接的 mod 查询。
 
-!!! info "实现状态"
-    服务端视角工具、玩家查询、聊天时刻上下文包和与接收方无关的签名
-    webhook 发送端与便携 [Toolkit Skill](toolkit-skill.md) 已经实现。
-    [Hermes 无人值守指南](hermes-unattended.md)记录接收方、route 与投递配置，
-    但签名端到端投递仍受
-    [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)
-    阻塞。旧的 `mc-agent-loop` 仍可用于兼容，但不是 Toolkit 必需组件。
+[查看完整架构与部署说明 →](concepts.md)
 
-## 组件
+## 接下来去哪里？
 
-| 名称 | 运行位置 | 职责 |
-| --- | --- | --- |
-| **Minecraft Agent Toolkit** | Harness 与 mod endpoint 所在机器 | `mc-agent-bridge` 包：守护进程、CLI、JSON-lines API、MCP 适配器和 webhook forwarder |
-| **Toolkit daemon** | 本地 Python 进程 | `mc-bridge run` 启动的常驻进程；Bridge daemon 是旧称 |
-| **Fabric mod** | 独立服务端或单机集成服务端 | 通过 loopback 暴露权威状态与动作 |
-| **Harness** | 与 Toolkit 同机 | 运行 Agent、维护会话并决定做什么 |
-| **Skill** | 由 Harness 加载 | 便携的 Toolkit 操作说明；不含协议或会话代码 |
-| **agent-loop** | 可选旧进程 | 监听聊天并调用临时保留的 Hermes 或 echo backend |
+| 我想…… | 打开 |
+| --- | --- |
+| 安装、升级或更换游戏路径 | [安装参考](install.md) |
+| 解决连接问题 | [首次运行帮助](getting-started.md#something-didnt-work) · [疑难排查](troubleshooting.md) |
+| 教智能体正确使用 Toolkit | [可选的 Toolkit Skill](toolkit-skill.md) |
+| 配置事件触发、无人值守或实验 | [进阶指南](advanced.md) |
 
-项目不维护 Codex backend、Claude Code backend 或 Hermes 专用游戏接口。
-所有 Harness 使用同一套 Toolkit。
-
-## 快速开始
-
-```powershell
-# 安装 Toolkit（mc-agent-bridge 仓库）。
-git clone https://github.com/guajun/mc-agent-bridge
-python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]"
-
-# 安装 Fabric mod 并启动 Minecraft 后：
-.venv/Scripts/mc-bridge run
-.venv/Scripts/mc-bridge call status
-.venv/Scripts/mc-bridge call capabilities
-.venv/Scripts/mc-bridge call state
-```
-
-默认目标是服务端视角。它发现
-`<server-dir>/mc-agent-server/port.txt`，绝不会静默回退到客户端 endpoint。
-Harness 可以拉起 `mc-bridge mcp`；shell 或不支持 MCP 的 Harness 可以使用
-`mc-bridge call`。
-
-[快速开始 :material-arrow-right:](getting-started.md){ .md-button .md-button--primary }
-[架构与术语 :material-arrow-right:](concepts.md){ .md-button }
-[安装 :material-arrow-right:](install.md){ .md-button }
-
-## 文档
-
-* [快速开始](getting-started.md) - 服务端视角配置与第一次调用
-* [安装](install.md) - 版本、部署位置与发现规则
-* [架构与术语](concepts.md) - 组件边界和两种启动方式
-* [Toolkit 命令与 MCP 工具](tools.md) - 当前工具面与能力发现
-* [安装 Toolkit Skill](toolkit-skill.md) - 供受支持 Harness 共用的一份便携 Skill
-* [Hermes 无人值守运行](hermes-unattended.md) - webhook route、受限工具与投递状态
-* [Hermes 兼容 backend](hermes-setup.md) - 临时 agent-loop 路径
-* [玩家身份](player-identity.md) - 调用者上下文、假人和旧客户端身份
-* [分叉一个活的世界](protocol-snapshot.md) - 快照与还原
-* [无头实验室服务器](lab-server.md) - 隔离实验实例
-* [可审计的冷启动运行](coldstart-protocol.md) - Harness 执行与证据契约
-* [疑难排查](troubleshooting.md) - 连接与上下文问题
-* [RFC](rfc/0001-agent-interface.md) - 历史决策和后续方案
+Hermes 无人值守属于进阶集成，目前仍有签名投递问题待解决。
+其[配置与状态](hermes-unattended.md)独立于上面的交互式使用流程。

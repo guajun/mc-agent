@@ -178,13 +178,13 @@ python tests/mods/minecart-audit/bridge_restore_smoke.py
 python tests/mods/minecart-audit/stage1_evidence.py
 ```
 
-读取两份 live 证据、导出产物、用真实 run/instance/端口/源世界字段组装部分 live bundle，并对它运行门禁。最近一次结果为 `independent_test_mod: pass`（断言 *input -> processing -> output chain*、*negative cases rejected*），而整体 bundle 因其他前置缺失仍是 `blocked`。这刻意不是门禁通过：#15 的 fixture 与其他检查各自负责。
+读取两份 live 证据、导出产物、用真实 run/instance/端口/源世界字段组装部分 live bundle，并对它运行门禁。历史上的部分 bundle 结果为 `independent_test_mod: pass`（断言 *input -> processing -> output chain*、*negative cases rejected*），整体因其他前置缺失为 `blocked`，不算完整门禁通过。后续组合门禁已通过 **8/8**，#13 全链路已验收，见[总运行手册](minecart-rom-runbook.md)。
 
 导出会**绑定**证据而不是改写身份：事件自身的 `run`/`inst`/维度与声明不符会被拒绝，存在未关闭会话或缺少 `audit_end` 的日志同样被拒绝。负例必须 verifier 判定恰为 `fail`（不完整/崩溃日志不算"已拒绝的负例"），门禁会断言每行 `verifier_verdict == "fail"`；环境触发的处理行会带 `actor_provenance` 而不是裸 null。manifest 的 `fixture_behavior_unchanged` 与 `agent_mod_coexists` 来自 live summary，任一为假时适配器拒绝导出。仓库另有 #28 提供的完整 bundle 无损适配器 `tools/stage1_evidence.py`；bridge 组合脚本在复制证据前会用 `/mcaudit end` 收尾源会话。
 
 ## 限制
 
 * 这是插桩，不是对抗性沙箱。它不承诺抵抗同权限恶意代码；它为人工审查记录证据。
-* 真实 ROM 地图与确定性 fixture 初始化仍属于 [#15](https://github.com/guajun/mc-agent/issues/15) 的工作；这里所有运行都用通用虚空实验室 fixture。组合 bridge/restore 运行确实证明了恢复副本的审计覆盖，但这不是 fixture 集成。
+* 真实 ROM 地图与确定性 fixture 初始化已由 [#15](https://github.com/guajun/mc-agent/issues/15) 交付；这里记录的历史组件运行使用通用虚空实验室 fixture。组合 bridge/restore 运行证明了恢复副本的审计覆盖；完整 fixture 集成的后续验收见总运行手册。
 * 把工具调用关联到 `input_*` 事件属于 [#19](https://github.com/guajun/mc-agent/issues/19) 的审计 harness：mod 精确记录操作者 UUID、tick 和序号，使关联成为可能，但它自己不读取工具轨迹。
 * 同 tick 多输出的顺序在 verifier 中有强制校验与单测；live fixture 每次只产生一辆矿车，因此该点由合成用例覆盖而非真实同 tick 双输出。
