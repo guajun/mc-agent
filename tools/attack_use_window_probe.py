@@ -293,16 +293,20 @@ def main(argv: list[str] | None = None) -> int:
                 console.connect()
         else:
             raise RuntimeError("the RCON console could not stay connected for setup")
-        # The two commands go out back-to-back on the persistent connection:
-        # no process spawn between them, so they land in the same server-thread
-        # batch (same or adjacent tick).
+        # The two commands are written to the socket back-to-back without
+        # waiting for the first reply: no process spawn and no round trip
+        # between them, so the server processes both in the same server-thread
+        # batch (the same or adjacent tick).
         start = time.time()
-        attack_reply = c(console, "player Bot attack once")
-        use_reply = c(console, "player Bot use once")
-        report["attackReply"] = attack_reply[-300:]
-        report["useReply"] = use_reply[-300:]
-        report["commandRoundTripMs"] = round((time.time() - start) * 1000.0, 3)
+        console._send(2, lab_server.Rcon.TYPE_COMMAND, "player Bot attack once")
+        console._send(2, lab_server.Rcon.TYPE_COMMAND, "player Bot use once")
+        report["commandSendGapMs"] = round((time.time() - start) * 1000.0, 3)
         time.sleep(1.0)
+        try:
+            for _ in range(4):
+                console._read_packet(idle=0.2)
+        except Exception as error:  # noqa: BLE001 - draining is best effort
+            report["drainError"] = f"{type(error).__name__}: {error}"
         c(console, "mcaudit phase experiment_end")
         c(console, "mcaudit end")
         report["events"] = read_jsonl(log)
@@ -327,7 +331,7 @@ def main(argv: list[str] | None = None) -> int:
         "exactlyOneUseProcessed": analysis.get("exactlyOneUseProcessed"),
         "noStaleAttackAttribution": analysis.get("noStaleAttackAttribution"),
         "processed": len(analysis.get("processed") or []),
-        "roundTripMs": report.get("commandRoundTripMs"),
+        "sendGapMs": report.get("commandSendGapMs"),
         "report": str(out / "probe-report.json"),
     }, indent=2))
     return 0 if analysis.get("ok") else 1
