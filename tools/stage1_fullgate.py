@@ -1893,8 +1893,12 @@ async def devcap_phase(args: argparse.Namespace) -> int:
         "no_rom_logic": no_rom_logic,
         "detail": {"probes": probes, "memory": {
             "expected": expected_entities, "matched": matched_entities,
-            "orderHashMatch": bool(verification.get("orderHash", {}).get("match")),
-            "snapshot": snapshot_dir,
+            "orderHashMatch": bool(order_match),
+            "nbtMatch": bool(nbt_ok),
+            "positionMatch": bool(pos_ok),
+            "preSnapshot": pre_dir,
+            "postSnapshot": post_dir,
+            "report": str(memory_log),
         }, "forbidden_scan": {"command": "findstr /s /i /n minecart note_block answer src", "hits": 0}},
     }, indent=2), encoding="utf-8")
 
@@ -1967,7 +1971,7 @@ async def devcap_phase(args: argparse.Namespace) -> int:
             actual_path = None
         resolves = actual_path is not None and actual_path == expected_path
         if not resolves:
-            raise RuntimeError(f"{info['name']} resolved world {world_dir!r}, expected {expected!r}")
+            raise RuntimeError(f"{info['name']} resolved world {world_dir!r}, expected {expected_path!r}")
         rows.append({
             "instance_id": info["name"], "role": role,
             "world_dir": f"labs/{info['name']}/world",
