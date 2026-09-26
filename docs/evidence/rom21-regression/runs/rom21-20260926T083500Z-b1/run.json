@@ -1,0 +1,727 @@
+{
+  "runId": "rom21-20260926T083500Z-b1",
+  "configId": "calibrated-b",
+  "configSha256": "01b559ab8a8f617710aad2a6a66b8eb7c82767cf78340576ce50beb5efd3a798",
+  "instance": "rom21-om21-20260926t083500z-b1-exp",
+  "programSha256": "f0d97d2ab0746ce9ea5d0f6fc76df6f5ba1668df5813d1402863ea39919c5f15",
+  "expectedCartCount": 4,
+  "agentUuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+  "cold": false,
+  "jarIteration": true,
+  "loggerJar": {
+    "version": "romlog-rom21-1",
+    "build": "romlog-rom21-1",
+    "path": "repo/labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v1/rom21-logger.jar",
+    "sha256": "3c1dae36590b82a26d0fad8cc5daa08d017ae7d27847c99004170a1c55da71ae",
+    "size": 21530,
+    "sidecar": "repo/labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v1/rom21-logger.jar.build.json",
+    "sources": [
+      {
+        "path": "src/main/java/dev/mcagent/rom21/mixin/MinecartContainerMixin.java",
+        "sha256": "2e7d220ed50640e93dcb4e824e2e8b1ffaa457ac1d515eaaa12bb39454c10e71"
+      },
+      {
+        "path": "src/main/java/dev/mcagent/rom21/RomLog.java",
+        "sha256": "f6d0215b745da12d7f1ad18a144158a11bbe7b96cd755b0bb81262bd6f876ea7"
+      },
+      {
+        "path": "src/main/java/dev/mcagent/rom21/RomLogMod.java",
+        "sha256": "fcc6e80736f1ef3d28c55e4c78665850b523baf7a19411d0830afef9eeb5f509"
+      },
+      {
+        "path": "src/main/resources/fabric.mod.json",
+        "sha256": "b8eaf650adea6a7ace505f66954be460886d720a64dc82483d6a62a3e991a4fa"
+      },
+      {
+        "path": "src/main/resources/rom21log.mixins.json",
+        "sha256": "4e8779ede9f5d9d19b940c5dd4181e364628d6268ab505401d1cfa52b1fb83e7"
+      },
+      {
+        "path": "src/main/resources/romlog.properties",
+        "sha256": "c039920d2718d4b6b586be9a584b425b3ec92633214f23ac99d2980d0c821364"
+      }
+    ],
+    "sourceSha256": "670c75eb8f413cfa96091049dca09e47ad4bc094361cc223e616a2026bbb1413",
+    "buildTool": "repo/tools/build_mod.py",
+    "buildOutput": [
+      "  88 classpath entries from lab rom21-om21-20260926t083500z-b1-src",
+      "  metadata labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v1/rom21-logger.jar.build.json",
+      "deploy it with: python tools/lab_server.py provision --name rom21-om21-20260926t083500z-b1-src --mod-jar labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v1/rom21-logger.jar"
+    ]
+  },
+  "loggerJarIteration": {
+    "version": "romlog-rom21-2",
+    "build": "romlog-rom21-2",
+    "path": "repo/labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v2/rom21-logger.jar",
+    "sha256": "8068999c97870bcdd4d657edd6ded22b7f9f1bed1bba85ec1c3af7bd62e15b90",
+    "size": 21530,
+    "sidecar": "repo/labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v2/rom21-logger.jar.build.json",
+    "sources": [
+      {
+        "path": "src/main/java/dev/mcagent/rom21/mixin/MinecartContainerMixin.java",
+        "sha256": "2e7d220ed50640e93dcb4e824e2e8b1ffaa457ac1d515eaaa12bb39454c10e71"
+      },
+      {
+        "path": "src/main/java/dev/mcagent/rom21/RomLog.java",
+        "sha256": "f6d0215b745da12d7f1ad18a144158a11bbe7b96cd755b0bb81262bd6f876ea7"
+      },
+      {
+        "path": "src/main/java/dev/mcagent/rom21/RomLogMod.java",
+        "sha256": "fcc6e80736f1ef3d28c55e4c78665850b523baf7a19411d0830afef9eeb5f509"
+      },
+      {
+        "path": "src/main/resources/fabric.mod.json",
+        "sha256": "b8eaf650adea6a7ace505f66954be460886d720a64dc82483d6a62a3e991a4fa"
+      },
+      {
+        "path": "src/main/resources/rom21log.mixins.json",
+        "sha256": "4e8779ede9f5d9d19b940c5dd4181e364628d6268ab505401d1cfa52b1fb83e7"
+      },
+      {
+        "path": "src/main/resources/romlog.properties",
+        "sha256": "c039920d2718d4b6b586be9a584b425b3ec92633214f23ac99d2980d0c821364"
+      }
+    ],
+    "sourceSha256": "670c75eb8f413cfa96091049dca09e47ad4bc094361cc223e616a2026bbb1413",
+    "buildTool": "repo/tools/build_mod.py",
+    "buildOutput": [
+      "  88 classpath entries from lab rom21-om21-20260926t083500z-b1-src",
+      "  metadata labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v2/rom21-logger.jar.build.json",
+      "deploy it with: python tools/lab_server.py provision --name rom21-om21-20260926t083500z-b1-src --mod-jar labs/rom21-regression/run-rom21-20260926T083500Z-b1/jars/v2/rom21-logger.jar"
+    ]
+  },
+  "auditJar": {
+    "path": "F:/mc-agent-worktrees/rom13/fullgate/tests/mods/minecart-audit/dist/mc-minecart-audit-0.1.0.jar",
+    "sha256": "7a77e89d72969f23ce7b7c2543bfe992c2a3674171f3eb190a8e7faa8f2ec4ac"
+  },
+  "interfaceJar": {
+    "path": "F:/mc-agent-worktrees/rom13/meta16/labs/_build/mods/mc-agent-interface-0.6.0.jar",
+    "sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f"
+  },
+  "mapWorld": "repo/labs/_cache/maps/unpacked/minecart-rom-base-1.0.0/world",
+  "provenanceStart": {
+    "head": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+    "clean": true,
+    "sources": {
+      "tools/rom21_regression.py": {
+        "bytes": 74683,
+        "sha256": "8d69547476adfb7aba8658370f2adab485a1fea984a6034db6d254d8cd1fe7ba",
+        "git_blob_sha256": "8d69547476adfb7aba8658370f2adab485a1fea984a6034db6d254d8cd1fe7ba",
+        "crlf": false
+      },
+      "tools/rom21_verify.py": {
+        "bytes": 53466,
+        "sha256": "c3f096ac7cb41375f80b4bbe12eef64f52642df1c7c9f1de3e1b465c97880943",
+        "git_blob_sha256": "c3f096ac7cb41375f80b4bbe12eef64f52642df1c7c9f1de3e1b465c97880943",
+        "crlf": false
+      },
+      "tools/lab_server.py": {
+        "bytes": 79187,
+        "sha256": "10efcb7ea581ecb9f0173e1573687f7e9c312eacc5ef1819acaccb0f9b77796b",
+        "git_blob_sha256": "4a783c0c822b05e2a1fb795186176b8d43940e600f32ddbc47b067afa717901d",
+        "crlf": true
+      },
+      "tools/build_mod.py": {
+        "bytes": 14668,
+        "sha256": "244e9a23dd66a2f02a999122884f589ba26650767f06532c5bcf179428f373b0",
+        "git_blob_sha256": "3e86d82b57960dc974c70838707316bbf382f5f5c98561eee790a70d4fe683ee",
+        "crlf": true
+      },
+      "tools/minecart_audit.py": {
+        "bytes": 62110,
+        "sha256": "3c200f5d08d86c122c10771de5c91953627314ef3de8a50de6fe0f4e54e853aa",
+        "git_blob_sha256": "f770ee94402b9e0ff83db37369f492d74b13960e3658418da5eecf28b5931923",
+        "crlf": true
+      },
+      "tools/stage1_gate.py": {
+        "bytes": 199235,
+        "sha256": "ecdb70d6e2b49b93ae67a654d69272e702c2e200c639b0507d46c344957e20f9",
+        "git_blob_sha256": "7cb16a86bb73e2025e846212dc26a22710364c90b91fc4c7f58e78e9a8908401",
+        "crlf": true
+      },
+      "examples/minecart-rom/runner/minecart_rom.py": {
+        "bytes": 22118,
+        "sha256": "79f8d1d98ea9f960d60523438373c7d460b1ee57378b8906582e7c16b1af76ac",
+        "git_blob_sha256": "766de64629346198eb221f7fc37e3242b75c369bb18c5747c6a4f790c5e624aa",
+        "crlf": true
+      },
+      "examples/minecart-rom/runner/fixture.py": {
+        "bytes": 80302,
+        "sha256": "b32534f36530519915815f885a36656e83c7002d919b81dd0cb27f9e6178e44a",
+        "git_blob_sha256": "c6881dccc32ff8c29865f31d701e78871ce7e7b1e3a3f6368ecbe284b326af58",
+        "crlf": true
+      },
+      "examples/minecart-rom/runner/interface_mod.py": {
+        "bytes": 14629,
+        "sha256": "5aedbd6290bc51e8415805a77e988481046720917eb550b563d08d21025e7035",
+        "git_blob_sha256": "ed003aef19ad72eeb245ec76f0c62714ada74e56a1499833bb804e2e62047e52",
+        "crlf": true
+      },
+      "examples/minecart-rom/regression/logger/src/main/java/dev/mcagent/rom21/RomLog.java": {
+        "bytes": 18293,
+        "sha256": "f6d0215b745da12d7f1ad18a144158a11bbe7b96cd755b0bb81262bd6f876ea7",
+        "git_blob_sha256": "f6d0215b745da12d7f1ad18a144158a11bbe7b96cd755b0bb81262bd6f876ea7",
+        "crlf": false
+      },
+      "examples/minecart-rom/regression/logger/src/main/java/dev/mcagent/rom21/RomLogMod.java": {
+        "bytes": 852,
+        "sha256": "fcc6e80736f1ef3d28c55e4c78665850b523baf7a19411d0830afef9eeb5f509",
+        "git_blob_sha256": "fcc6e80736f1ef3d28c55e4c78665850b523baf7a19411d0830afef9eeb5f509",
+        "crlf": false
+      },
+      "examples/minecart-rom/regression/logger/src/main/java/dev/mcagent/rom21/mixin/MinecartContainerMixin.java": {
+        "bytes": 1102,
+        "sha256": "2e7d220ed50640e93dcb4e824e2e8b1ffaa457ac1d515eaaa12bb39454c10e71",
+        "git_blob_sha256": "2e7d220ed50640e93dcb4e824e2e8b1ffaa457ac1d515eaaa12bb39454c10e71",
+        "crlf": false
+      },
+      "examples/minecart-rom/regression/logger/src/main/resources/fabric.mod.json": {
+        "bytes": 535,
+        "sha256": "b8eaf650adea6a7ace505f66954be460886d720a64dc82483d6a62a3e991a4fa",
+        "git_blob_sha256": "b8eaf650adea6a7ace505f66954be460886d720a64dc82483d6a62a3e991a4fa",
+        "crlf": false
+      },
+      "examples/minecart-rom/regression/logger/src/main/resources/rom21log.mixins.json": {
+        "bytes": 215,
+        "sha256": "4e8779ede9f5d9d19b940c5dd4181e364628d6268ab505401d1cfa52b1fb83e7",
+        "git_blob_sha256": "4e8779ede9f5d9d19b940c5dd4181e364628d6268ab505401d1cfa52b1fb83e7",
+        "crlf": false
+      },
+      "examples/minecart-rom/regression/logger/src/main/resources/romlog.properties": {
+        "bytes": 216,
+        "sha256": "c039920d2718d4b6b586be9a584b425b3ec92633214f23ac99d2980d0c821364",
+        "git_blob_sha256": "c039920d2718d4b6b586be9a584b425b3ec92633214f23ac99d2980d0c821364",
+        "crlf": false
+      }
+    }
+  },
+  "provenanceEnd": {
+    "head": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+    "clean": true
+  },
+  "sourceWorld": {
+    "before": {
+      "source_save_present": true,
+      "tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "files": 40,
+      "bytes": 11556310,
+      "baseline_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "matches_baseline": true,
+      "observedAt": "2026-09-26T08:17:35Z"
+    },
+    "after": {
+      "source_save_present": true,
+      "tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "files": 40,
+      "bytes": 11556310,
+      "baseline_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "matches_baseline": true,
+      "observedAt": "2026-09-26T08:21:34Z"
+    }
+  },
+  "coldFetch": null,
+  "auditProjection": "audit-<label>.projected.jsonl is the raw audit log with the periodic cart_sample stream removed; it keeps every session/phase/input/cart event used by the verifier. The full raw audit files stay in the git-ignored lab directories and their sha256 is pinned per generation.",
+  "verifierInputs": "verify-<label>/ is a complete verifier input (run.json + logger.jsonl + audit.jsonl + audit-check.json + restore-verify.json); `python tools/rom21_verify.py verify --run docs/evidence/rom21-regression/runs/<run-id>/verify-<label>` must exit 0",
+  "generations": [
+    {
+      "label": "gen1",
+      "ordinal": 1,
+      "loggerJar": {
+        "version": "romlog-rom21-1",
+        "build": "romlog-rom21-1",
+        "path": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v1\\rom21-logger.jar",
+        "sha256": "3c1dae36590b82a26d0fad8cc5daa08d017ae7d27847c99004170a1c55da71ae",
+        "size": 21530,
+        "sidecar": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v1\\rom21-logger.jar.build.json",
+        "sources": [
+          {
+            "path": "src/main/java/dev/mcagent/rom21/mixin/MinecartContainerMixin.java",
+            "sha256": "2e7d220ed50640e93dcb4e824e2e8b1ffaa457ac1d515eaaa12bb39454c10e71"
+          },
+          {
+            "path": "src/main/java/dev/mcagent/rom21/RomLog.java",
+            "sha256": "f6d0215b745da12d7f1ad18a144158a11bbe7b96cd755b0bb81262bd6f876ea7"
+          },
+          {
+            "path": "src/main/java/dev/mcagent/rom21/RomLogMod.java",
+            "sha256": "fcc6e80736f1ef3d28c55e4c78665850b523baf7a19411d0830afef9eeb5f509"
+          },
+          {
+            "path": "src/main/resources/fabric.mod.json",
+            "sha256": "b8eaf650adea6a7ace505f66954be460886d720a64dc82483d6a62a3e991a4fa"
+          },
+          {
+            "path": "src/main/resources/rom21log.mixins.json",
+            "sha256": "4e8779ede9f5d9d19b940c5dd4181e364628d6268ab505401d1cfa52b1fb83e7"
+          },
+          {
+            "path": "src/main/resources/romlog.properties",
+            "sha256": "c039920d2718d4b6b586be9a584b425b3ec92633214f23ac99d2980d0c821364"
+          }
+        ],
+        "sourceSha256": "670c75eb8f413cfa96091049dca09e47ad4bc094361cc223e616a2026bbb1413",
+        "buildTool": "F:\\mc-agent-worktrees\\rom13\\regression\\tools\\build_mod.py",
+        "buildOutput": [
+          "  88 classpath entries from lab rom21-om21-20260926t083500z-b1-src",
+          "  metadata labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v1\\rom21-logger.jar.build.json",
+          "deploy it with: python tools/lab_server.py provision --name rom21-om21-20260926t083500z-b1-src --mod-jar labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v1\\rom21-logger.jar"
+        ]
+      },
+      "auditCheck": {
+        "verdict": "pass",
+        "exitCode": 0
+      },
+      "restore": {
+        "applied": true,
+        "verified": true,
+        "matched": 5
+      },
+      "verificationVerdict": "pass",
+      "failures": [],
+      "answer": [
+        {
+          "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+          "tick": 583,
+          "seq": 2,
+          "via": "left_stack_region",
+          "items": [
+            [
+              16,
+              "minecraft:stone",
+              4
+            ],
+            [
+              22,
+              "minecraft:copper_ingot",
+              5
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 16,
+              "id": "minecraft:stone",
+              "count": 4
+            },
+            {
+              "slot": 22,
+              "id": "minecraft:copper_ingot",
+              "count": 5
+            }
+          ],
+          "digest": "22b02cf3d92f9c6a"
+        },
+        {
+          "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+          "tick": 857,
+          "seq": 4,
+          "via": "left_stack_region",
+          "items": [
+            [
+              2,
+              "minecraft:glass",
+              1
+            ],
+            [
+              13,
+              "minecraft:coal",
+              5
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 2,
+              "id": "minecraft:glass",
+              "count": 1
+            },
+            {
+              "slot": 13,
+              "id": "minecraft:coal",
+              "count": 5
+            }
+          ],
+          "digest": "be3c4d95060f082d"
+        },
+        {
+          "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+          "tick": 1134,
+          "seq": 6,
+          "via": "left_stack_region",
+          "items": [
+            [
+              0,
+              "minecraft:glass",
+              4
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 0,
+              "id": "minecraft:glass",
+              "count": 4
+            }
+          ],
+          "digest": "e2bfc003d3b85b9c"
+        },
+        {
+          "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+          "tick": 1411,
+          "seq": 8,
+          "via": "left_stack_region",
+          "items": [
+            [
+              1,
+              "minecraft:copper_ingot",
+              6
+            ],
+            [
+              2,
+              "minecraft:redstone",
+              4
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 1,
+              "id": "minecraft:copper_ingot",
+              "count": 6
+            },
+            {
+              "slot": 2,
+              "id": "minecraft:redstone",
+              "count": 4
+            }
+          ],
+          "digest": "b0a06bc29fa55256"
+        }
+      ],
+      "oracle": [
+        {
+          "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+          "tick": 720,
+          "seq": 107,
+          "items": [
+            [
+              16,
+              "minecraft:stone",
+              4
+            ],
+            [
+              22,
+              "minecraft:copper_ingot",
+              5
+            ]
+          ],
+          "digest": "4c3e522766059e4b"
+        },
+        {
+          "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+          "tick": 994,
+          "seq": 155,
+          "items": [
+            [
+              2,
+              "minecraft:glass",
+              1
+            ],
+            [
+              13,
+              "minecraft:coal",
+              5
+            ]
+          ],
+          "digest": "7f4cb01024cc8c6b"
+        },
+        {
+          "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+          "tick": 1271,
+          "seq": 187,
+          "items": [
+            [
+              0,
+              "minecraft:glass",
+              4
+            ]
+          ],
+          "digest": "4466c027c317d318"
+        },
+        {
+          "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+          "tick": 1548,
+          "seq": 207,
+          "items": [
+            [
+              1,
+              "minecraft:copper_ingot",
+              6
+            ],
+            [
+              2,
+              "minecraft:redstone",
+              4
+            ]
+          ],
+          "digest": "d517c7bdffb64abe"
+        }
+      ],
+      "observedPopOrder": [
+        "ad270d2b-c266-4bdd-b96c-88b272598e45",
+        "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+        "e90dec84-cc7b-407f-b22f-a24250138b00",
+        "74c877d2-6345-48a6-b5ad-ca9a86848e5d"
+      ],
+      "loggerSha256": "4873cc336e393bc5efbbed650b2a71c1e78462bc8d83c4a5287e8698603a226b",
+      "auditSha256": "deee549e91d65ff5c08774b461697695d5b2dc8ba453a0b2bd6dcf3a263b80f4",
+      "deployedSha256": null
+    },
+    {
+      "label": "gen2",
+      "ordinal": 2,
+      "loggerJar": {
+        "version": "romlog-rom21-2",
+        "build": "romlog-rom21-2",
+        "path": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v2\\rom21-logger.jar",
+        "sha256": "8068999c97870bcdd4d657edd6ded22b7f9f1bed1bba85ec1c3af7bd62e15b90",
+        "size": 21530,
+        "sidecar": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v2\\rom21-logger.jar.build.json",
+        "sources": [
+          {
+            "path": "src/main/java/dev/mcagent/rom21/mixin/MinecartContainerMixin.java",
+            "sha256": "2e7d220ed50640e93dcb4e824e2e8b1ffaa457ac1d515eaaa12bb39454c10e71"
+          },
+          {
+            "path": "src/main/java/dev/mcagent/rom21/RomLog.java",
+            "sha256": "f6d0215b745da12d7f1ad18a144158a11bbe7b96cd755b0bb81262bd6f876ea7"
+          },
+          {
+            "path": "src/main/java/dev/mcagent/rom21/RomLogMod.java",
+            "sha256": "fcc6e80736f1ef3d28c55e4c78665850b523baf7a19411d0830afef9eeb5f509"
+          },
+          {
+            "path": "src/main/resources/fabric.mod.json",
+            "sha256": "b8eaf650adea6a7ace505f66954be460886d720a64dc82483d6a62a3e991a4fa"
+          },
+          {
+            "path": "src/main/resources/rom21log.mixins.json",
+            "sha256": "4e8779ede9f5d9d19b940c5dd4181e364628d6268ab505401d1cfa52b1fb83e7"
+          },
+          {
+            "path": "src/main/resources/romlog.properties",
+            "sha256": "c039920d2718d4b6b586be9a584b425b3ec92633214f23ac99d2980d0c821364"
+          }
+        ],
+        "sourceSha256": "670c75eb8f413cfa96091049dca09e47ad4bc094361cc223e616a2026bbb1413",
+        "buildTool": "F:\\mc-agent-worktrees\\rom13\\regression\\tools\\build_mod.py",
+        "buildOutput": [
+          "  88 classpath entries from lab rom21-om21-20260926t083500z-b1-src",
+          "  metadata labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v2\\rom21-logger.jar.build.json",
+          "deploy it with: python tools/lab_server.py provision --name rom21-om21-20260926t083500z-b1-src --mod-jar labs\\rom21-regression\\run-rom21-20260926T083500Z-b1\\jars\\v2\\rom21-logger.jar"
+        ]
+      },
+      "auditCheck": {
+        "verdict": "pass",
+        "exitCode": 0
+      },
+      "restore": {
+        "applied": true,
+        "verified": true,
+        "matched": 5
+      },
+      "verificationVerdict": "pass",
+      "failures": [],
+      "answer": [
+        {
+          "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+          "tick": 586,
+          "seq": 12,
+          "via": "left_stack_region",
+          "items": [
+            [
+              16,
+              "minecraft:stone",
+              4
+            ],
+            [
+              22,
+              "minecraft:copper_ingot",
+              5
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 16,
+              "id": "minecraft:stone",
+              "count": 4
+            },
+            {
+              "slot": 22,
+              "id": "minecraft:copper_ingot",
+              "count": 5
+            }
+          ],
+          "digest": "22b02cf3d92f9c6a"
+        },
+        {
+          "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+          "tick": 861,
+          "seq": 14,
+          "via": "left_stack_region",
+          "items": [
+            [
+              2,
+              "minecraft:glass",
+              1
+            ],
+            [
+              13,
+              "minecraft:coal",
+              5
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 2,
+              "id": "minecraft:glass",
+              "count": 1
+            },
+            {
+              "slot": 13,
+              "id": "minecraft:coal",
+              "count": 5
+            }
+          ],
+          "digest": "be3c4d95060f082d"
+        },
+        {
+          "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+          "tick": 1136,
+          "seq": 16,
+          "via": "left_stack_region",
+          "items": [
+            [
+              0,
+              "minecraft:glass",
+              4
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 0,
+              "id": "minecraft:glass",
+              "count": 4
+            }
+          ],
+          "digest": "e2bfc003d3b85b9c"
+        },
+        {
+          "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+          "tick": 1415,
+          "seq": 18,
+          "via": "left_stack_region",
+          "items": [
+            [
+              1,
+              "minecraft:copper_ingot",
+              6
+            ],
+            [
+              2,
+              "minecraft:redstone",
+              4
+            ]
+          ],
+          "rawItems": [
+            {
+              "slot": 1,
+              "id": "minecraft:copper_ingot",
+              "count": 6
+            },
+            {
+              "slot": 2,
+              "id": "minecraft:redstone",
+              "count": 4
+            }
+          ],
+          "digest": "b0a06bc29fa55256"
+        }
+      ],
+      "oracle": [
+        {
+          "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+          "tick": 723,
+          "seq": 314,
+          "items": [
+            [
+              16,
+              "minecraft:stone",
+              4
+            ],
+            [
+              22,
+              "minecraft:copper_ingot",
+              5
+            ]
+          ],
+          "digest": "4c3e522766059e4b"
+        },
+        {
+          "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+          "tick": 998,
+          "seq": 362,
+          "items": [
+            [
+              2,
+              "minecraft:glass",
+              1
+            ],
+            [
+              13,
+              "minecraft:coal",
+              5
+            ]
+          ],
+          "digest": "7f4cb01024cc8c6b"
+        },
+        {
+          "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+          "tick": 1273,
+          "seq": 396,
+          "items": [
+            [
+              0,
+              "minecraft:glass",
+              4
+            ]
+          ],
+          "digest": "4466c027c317d318"
+        },
+        {
+          "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+          "tick": 1552,
+          "seq": 416,
+          "items": [
+            [
+              1,
+              "minecraft:copper_ingot",
+              6
+            ],
+            [
+              2,
+              "minecraft:redstone",
+              4
+            ]
+          ],
+          "digest": "d517c7bdffb64abe"
+        }
+      ],
+      "observedPopOrder": [
+        "ad270d2b-c266-4bdd-b96c-88b272598e45",
+        "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+        "e90dec84-cc7b-407f-b22f-a24250138b00",
+        "74c877d2-6345-48a6-b5ad-ca9a86848e5d"
+      ],
+      "loggerSha256": "c41dc8f05b2e04523b2eb0433c1ba2f818f2f90c9b5ed696a2411adbae38bdf9",
+      "auditSha256": "24f306c2d1de46f940485f3067fb0de18974f13a8fdafaadd7ae8e1c1f344e12",
+      "deployedSha256": "8068999c97870bcdd4d657edd6ded22b7f9f1bed1bba85ec1c3af7bd62e15b90"
+    }
+  ]
+}

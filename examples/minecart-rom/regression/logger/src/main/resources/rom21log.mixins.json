@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "dev.mcagent.rom21.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "MinecartContainerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

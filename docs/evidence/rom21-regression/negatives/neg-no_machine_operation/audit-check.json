@@ -1,0 +1,120 @@
+{
+  "verdict": "fail",
+  "require_machine": true,
+  "reasons": [],
+  "sessions": [
+    {
+      "id": "s1790411288951",
+      "events": 99,
+      "firstSeq": 1,
+      "lastSeq": 99,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    }
+  ],
+  "machine_operated": false,
+  "agentOperations": [],
+  "outputs": [
+    {
+      "uuid": "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+      "epoch": 1,
+      "exitSeq": null,
+      "exitTick": null,
+      "exitPos": null,
+      "removeSeq": null,
+      "removeReason": null,
+      "inventory": null
+    },
+    {
+      "uuid": "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+      "epoch": 1,
+      "exitSeq": null,
+      "exitTick": null,
+      "exitPos": null,
+      "removeSeq": null,
+      "removeReason": null,
+      "inventory": null
+    },
+    {
+      "uuid": "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+      "epoch": 1,
+      "exitSeq": null,
+      "exitTick": null,
+      "exitPos": null,
+      "removeSeq": null,
+      "removeReason": null,
+      "inventory": null
+    },
+    {
+      "uuid": "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+      "epoch": 1,
+      "exitSeq": null,
+      "exitTick": null,
+      "exitPos": null,
+      "removeSeq": null,
+      "removeReason": null,
+      "inventory": null
+    },
+    {
+      "uuid": "d09386ce-522a-4e38-9b38-a10b395927ce",
+      "epoch": 1,
+      "exitSeq": null,
+      "exitTick": null,
+      "exitPos": null,
+      "removeSeq": null,
+      "removeReason": null,
+      "inventory": null
+    }
+  ],
+  "checks": {
+    "stream": {
+      "pass": true,
+      "detail": ""
+    },
+    "run_identity": {
+      "pass": true,
+      "detail": "run=['rom21-neg-no_machine_operation-1790411267'] inst=['rom21-00z-no-machine-operation-exp']"
+    },
+    "sessions": {
+      "pass": true,
+      "detail": "1 session(s); ended=1; open=0; evaluated=s1790411288951"
+    },
+    "completeness": {
+      "pass": true,
+      "detail": "end=complete incomplete=[] truncated=False open=0"
+    },
+    "status_agrees": {
+      "pass": true,
+      "detail": "no status file given"
+    },
+    "lifecycle": {
+      "pass": true,
+      "detail": "phases valid; experiment windows=1"
+    },
+    "input_chain": {
+      "pass": true,
+      "detail": "0 target processing event(s), all correlated"
+    },
+    "phase_isolation": {
+      "pass": true,
+      "detail": "agent operations confined to the experiment phase"
+    },
+    "machine_operated": {
+      "pass": false,
+      "detail": "0 calibrated agent operation(s); 0 uncalibrated player trigger(s); 0 environment trigger(s)"
+    },
+    "transient_outputs": {
+      "pass": true,
+      "detail": "5 tracked cart(s) checked"
+    },
+    "ordering": {
+      "pass": true,
+      "detail": "0 exit(s) in actual occurrence order"
+    }
+  },
+  "events": 99,
+  "run": "rom21-neg-no_machine_operation-1790411267",
+  "instance": "rom21-00z-no-machine-operation-exp",
+  "_exitCode": 1
+}

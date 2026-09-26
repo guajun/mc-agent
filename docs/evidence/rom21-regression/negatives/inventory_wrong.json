@@ -1,0 +1,17 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "inventory_wrong",
+  "kind": "live",
+  "injected": "a restored cart's Items[0].count modified before the operation",
+  "expectedCheck": "inventory_matches_program",
+  "verdict": "fail",
+  "failedChecks": [
+    "inventory_matches_program"
+  ],
+  "failClosed": true,
+  "runId": "rom21-neg-inventory_wrong-1790411074",
+  "evidence": {
+    "loggerSha256": "330f0432a14ad18e0c5bd2a0996f1d95d42dc4a313f88cc34b82800c0802b659",
+    "auditSha256": "dbc5bd6f62d250417d3a4ae2dd707d1a457d2f0f88d26f4b2885f0d7ac63ad45"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "kind": "committed-generation",
+  "runId": "rom21-20260926T083500Z-b1",
+  "label": 2,
+  "accepted": true,
+  "verdict": "pass",
+  "failures": [],
+  "problems": [],
+  "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+  "verifierHead": "8f28aea06ba3644fd06485f4338bfeda999da6bf",
+  "verifier": {
+    "path": "tools/rom21_verify.py",
+    "sha256": "18bbe6da3511d19c30a936b6b64a5031facd573711b3551cfc18c44f5b4389a4"
+  },
+  "inputs": {
+    "run.json": {
+      "path": "docs/evidence/rom21-regression/runs/rom21-20260926T083500Z-b1/verify-gen2/run.json",
+      "sha256": "fbe51a67b3259cbbd37371958a3650d467fa90ef740ab6a2e2547c0de6349a00"
+    },
+    "logger.jsonl": {
+      "path": "docs/evidence/rom21-regression/runs/rom21-20260926T083500Z-b1/verify-gen2/logger.jsonl",
+      "sha256": "c41dc8f05b2e04523b2eb0433c1ba2f818f2f90c9b5ed696a2411adbae38bdf9"
+    },
+    "audit.jsonl": {
+      "path": "docs/evidence/rom21-regression/runs/rom21-20260926T083500Z-b1/verify-gen2/audit.jsonl",
+      "sha256": "b0e2d9514bc78fdee7713137adcc7bb890e78653e0ff57da6e29320973097cea"
+    },
+    "audit-check.json": {
+      "path": "docs/evidence/rom21-regression/runs/rom21-20260926T083500Z-b1/verify-gen2/audit-check.json",
+      "sha256": "4e87463cf429a84615fa8b97362d60b2c240e96c8297de0f4025e8c7304adae2"
+    },
+    "restore-verify.json": {
+      "path": "docs/evidence/rom21-regression/runs/rom21-20260926T083500Z-b1/verify-gen2/restore-verify.json",
+      "sha256": "1e7c6d4f99a49c20a13729d797b9ea4204e31ff7bcd405be89302d235d8e028c"
+    }
+  }
+}

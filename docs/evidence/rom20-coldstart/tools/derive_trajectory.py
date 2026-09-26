@@ -56,6 +56,14 @@ RELATED_MARKERS = {
 }
 
 
+def largest_result_chars(records: list[dict]) -> int:
+    """Largest imported result text length, computed from the records."""
+    return max(
+        (len(str((record.get("result") or {}).get("text") or "")) for record in records),
+        default=0,
+    )
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -116,6 +124,9 @@ def main() -> int:
         for record in imported_results
         if (record.get("result") or {}).get("truncated")
     ]
+    # Derive the largest imported result from the records themselves instead of
+    # hard-coding a host-specific number: the import proof must follow the data.
+    largest_session_result_chars = largest_result_chars(imported_results)
     imported_bash = [call for call in imported_calls if call.get("tool") == "bash"]
 
     def is_recorder_only(command: str, call_id: str) -> bool:
@@ -247,7 +258,7 @@ def main() -> int:
         },
         "import": {
             "max_text_chars": args.import_max_text,
-            "largest_session_result_chars": 23574,
+            "largest_session_result_chars": largest_session_result_chars,
             "truncated_result_count": len(truncated),
             "truncated_call_ids": truncated,
             "note": "the frozen session was imported with a max-text larger than its largest result, so no result is truncated",

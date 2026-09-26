@@ -1,0 +1,23 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "no_machine_operation",
+  "kind": "live",
+  "injected": "restored ready machine, no note-block press at all",
+  "expectedCheck": "agent_operations",
+  "verdict": "fail",
+  "failedChecks": [
+    "audit_oracle",
+    "agent_operations",
+    "causal_joins",
+    "transient_captures",
+    "natural_void_captures",
+    "inventory_matches_program",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-neg-no_machine_operation-1790411267",
+  "evidence": {
+    "loggerSha256": "5765a0daeb272fea30473e7b506c1a85573e67cd7d5ac0e94cfd8f6249b1f6ae",
+    "auditSha256": "083e75f46c74061d797108ea275496d0906d6e442afe21bc7a944355fc3b6604"
+  }
+}
