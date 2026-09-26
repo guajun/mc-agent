@@ -1,13 +1,13 @@
 # Minecart ROM 验收 runbook
 
-本页是 [issue #13](https://github.com/guajun/mc-agent/issues/13) 的父级路径：从工具链就绪
-（[#14](https://github.com/guajun/mc-agent/issues/14)）到一次可审计的真实智能体冷启动
-（[#20](https://github.com/guajun/mc-agent/issues/20)），再到固化的真实游戏回归
-（[#21](https://github.com/guajun/mc-agent/issues/21)）。它记录**当前**状态与精确的交接命令；
-详细契约在链接的页面里。
+本页是 [issue #13](https://github.com/guajun/mc-agent/issues/13) 的父级验收链记录：工具链
+就绪（[#14](https://github.com/guajun/mc-agent/issues/14)）、一次可审计的真实智能体冷启动
+（[#20](https://github.com/guajun/mc-agent/issues/20)），以及固化的真实游戏回归
+（[#21](https://github.com/guajun/mc-agent/issues/21)）。三个阶段均已执行、独立评审并合并；
+子 issue 已关闭，接受的证据包链接如下。详细契约在链接的页面里。
 
-**本页不是证据。** 只有真正运行过并保留原始产物的步骤才算数。本仓库不得把未完成的门禁或
-issue 标成完成；在门禁或审计真正输出通过之前，不得把本页任何命令报成通过。
+**本页不是证据。** 已接受的事实以证据包和已合并 PR 为准；只有真正运行过并保留原始产物的
+步骤才算数。本页不得在没有证据的情况下把任何门禁或 issue 标成通过。
 
 详细契约：
 
@@ -26,28 +26,45 @@ issue 标成完成；在门禁或审计真正输出通过之前，不得把本�
 | 3. 固化回归 | [#21](https://github.com/guajun/mc-agent/issues/21) | 在固定 head 上**已复核、真实成功**的 #20 | 真实游戏回归：>=3 个全新实例、>=2 个校准程序、>=1 次冷下载、负例 | 回放旧日志；把脚本通过宣称为模型自主 |
 
 依赖方向：阶段一证据由测试端工具在 #20 **之前**产出；#20 增加 Agent 自己的操作、logger 与
-答案；#21 从复核过的 #20 产物提取参数化回归。
+答案；#21 从复核过的 #20 产物提取参数化回归。三个阶段均按这些规则完成；接受的证据见下方
+最终验收一节。
 
-## 当前状态（2026-09-26 核实，仓库 head `9b028d3`）
+## 最终验收（main `b54e1e8`，2026-09-26）
 
-| 项目 | 状态 | 证据 |
+三个阶段均已执行、独立评审并合并。Issue #14-#21 已关闭；父 issue #13 仅保持开启，直到本
+文档同步 PR 合并。
+
+| 阶段 | Issue | 已合并 PR | 验收证据 | 独立评审 |
+| --- | --- | --- | --- | --- |
+| 1. 工具链门禁 | [#14](https://github.com/guajun/mc-agent/issues/14) | [#30](https://github.com/guajun/mc-agent/pull/30) `ce08fd3` | 门禁 **PASS 8/8**（exit 0）；run `rom13-fullgate-20260926T044858Z`、执行源码 `6e009108...`、审计 jar `7a77e89d...`；[完整门禁摘要](evidence/rom13-stage1/full-gate-summary.json)、[阶段一证据 README](evidence/rom13-stage1/README.md) | [评审 5324700330](https://github.com/guajun/mc-agent/pull/30#pullrequestreview-5324700330) 及已接受的补充探针 |
+| 2. 可审计冷启动 | [#20](https://github.com/guajun/mc-agent/issues/20) | [#32](https://github.com/guajun/mc-agent/pull/32) `ef05c0b` | 一个全新 pi 会话（0.87.1、`deepseek/deepseek-flash`、thinking `max`），157 次工具调用，任务期间无人工帮助；Agent 自己的 logger 捕获 5 辆真实矿车；run 审计 **5/5 PASS**；run `rom20-20260926T063100Z`、执行源码 `1deb735`；[ROM20 证据](evidence/rom20-coldstart/README.md) | [评审 5325036876](https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325036876)，head `1fa769e` |
+| 3. 固化回归 | [#21](https://github.com/guajun/mc-agent/issues/21) | [#34](https://github.com/guajun/mc-agent/pull/34) `b54e1e8` | 3 个全新实例、2 个校准程序、1 次冷下载、同大小 jar 迭代（21,530 字节、新哈希、重启+重新恢复）、8 个负例（5 实机、3 离线）；游戏执行 `c5fa37b`、离线验证器加固 `8f28aea`；[回归页](rom21-regression.md)、[ROM21 证据](evidence/rom21-regression/README.md) | [评审 5325226293](https://github.com/guajun/mc-agent/pull/34#pullrequestreview-5325226293)，head `ae5cc96` |
+
+已合并前置 PR：bridge#8、bridge#9、#22-#29、#30、#32、#34。Issue #14-#21 均已带证据关闭
+（bridge#6 通过 bridge PR #9 关闭）。[bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)
+（可选 Hermes webhook 兼容）仍开启，**不**属于本次验收。根 issue #13 仅保持开启，直到本文档
+同步 PR 合并。
+
+源存档在所有验收运行前后均未变化：tree hash `8cd54c86...324a`，40 个文件，11,556,310 字节。
+
+### 原始模型能力 vs 固化回归
+
+| | 原始 #20 冷启动 | #21 回归 |
 | --- | --- | --- |
-| 阶段一门禁工具 | 已合并（#22） | `tools/stage1_gate.py`；`selftest` **152 checks** |
-| 冷启动协议工具 | 已合并（#25） | `tools/coldstart.py`、`harness_preflight.py`、`run_trace.py`、`run_audit.py` |
-| 组合集成驱动 | 已合并（#28，`2675825`） | `tools/stage1_integration.py`；[阶段一集成运行](stage1-integration.md) |
-| 完整门禁验收驱动 | 分支 `codex/rom13-fullgate`（#14 PR #30），评审修复运行 | `tools/stage1_fullgate.py`；真实有界 ROM 标定 + 无 mod 对照 + 重启后记忆验证；[完整门禁摘要](evidence/rom13-stage1/full-gate-summary.json) |
-| fixture #15 | 已合并（#27，`8dd75c6`） | `examples/minecart-rom/` |
-| 审计 mod #18 | 已合并（#26，`824c15d`） | `tests/mods/minecart-audit/` |
-| 真实阶段一门禁 | 分支 `codex/rom13-fullgate` 上 **PASS 8/8**（exit 0），等待人工评审 | [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json) |
-| 阶段 #20 | 未开始 | 无冷启动 run 目录、无 Agent logger |
-| 阶段 #21 | 未准备 | - |
-| 源存档 | 完整门禁运行前后未变化 | tree hash `8cd54c86...324a`（40 个文件，11,556,310 字节） |
+| 证明什么 | 全新模型上下文自主研究机器、自行编写 logger 并操作 | 成功配方可在全新实机实例上无模型复现 |
+| 模型参与 | pi 0.87.1 / `deepseek-flash`、thinking `max`、157 次工具调用、任务期间无人工帮助 | 无；脚本化实机运行 |
+| 证据 | [ROM20 包](evidence/rom20-coldstart/README.md)（冻结的答案与独立 oracle） | [ROM21 包](evidence/rom21-regression/README.md) 与[回归页](rom21-regression.md) |
+| 离线复现 | 从冻结原始日志重建 logger 并重新推导投影（[ROM20 复现说明](evidence/rom20-coldstart/README.md)） | `python tools/rom21_regression.py selftest`；`python tools/rom21_verify.py verify --run docs/evidence/rom21-regression/runs/<run-id>/verify-gen1` |
+| 实机复现 | 除非再开一次全新自主会话，否则不可重复；冻结包即证据 | `python tools/rom21_regression.py suite --stamp <new-stamp>` 与 `python tools/rom21_regression.py negatives`（需要 Java 25、游戏与网络） |
+| Demo | - | `python examples/minecart-rom/regression/demo/demo.py`（复用已提交包） |
 
-已合并的前置 PR：bridge#8、bridge#9、#22、#23、#24、#25、#26、#27、#28、#29。#16、#17 与 bridge#6
-已带证据评论关闭。上面的完整门禁通过是 #14 的验收运行；只有经过评审的 `pass` 才授权阶段二，且 Agent 不做合并。
+**回归结果不是模型能力证据。** #21 页面与包明确写明；原始 #20 证据保持冻结，校准运行从不
+假设弹出顺序等于生成顺序，也不宣称覆盖空/重复库存。
 
-上表中的合并 head 是完整门禁运行的输入。重新执行配方前请重新解析（例如
-`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`），并确认树仍与完整门禁摘要中的固定哈希一致。
+!!! note "历史快照说明（合并前）"
+    本页曾在 PR #27、PR #26 仍开启时写作，并把已检查快照标为 `37fb824` 与 `0e8c15b`。两者
+    现已合并（#27 `8dd75c6`、#26 `824c15d`），完整门禁运行固定了接受哈希。那些快照标签属于
+    历史，不是当前 head。
 
 !!! note "跟踪器历史（历史记录，2026-09-25）"
     #14 与 #19 在工具 PR 合并后曾被短暂关闭，当天 18:26 UTC 在仍为 blocked 的实机门禁
@@ -86,6 +103,8 @@ issue 标成完成；在门禁或审计真正输出通过之前，不得把本�
 * 修复必须在测试端：记录能把追踪的 smoke 调用与审计事件绑定的回执（例如审计命令返回它记录的
   序号，或显式 `--joins` 证明给出命令、操作者 UUID 与共同时钟）。绝不手改
   `verified: true`。
+* 已接受的完整门禁运行补齐了这一缺口并产出已验证 join；其固定哈希见
+  [完整门禁摘要](evidence/rom13-stage1/full-gate-summary.json)。
 
 如果某个阶段一检查只能由 #20 的 Agent 满足，那是阶段一证据链的实现 bug——修测试端 smoke 或
 适配器并记录。绝不能以此跳过阶段一，或给门禁喂阶段二的说辞。
@@ -126,16 +145,15 @@ python tools/stage1_integration.py run --bundle-only      # 逐字节可复现�
   `visibility.json`）；见
   [`docs/evidence/rom13-stage1/README.md`](evidence/rom13-stage1/README.md)。
 
-2026-09-25 运行缺少的，就是重跑时必须从已接受前置补齐的： #15 fixture 证据、
-同 run 恢复产物、测试 mod 完整性（manifest、负例、审计生命周期、缺日志检测）、阶段一
-harness `tool_environment` 与 smoke 套件/版本锁/证据索引，以及上文的已验证 join。
+完整门禁验收运行已补齐这些缺口：合并后的 #15 fixture、同 run 恢复、测试 mod 完整性、
+harness `tool_environment`、smoke/版本锁/证据索引，以及显式证明的 join。其固定哈希见
+[完整门禁摘要](evidence/rom13-stage1/full-gate-summary.json)；更早的 `integration-summary.json`
+保留为诚实的 `blocked` 历史。
 
-### 1.3 Fixture（#15，PR #27 接受后）
+### 1.3 Fixture（#15，已合并）
 
-本配方针对 PR #27 快照 `37fb824`（2026-09-26）核实；该快照之后分支仍在修复，因此尚未进入
-`main`。运行前请解析实际已接受/已合并的 head
-（`gh pr view 27 --repo guajun/mc-agent --json state,headRefOid`），并按该树重新核对 runner 参数。
-下面代码块来自该已检查快照树：
+fixture runner 已合并进 `main`（`examples/minecart-rom/`）。验收的三次初始化与完整门禁证据
+都使用已合并的 runner；下面命令复现 fixture 流程：
 
 ```powershell
 python examples/minecart-rom/runner/minecart_rom.py fetch --cold
@@ -188,8 +206,8 @@ python tools/stage1_gate.py check labs/rom13-integration/bundle \
 ```
 
 退出码 `0` 通过、`1` 失败、`3` blocked、`2` 用法错误。`--skip-source-rehash` 永远 block；
-声明产物缺失也 block；通过还需要协调者复核原始证据（门禁无法证明原始日志未被伪造）。只有
-那时 #20 才能开始。
+声明产物缺失也 block；通过还需要协调者复核原始证据（门禁无法证明原始日志未被伪造）。该复核
+已在阶段二之前完成：完整门禁运行 8/8 通过，即 #14 的验收证据。
 
 ### 1.6 Harness 能力（阶段一产物，无模型）
 
@@ -212,10 +230,9 @@ python tools/harness_preflight.py run --config examples/coldstart/harness-pi.jso
 
 ## 阶段二：全新冷启动精确配方
 
-前置：阶段一门禁 PASS 且已复核；为本次运行生成全新密封 challenge 程序（绝不用公开校准
-默认程序）；fixture ready 且通过校验；两个 lab 都加载 #18 审计 mod；全新 pi 会话。fixture
-runner 本身随 #15（PR #27；快照与 head 解析见 1.3）提供——未接受前阶段二不能开始。
-下面的示例端口保持在冷启动配置保留的 `27190-27199` 区间内。
+本节是已接受 #20 运行的复现配方（见最终验收表）。它需要已复核的阶段一通过、不同于公开校准的
+全新密封 challenge、校验通过的 fixture、两个 lab 加载 #18 审计 mod，以及全新 pi 会话；这些
+现在都已合并进 `main`。下面的示例端口保持在冷启动配置保留的 `27190-27199` 区间内。
 
 ### 2.1 固定 Harness 默认值
 
@@ -282,29 +299,23 @@ PENDING，绝不是通过。关键记录缺失一律 fail closed。
 若本页与[可审计的冷启动运行](coldstart-protocol.md)冲突，以那一页为契约，逐字复用那里的命令
 参数。
 
-## 阶段三：前置条件（不得提前开始）
+## 阶段三：已接受回归
 
-#21 只能在**已复核、真实成功**的 #20 于固定 head 上完成之后开始。其验收要求每次都运行真实
-游戏（不回放旧日志、不要求模型）、三个全新实例、至少两个校准程序、至少一次冷下载路径、issue
-列出的负例、同大小 jar 迭代后的部署/重启/重新恢复，并把结果分别标为"固化回归结果"与"原始
-冷启动能力证据"。阶段二的 Agent logger 只在真实成功之后固化——绝不提前写。
+#21 已接受并合并（[#34](https://github.com/guajun/mc-agent/pull/34) `b54e1e8`），最终独立评审
+[5325226293](https://github.com/guajun/mc-agent/pull/34#pullrequestreview-5325226293)（head
+`ae5cc96`）。其原有前置均已满足：已复核、真实成功的 #20；每次运行都用真实游戏数据（不回放
+旧日志、不调用模型）；3 个全新实例；2 个校准程序；1 次冷下载；8 个声明负例；以及同大小 jar
+迭代后的部署/重启/重新恢复。回归结果与原始 #20 能力证据在上表中明确区分。
 
-## 精确剩余交接步骤
+复现命令与语义：[rom21-regression.md](rom21-regression.md) 与
+[ROM21 证据包](evidence/rom21-regression/README.md)。
 
-1. 完成 PR #26（#18）与 PR #27（#15）的评审与合并；在此之前它们都不算接受。
-2. 用已就绪产物扩展集成的 bundle：`tool_environment`（来自 `harness_preflight.py`）、
-   `smoke_mod`（通用构建/部署/重启）、fixture 证据、同 run 恢复 snapshot/record、测试 mod
-   manifest/负例/生命周期、`missing-log-detection`、smoke/校准/版本锁/证据索引，以及带显式
-   证明的已验证 join。
-3. 重跑 `python tools/stage1_integration.py run`（冻结输入可加 `--bundle-only`），然后
-   `stage1_gate.py check ... --source-world ... --report`。
-4. 把报告与原始产物位置贴到 issue #14；协调者复核哈希与原始日志。只有复核过的完整 `pass`
-   才放行 #20。
-5. 在复核过的完整 `pass` 之前保持 #14/#19 开启（已于 2026-09-25 重新开启）；不得因工具合并
-   而关闭，也不得把跟踪器状态当作验收。
-6. 按第 2 节准备全新 #20 环境（新 challenge、干净上下文、记录可见性、不预写 logger），在
-   门禁 pass 复核后以独立 pi 会话运行。
-7. 只有当 #20 被审计为真实成功之后，才按第 3 节条件从它的产物提取 #21。
+## 最终状态
+
+* 子 issue #14-#21 均已带证据关闭；父 issue #13 仅保持开启，直到本文档同步 PR 合并。
+* [bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)（可选 Hermes webhook 兼容）
+  仍开启，不在本次验收范围内。
+* 本次验收不再规划运行时工作。任何新工作都应是新 issue 加新证据包，而不是改写已冻结的包。
 
 ## 状态诚实性规则
 
@@ -315,5 +326,6 @@ PENDING，绝不是通过。关键记录缺失一律 fail closed。
 * GitHub issue 已关闭不是验收；绿色 selftest 不是实机门禁；脚本通过不是模型自主。
 
 另见：[阶段一集成门禁](stage1-gate.md)、[阶段一集成运行](stage1-integration.md)、
-[可审计的冷启动运行](coldstart-protocol.md)、[构建 mod](mod-building.md)、
+[可审计的冷启动运行](coldstart-protocol.md)、[ROM21 回归](rom21-regression.md)、
+[审计测试 mod](minecart-audit.md)、[构建 mod](mod-building.md)、
 [实验室服务器](lab-server.md)、[分叉校验](fork-verify.md)、[工具](tools.md)。
