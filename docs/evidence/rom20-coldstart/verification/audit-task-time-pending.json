@@ -1,0 +1,134 @@
+{
+  "schema": "mc-agent-coldstart-audit/1",
+  "at": "2026-09-26T06:51:20.569Z",
+  "run_id": "rom20-20260926T063100Z",
+  "harness": {
+    "name": "pi",
+    "version": "0.87.1",
+    "model": "deepseek/deepseek-flash",
+    "provider": "deepseek"
+  },
+  "overall": "PENDING",
+  "failure_class": null,
+  "flags": [
+    {
+      "flag": "machine_operated",
+      "status": "PENDING",
+      "summary": "mechanically satisfied but awaiting explicit review: machine_operated.causality",
+      "evidence": [
+        "testmod:seq953",
+        "trajectory:call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547"
+      ],
+      "missing": [
+        "machine_operated.causality"
+      ],
+      "needs_review": [
+        "10 input attempt(s) exist; attempts alone must not be accepted as operation"
+      ],
+      "required_review": [
+        {
+          "id": "machine_operated.causality",
+          "question": "confirm the traced call is what the test mod processed, not a coincidental call in the same window"
+        }
+      ],
+      "review_resolutions": []
+    },
+    {
+      "flag": "logger_armed_before_activation",
+      "status": "PENDING",
+      "summary": "mechanically satisfied but awaiting explicit review: logger_armed_before_activation.running",
+      "evidence": [
+        "logger:seq10",
+        "testmod:seq953",
+        "trajectory:call_01_WZij1nfMJFeTereaDDak0836"
+      ],
+      "missing": [
+        "logger_armed_before_activation.running"
+      ],
+      "needs_review": [],
+      "required_review": [
+        {
+          "id": "logger_armed_before_activation.running",
+          "question": "confirm from game-side load/restart evidence that the armed logger was actually running, not only written"
+        }
+      ],
+      "review_resolutions": []
+    },
+    {
+      "flag": "transient_outputs_captured",
+      "status": "PASS",
+      "summary": "5 capture(s) cover 5 ejected cart(s)",
+      "evidence": [
+        "testmod:seq954",
+        "logger:seq11",
+        "testmod:seq964",
+        "logger:seq12",
+        "testmod:seq974",
+        "logger:seq13",
+        "testmod:seq984",
+        "logger:seq14",
+        "testmod:seq994",
+        "logger:seq15"
+      ],
+      "missing": [],
+      "needs_review": [
+        "items and order still need comparison against the server-side entity NBT (see answer_correct/oracle)"
+      ],
+      "required_review": [],
+      "review_resolutions": []
+    },
+    {
+      "flag": "agent_read_log",
+      "status": "PASS",
+      "summary": "the agent's own trajectory read the logger output (content linkage to the named agent logger after the last capture)",
+      "evidence": [
+        "trajectory:call_00_hjdNlRHJlnwjYpsOpZRy1938",
+        "logger:seq15"
+      ],
+      "missing": [],
+      "needs_review": [],
+      "required_review": [],
+      "review_resolutions": []
+    },
+    {
+      "flag": "answer_correct",
+      "status": "PENDING",
+      "summary": "mechanically satisfied but awaiting explicit review: answer_correct.oracle_independence",
+      "evidence": [
+        "oracle",
+        "oracle:testmod:seq954",
+        "oracle:testmod:seq964",
+        "oracle:testmod:seq974",
+        "oracle:testmod:seq984",
+        "oracle:testmod:seq994",
+        "oracle:testmod:seq1010"
+      ],
+      "missing": [
+        "answer_correct.oracle_independence"
+      ],
+      "needs_review": [],
+      "required_review": [
+        {
+          "id": "answer_correct.oracle_independence",
+          "question": "confirm the oracle's evidence chain (fixture plus test mod) is independent of the agent answer"
+        }
+      ],
+      "review_resolutions": []
+    }
+  ],
+  "infra_errors": [],
+  "fixture_errors": [],
+  "pending_reasons": [],
+  "review_problems": [],
+  "inputs": {
+    "run": "run.json",
+    "trajectory": "344 records",
+    "test_mod": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\testmod.experiment.jsonl",
+    "agent_logger": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-freeze\\agent-logger-raw\\romlog.jsonl",
+    "answer": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\answer.json",
+    "oracle": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\oracle.json",
+    "fixture": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\fixture\\ready-snapshot.json",
+    "restore": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\restore-evidence.json",
+    "review": "reviews.jsonl"
+  }
+}

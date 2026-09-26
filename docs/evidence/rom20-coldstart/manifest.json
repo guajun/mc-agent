@@ -1,0 +1,535 @@
+{
+  "format": "mc-agent/rom20-coldstart-manifest@1",
+  "run_id": "rom20-20260926T063100Z",
+  "created_at": "2026-09-26T06:27:17.874Z",
+  "status": "externally reviewed: executed run independently proven successful (PR #32 review 5325010883); run audit 5/5 PASS; awaiting final code review at the pushed head",
+  "external_review": {
+    "url": "https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325010883",
+    "review_id": 5325010883,
+    "reviewed_head": "666d74004d2b41869fafbc83e05392cad7a150d9",
+    "submitted_at": "2026-09-26T07:03:53Z",
+    "reviewer": "guajun (independent pi reviewer)",
+    "verdict": "executed run 1deb735 independently proven successful; three semantic reviews justified",
+    "resolved_reviews": [
+      "machine_operated.causality",
+      "logger_armed_before_activation.running",
+      "answer_correct.oracle_independence"
+    ],
+    "audit_after_resolution": "5/5 PASS"
+  },
+  "execution": {
+    "repo_commit": "1deb735ba0f0b2ff36533868fc5d91fab8546d09",
+    "branch": "codex/rom13-coldstart",
+    "dirty_entries": 0,
+    "harness": {
+      "name": "pi",
+      "version": "0.87.1",
+      "model": "deepseek/deepseek-flash",
+      "provider": "deepseek"
+    },
+    "thinking": "max",
+    "task_sha256": "721eda3c6f383d1ade57503aec632a92239dc7700255fc4f7912f7a37b497d6f",
+    "player_uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+    "note": "no commit after 1deb735 was part of the executed run; later commits are packaging (this evidence package) and preparation-recipe fixes/tests (eb2bedf, 666d740, ...)",
+    "packaging_commit_note": "no commit after 1deb735 was part of the executed run; later commits are packaging and preparation-recipe fixes/tests"
+  },
+  "attempts": {
+    "operator_preparation_attempts": 6,
+    "task_sessions": 1,
+    "in_session_failures": [
+      "restore attempt 1: 6/6 entities lost to stale copied region data (preserved)",
+      "Romuser spawn attempt 1: fell into the void before the hover seat could be mounted (preserved)"
+    ]
+  },
+  "counts": {
+    "session_records": 282,
+    "session_tool_calls": 157,
+    "audit_events": 1027,
+    "derived_trajectory_records": 347,
+    "manual_records": 32,
+    "imported_records": 314,
+    "truncated_imported_results": 0
+  },
+  "lab_root": "labs/rom20-20260926T063100Z (git-ignored raw evidence; paths below are relative to the coldstart worktree)",
+  "freeze_snapshot": {
+    "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze",
+    "manifest_sha256": "3c76b425fd8dee5e5262e599579f20e390bfb5cc7f74e54c1785bab492a9245b",
+    "verified_entries": 100
+  },
+  "raw_sources": [
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/agent-session.jsonl",
+      "role": "frozen pi session (282 records, 157 tool calls)",
+      "bytes": 1129459,
+      "sha256": "46c2e824f46a72b2e68257d416107945e1c3818097b20ce83a1646b285a313b0"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/agent-final.txt",
+      "role": "agent final answer text",
+      "bytes": 3188,
+      "sha256": "0df338e97f0600646977280466ed4e60bed96805138d04cf27a319bc8dd64dfa"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/testmod/audit-rom20-20260926T063100Z.jsonl",
+      "role": "raw independent test-mod audit log",
+      "bytes": 634893,
+      "sha256": "bdc736ca9ae734f64cbe189c215483f905496892a95fd9be344cde7058d4ba32"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/testmod/config.json",
+      "role": "raw audit mod config",
+      "bytes": 971,
+      "sha256": "9530e356b5ddbcf9394316483fc959bef92a1cc3360df27432dd53b0914df663"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/testmod/status-rom20-20260926T063100Z.json",
+      "role": "raw audit status",
+      "bytes": 1353,
+      "sha256": "0d5c28187b195739ee1dfcaf961401af5461b9cf12760158f2f549f418b63413"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/agent-logger-raw/romlog.jsonl",
+      "role": "raw agent logger output",
+      "bytes": 7228,
+      "sha256": "054a3970381e3a0a47755b0fbec65a850e0367f028181172b86f4f99d32e0dc0"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/run-as-agent-left/run.json",
+      "role": "original run manifest",
+      "bytes": 5351,
+      "sha256": "da2f0cb9f92b45e38cb66fb47f3a27f26775b6fd6cdc6d1a63003c3eba46fad6"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/run-as-agent-left/evidence.json",
+      "role": "original evidence declarations",
+      "bytes": 2152,
+      "sha256": "6c1101a223b9657b755e8421636cc00db55766c94d811de5d6545c5a12d5fdbb"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/run-as-agent-left/trajectory.jsonl",
+      "role": "original 30-record trajectory",
+      "bytes": 15932,
+      "sha256": "a068b4280c67c5c7be4656db6d6aaf0783b2577bb9181b6fc38e42b25082f284"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/run-as-agent-left/visibility.json",
+      "role": "visibility snapshot",
+      "bytes": 1468,
+      "sha256": "fbc40821c704cbc1f27846642fac0a7ce0481b00a3a82039c5dbc962576d7dbf"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/artifacts/rom20-agent-logger.jar",
+      "role": "deployed agent logger jar",
+      "bytes": 16778,
+      "sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/artifacts/rom20-agent-logger.jar.build.json",
+      "role": "raw build sidecar",
+      "bytes": 1806,
+      "sha256": "64862d75fa4a00b1fe36a043fa2cdd66265526ab31b5f1464021b291c4bbb300"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/agent-logger/src/main/java/dev/mcagent/romlog/RomLog.java",
+      "role": "logger source",
+      "bytes": 12169,
+      "sha256": "4e2b5d0f0cc9defcf5e0f1bc8b36c8c9954678fd07120e89895d650cdf458777"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/agent-logger/src/main/java/dev/mcagent/romlog/RomLogMod.java",
+      "role": "logger source",
+      "bytes": 828,
+      "sha256": "32ca8d636776833a062edb8fd93ab21c93bdca31b2cf4f8aa1d34731f7d394ff"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/agent-logger/src/main/java/dev/mcagent/romlog/mixin/MinecartContainerMixin.java",
+      "role": "logger source",
+      "bytes": 1049,
+      "sha256": "61dd10d999c5030808cd1052e01cf01e1db58ee26df99489dac6d5da591e4b5a"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/agent-logger/src/main/resources/fabric.mod.json",
+      "role": "logger resource",
+      "bytes": 482,
+      "sha256": "46ed94d210c6b25a12647c9ceefb2b7f036f008b83aae252a1c88bae1e083e97"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/agent-logger/src/main/resources/romlog.mixins.json",
+      "role": "logger resource",
+      "bytes": 216,
+      "sha256": "d7b86c84a46077f81f4946916a178fde852d2bedd380df38ce664d5517ef2e92"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/evidence/answer.json",
+      "role": "original answer",
+      "bytes": 2681,
+      "sha256": "8e42af9479ad302779228d162a888210af5f78e7fd9a6beb81afaf1b94d61347"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/evidence/oracle.json",
+      "role": "original oracle",
+      "bytes": 3011,
+      "sha256": "9b722a059bee804c200b1fb8bf66a053e18a2566f4125ae3251d6a48bd7ddd3c"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/evidence/testmod.experiment.jsonl",
+      "role": "original (pre-fix) projection",
+      "bytes": 12743,
+      "sha256": "6faef50eca1d056f422b77539067132b0036f46a6005ba23459e2683c95f0e3a"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/evidence/romlog.experiment.norm.jsonl",
+      "role": "original normalized logger view",
+      "bytes": 4278,
+      "sha256": "32c88150c78557d0df4ab31182e6cbf38e91285ec42a4adfa8e1a8110d81a31c"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/evidence/restore-attempt-1-failed.json",
+      "role": "failed restore attempt record",
+      "bytes": 2032,
+      "sha256": "23fec8d43f6ffb398c181c3e56ff58f140ffbee1dbee9f3df0d591f3d23a4e88"
+    }
+  ],
+  "derived_products": [
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/trajectory.jsonl",
+      "role": "canonical chronological trajectory (347 records)",
+      "bytes": 790937,
+      "sha256": "11b5443132588abc7fae2b27ef8e8126bc1459691ef700d1c33777104dde46da"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/trajectory-derivation.json",
+      "role": "derivation manifest (raw hashes, mapping, validation, import max-text)",
+      "bytes": 15732,
+      "sha256": "19cc6adb542d8d134a5023f594333c1ba629674c44fa401b0b7526484cfd2541"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/reviews.jsonl",
+      "role": "independent review resolutions (3 required semantic reviews)",
+      "bytes": 2093,
+      "sha256": "b919e961f690dd81653bb2489e3ad388ea54de2b37ebd54eaa3cf9bd034ee0fa"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit.json",
+      "role": "cold-start run audit after review resolutions (5 PASS)",
+      "bytes": 7124,
+      "sha256": "4fb8b8eb84ccc22b731646dfe011dc29e19eecf22452538197ec2ee166e0e224"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit.md",
+      "role": "cold-start run audit report after review resolutions",
+      "bytes": 3335,
+      "sha256": "d02a6c69b77269f10ffaa7bceab4e6f990394d4932a049157730a56fd007e699"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit-task-time-pending.json",
+      "role": "task-time audit report preserved (PENDING)",
+      "bytes": 4667,
+      "sha256": "e0df49277f9194ebba9b69739df066d96f72a8854e14dab18d57d1f2b338f6c8"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit-task-time-pending.md",
+      "role": "task-time audit report preserved (PENDING)",
+      "bytes": 3092,
+      "sha256": "a6828f391f4b657e65ca572a06ce802671c2f4442dad691bc75eddfbf0eecc3f"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/answer.json",
+      "role": "answer (regenerated, identical hash to original)",
+      "bytes": 2565,
+      "sha256": "bd1922968e7370abd54588a9ad2153a70622a2280eabb20818be2bee72d0fb80"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/oracle.json",
+      "role": "independent oracle (regenerated, identical hash to original)",
+      "bytes": 2885,
+      "sha256": "7af14cc241936af5d1887b198431f815fa51f69596556dad50e38ad28a559972"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/testmod.experiment.jsonl",
+      "role": "fixed canonical projection (raw session order, phase provenance retained)",
+      "bytes": 14723,
+      "sha256": "283edf73d61bcfba855bb40e0551766da7f936341600352c0db77ee17d67c11c"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/romlog.experiment.norm.jsonl",
+      "role": "normalized agent logger view",
+      "bytes": 4278,
+      "sha256": "32c88150c78557d0df4ab31182e6cbf38e91285ec42a4adfa8e1a8110d81a31c"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/restore-evidence.json",
+      "role": "restore verification summary",
+      "bytes": 589,
+      "sha256": "8032c3dc3b15653c2e9731f58da69fc39f36fe398364a98ab34fd200324fb109"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/minecart-audit-check.json",
+      "role": "independent test-mod verifier result",
+      "bytes": 6373,
+      "sha256": "f608bc12af6373951453bcfb05e40c79976e1d7ab23c573573c7feb3f5c73819"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/build-check/rom20-agent-logger.jar",
+      "role": "reproducible rebuild of the deployed logger",
+      "bytes": 16778,
+      "sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/failures/restore-attempt-1-failed.session-result.txt",
+      "role": "byte-exact failed-restore tool result from the frozen session (line 169)",
+      "bytes": 6120,
+      "sha256": "eeba70d42d9d43a9a86e2574d9492a11ec02520f33325779c9eaa99f5bd3bf93"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/failures/first-spawn-romuser-console-excerpt.txt",
+      "role": "host-local console excerpt for the first-spawn failure (not frozen)",
+      "bytes": 915,
+      "sha256": "2836ea0bdee6a00ef71b10388435dbf01be49de73e82ef0f1717f80a4f47c495"
+    },
+    {
+      "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/failures/failure-evidence.json",
+      "role": "failure evidence provenance and hashes",
+      "bytes": 1948,
+      "sha256": "3c7b4496cd3834394a090c10f5ad8f74dee0f2a4c8b8acc6cfa3beac2e9d299a"
+    }
+  ],
+  "host_local_sources": [
+    {
+      "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-exp\\logs\\console.log",
+      "role": "host-local game console log (not part of the frozen archive)",
+      "bytes": 73119,
+      "sha256": "a75570222e5d3b0c8e98c9d87d741f465d2ba05e9306cd156a96512881a4b18e"
+    }
+  ],
+  "run_artifacts": [
+    {
+      "artifact": "001-MinecartContainerMixin.java",
+      "sha256": "61dd10d999c5030808cd1052e01cf01e1db58ee26df99489dac6d5da591e4b5a"
+    },
+    {
+      "artifact": "002-RomLog.java",
+      "sha256": "4e2b5d0f0cc9defcf5e0f1bc8b36c8c9954678fd07120e89895d650cdf458777"
+    },
+    {
+      "artifact": "003-RomLogMod.java",
+      "sha256": "32ca8d636776833a062edb8fd93ab21c93bdca31b2cf4f8aa1d34731f7d394ff"
+    },
+    {
+      "artifact": "004-fabric.mod.json",
+      "sha256": "46ed94d210c6b25a12647c9ceefb2b7f036f008b83aae252a1c88bae1e083e97"
+    },
+    {
+      "artifact": "005-romlog.mixins.json",
+      "sha256": "d7b86c84a46077f81f4946916a178fde852d2bedd380df38ce664d5517ef2e92"
+    },
+    {
+      "artifact": "006-rom20-agent-logger.jar",
+      "sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89"
+    },
+    {
+      "artifact": "007-check_acquired.py",
+      "sha256": "edb3e4d9adcc9bb8d802692c88507cdd09c54390dae6c5959c5fc7fdd1f59283"
+    },
+    {
+      "artifact": "008-make_evidence.py",
+      "sha256": "0ff32959f1389279bcae28deb37889e2116cb46f833fc10973c56730b73146c1"
+    },
+    {
+      "artifact": "009-operate.py",
+      "sha256": "2818a6cdc09df4fb1fb2594b416cad51e1aee14dddd699d2ae82819d1437e7d0"
+    },
+    {
+      "artifact": "010-place_user.py",
+      "sha256": "83daacf2565fcc430766738a5cf62b54345e5fab3110df2a444df6a426e91517"
+    },
+    {
+      "artifact": "011-read_romlog.py",
+      "sha256": "1329b1835afd417445edf697966426422ea41e1ab6602600673a5aaf50989a8d"
+    }
+  ],
+  "logger_build": {
+    "jar_sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89",
+    "source_hashes": [
+      {
+        "path": "src/main/java/dev/mcagent/romlog/mixin/MinecartContainerMixin.java",
+        "sha256": "61dd10d999c5030808cd1052e01cf01e1db58ee26df99489dac6d5da591e4b5a"
+      },
+      {
+        "path": "src/main/java/dev/mcagent/romlog/RomLog.java",
+        "sha256": "4e2b5d0f0cc9defcf5e0f1bc8b36c8c9954678fd07120e89895d650cdf458777"
+      },
+      {
+        "path": "src/main/java/dev/mcagent/romlog/RomLogMod.java",
+        "sha256": "32ca8d636776833a062edb8fd93ab21c93bdca31b2cf4f8aa1d34731f7d394ff"
+      },
+      {
+        "path": "src/main/resources/fabric.mod.json",
+        "sha256": "46ed94d210c6b25a12647c9ceefb2b7f036f008b83aae252a1c88bae1e083e97"
+      },
+      {
+        "path": "src/main/resources/romlog.mixins.json",
+        "sha256": "d7b86c84a46077f81f4946916a178fde852d2bedd380df38ce664d5517ef2e92"
+      }
+    ],
+    "reproducible_rebuild_match": true
+  },
+  "committed": {
+    "failures/failure-evidence.json": {
+      "sha256": "3c7b4496cd3834394a090c10f5ad8f74dee0f2a4c8b8acc6cfa3beac2e9d299a",
+      "bytes": 1948
+    },
+    "failures/first-spawn-romuser-console-excerpt.txt": {
+      "sha256": "2836ea0bdee6a00ef71b10388435dbf01be49de73e82ef0f1717f80a4f47c495",
+      "bytes": 915
+    },
+    "failures/restore-attempt-1-failed.session-result.txt": {
+      "sha256": "eeba70d42d9d43a9a86e2574d9492a11ec02520f33325779c9eaa99f5bd3bf93",
+      "bytes": 6120
+    },
+    "failures.md": {
+      "sha256": "d7e67e70dc1e1308ecd81b79ba2701e6821e669f5dd87dc9f338ffc08059de99",
+      "bytes": 3906
+    },
+    "logger/build-provenance.json": {
+      "sha256": "c7f0b22f4f64caaaa5b4d0e1fc29394659acb6c8384701003ecba3a08e7ff4f0",
+      "bytes": 1991
+    },
+    "logger/src/main/java/dev/mcagent/romlog/mixin/MinecartContainerMixin.java": {
+      "sha256": "61dd10d999c5030808cd1052e01cf01e1db58ee26df99489dac6d5da591e4b5a",
+      "bytes": 1049
+    },
+    "logger/src/main/java/dev/mcagent/romlog/RomLog.java": {
+      "sha256": "4e2b5d0f0cc9defcf5e0f1bc8b36c8c9954678fd07120e89895d650cdf458777",
+      "bytes": 12169
+    },
+    "logger/src/main/java/dev/mcagent/romlog/RomLogMod.java": {
+      "sha256": "32ca8d636776833a062edb8fd93ab21c93bdca31b2cf4f8aa1d34731f7d394ff",
+      "bytes": 828
+    },
+    "logger/src/main/resources/fabric.mod.json": {
+      "sha256": "46ed94d210c6b25a12647c9ceefb2b7f036f008b83aae252a1c88bae1e083e97",
+      "bytes": 482
+    },
+    "logger/src/main/resources/romlog.mixins.json": {
+      "sha256": "d7b86c84a46077f81f4946916a178fde852d2bedd380df38ce664d5517ef2e92",
+      "bytes": 216
+    },
+    "README.md": {
+      "sha256": "42a3ee4b74dd2ab912b35358347d466ef46443e5eabd90288bdad5c5cd1b382a",
+      "bytes": 14817
+    },
+    "result/agent-logger.norm.jsonl": {
+      "sha256": "32c88150c78557d0df4ab31182e6cbf38e91285ec42a4adfa8e1a8110d81a31c",
+      "bytes": 4278
+    },
+    "result/answer.json": {
+      "sha256": "bd1922968e7370abd54588a9ad2153a70622a2280eabb20818be2bee72d0fb80",
+      "bytes": 2565
+    },
+    "result/oracle.json": {
+      "sha256": "7af14cc241936af5d1887b198431f815fa51f69596556dad50e38ad28a559972",
+      "bytes": 2885
+    },
+    "result/testmod.experiment.jsonl": {
+      "sha256": "283edf73d61bcfba855bb40e0551766da7f936341600352c0db77ee17d67c11c",
+      "bytes": 14723
+    },
+    "tools/check_acquired.py": {
+      "sha256": "edb3e4d9adcc9bb8d802692c88507cdd09c54390dae6c5959c5fc7fdd1f59283",
+      "bytes": 5411
+    },
+    "tools/derive_trajectory.py": {
+      "sha256": "d730fb4d4471a059b5c87f997bab5bbab713ea5be4348e52e7355ce057ca1946",
+      "bytes": 12508
+    },
+    "tools/extract_failure_evidence.py": {
+      "sha256": "22437f5657d5ef474a14da11cbb85c16ca7c5d57c08032adfd14b2f430a144ff",
+      "bytes": 4574
+    },
+    "tools/fix_derived_evidence.py": {
+      "sha256": "3321273f69dac16bb477ce59d138d5d10043011ac5baa0f62320e18571d22be6",
+      "bytes": 4641
+    },
+    "tools/make_evidence-original.py": {
+      "sha256": "0ff32959f1389279bcae28deb37889e2116cb46f833fc10973c56730b73146c1",
+      "bytes": 14530
+    },
+    "tools/make_evidence_fixed.py": {
+      "sha256": "ba23cfd365367461a920f78e54e45a414f1651b84c872151a6b5079d54342497",
+      "bytes": 16458
+    },
+    "tools/make_manifest.py": {
+      "sha256": "264b423bdb3b0011d98b6c0262b6cbd1d010fc1380dc51f85ea9ebb8298dd1f4",
+      "bytes": 9931
+    },
+    "tools/make_package.py": {
+      "sha256": "9c541598e1a8eaa25d5509d32a7f281c3f963fd18c475279249f5f2184a4be1d",
+      "bytes": 6207
+    },
+    "tools/operate.py": {
+      "sha256": "2818a6cdc09df4fb1fb2594b416cad51e1aee14dddd699d2ae82819d1437e7d0",
+      "bytes": 4467
+    },
+    "tools/place_user.py": {
+      "sha256": "83daacf2565fcc430766738a5cf62b54345e5fab3110df2a444df6a426e91517",
+      "bytes": 2295
+    },
+    "tools/read_romlog.py": {
+      "sha256": "1329b1835afd417445edf697966426422ea41e1ab6602600673a5aaf50989a8d",
+      "bytes": 1189
+    },
+    "trajectory/evidence.json": {
+      "sha256": "bae27ff74f6cdee66c1bbf054d531dbcb24ca1325e5beae2f204daee1a0e0efb",
+      "bytes": 2782
+    },
+    "trajectory/run.json": {
+      "sha256": "97659650b5482bc0115bb38bc2cd05132a718e6920551400a05fc5a43fd7761e",
+      "bytes": 7262
+    },
+    "trajectory/trajectory-derivation.json": {
+      "sha256": "19cc6adb542d8d134a5023f594333c1ba629674c44fa401b0b7526484cfd2541",
+      "bytes": 15732
+    },
+    "trajectory/trajectory.canonical.jsonl": {
+      "sha256": "11b5443132588abc7fae2b27ef8e8126bc1459691ef700d1c33777104dde46da",
+      "bytes": 790937
+    },
+    "verification/audit-task-time-pending.json": {
+      "sha256": "e0df49277f9194ebba9b69739df066d96f72a8854e14dab18d57d1f2b338f6c8",
+      "bytes": 4667
+    },
+    "verification/audit-task-time-pending.md": {
+      "sha256": "a6828f391f4b657e65ca572a06ce802671c2f4442dad691bc75eddfbf0eecc3f",
+      "bytes": 3092
+    },
+    "verification/audit.json": {
+      "sha256": "0285923bb70ecc9427c8e05dfa05a4e4530207c4eaf4bf92c17149e0d38a8911",
+      "bytes": 7124
+    },
+    "verification/audit.md": {
+      "sha256": "977ce197e3f0d368451038a1c30d808530f8865f6759ef98712754f0d2b507fc",
+      "bytes": 3335
+    },
+    "verification/minecart-audit-check.json": {
+      "sha256": "73bdd6d6361e124b5c40ea339397011e47e64bf6737f7e5d8022c09ab1effffc",
+      "bytes": 6086
+    },
+    "verification/restore-evidence.json": {
+      "sha256": "8032c3dc3b15653c2e9731f58da69fc39f36fe398364a98ab34fd200324fb109",
+      "bytes": 589
+    },
+    "verification/reviews.jsonl": {
+      "sha256": "b919e961f690dd81653bb2489e3ad388ea54de2b37ebd54eaa3cf9bd034ee0fa",
+      "bytes": 2093
+    }
+  },
+  "notes": [
+    "Every raw source hash above was re-verified against the freeze manifest before packaging.",
+    "The canonical trajectory merges the frozen pi session (full text, no truncation) with the original operator/manual records and the independent review marks; see trajectory/trajectory-derivation.json.",
+    "The test-mod projection was regenerated in raw session order (tools/make_evidence_fixed.py); the pre-fix projection stays in the freeze snapshot.",
+    "The task-time audit was PENDING and is preserved as verification/audit-task-time-pending.*; verification/audit.* is the post-review 5/5 PASS report.",
+    "docs/evidence/rom20-coldstart/** is marked -text in .gitattributes so committed bytes match the working tree exactly (including CRLF failure excerpts).",
+    "No RCON password or environment credential is committed."
+  ]
+}

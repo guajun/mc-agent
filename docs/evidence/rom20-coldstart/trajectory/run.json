@@ -1,0 +1,184 @@
+{
+  "schema": "mc-agent-coldstart-run/1",
+  "run_id": "rom20-20260926T063100Z",
+  "created_at": "2026-09-26T06:27:17.874Z",
+  "repo": {
+    "root": "F:\\mc-agent-worktrees\\rom13\\coldstart",
+    "commit": "1deb735ba0f0b2ff36533868fc5d91fab8546d09",
+    "branch": "codex/rom13-coldstart",
+    "dirty_entries": 0
+  },
+  "harness": {
+    "name": "pi",
+    "version": "0.87.1",
+    "model": "deepseek/deepseek-flash",
+    "provider": "deepseek"
+  },
+  "task": {
+    "path": "task.md",
+    "source": "task-minecart-rom.md",
+    "sha256": "721eda3c6f383d1ade57503aec632a92239dc7700255fc4f7912f7a37b497d6f",
+    "player_uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+    "note": "exact bytes shown to the agent; no answer or prior solution is part of the run"
+  },
+  "trajectory": {
+    "path": "trajectory.jsonl"
+  },
+  "visibility": {
+    "path": "visibility.json",
+    "file_count": 4
+  },
+  "imports": [
+    {
+      "source": "labs\\rom20-20260926T063100Z\\operator\\post-task-freeze\\agent-session.jsonl",
+      "path": "imports/agent-session.jsonl",
+      "sha256": "46c2e824f46a72b2e68257d416107945e1c3818097b20ce83a1646b285a313b0",
+      "records": 282,
+      "imported_at": "2026-09-26T07:06:49.638Z"
+    }
+  ],
+  "status": "open",
+  "notes": [
+    "operator preparation before the agent phase; no task-time assistance",
+    "agent raw session path (planned): F:/mc-agent-worktrees/rom13/meta20-session.jsonl",
+    "operator preparation raw session: F:/mc-agent-worktrees/rom13/meta20-prepare-session.jsonl",
+    "run root: F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z"
+  ],
+  "artifacts": [
+    {
+      "label": "agent logger source",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\agent-logger\\src\\main\\java\\dev\\mcagent\\romlog\\mixin\\MinecartContainerMixin.java",
+      "path": "artifacts/001-MinecartContainerMixin.java",
+      "sha256": "61dd10d999c5030808cd1052e01cf01e1db58ee26df99489dac6d5da591e4b5a",
+      "size": 1049,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.124Z"
+    },
+    {
+      "label": "agent logger source",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\agent-logger\\src\\main\\java\\dev\\mcagent\\romlog\\RomLog.java",
+      "path": "artifacts/002-RomLog.java",
+      "sha256": "4e2b5d0f0cc9defcf5e0f1bc8b36c8c9954678fd07120e89895d650cdf458777",
+      "size": 12169,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.126Z"
+    },
+    {
+      "label": "agent logger source",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\agent-logger\\src\\main\\java\\dev\\mcagent\\romlog\\RomLogMod.java",
+      "path": "artifacts/003-RomLogMod.java",
+      "sha256": "32ca8d636776833a062edb8fd93ab21c93bdca31b2cf4f8aa1d34731f7d394ff",
+      "size": 828,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.127Z"
+    },
+    {
+      "label": "agent logger source",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\agent-logger\\src\\main\\resources\\fabric.mod.json",
+      "path": "artifacts/004-fabric.mod.json",
+      "sha256": "46ed94d210c6b25a12647c9ceefb2b7f036f008b83aae252a1c88bae1e083e97",
+      "size": 482,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.129Z"
+    },
+    {
+      "label": "agent logger source",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\agent-logger\\src\\main\\resources\\romlog.mixins.json",
+      "path": "artifacts/005-romlog.mixins.json",
+      "sha256": "d7b86c84a46077f81f4946916a178fde852d2bedd380df38ce664d5517ef2e92",
+      "size": 216,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.130Z"
+    },
+    {
+      "label": "agent logger jar",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\artifacts\\rom20-agent-logger.jar",
+      "path": "artifacts/006-rom20-agent-logger.jar",
+      "sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89",
+      "size": 16778,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.317Z"
+    },
+    {
+      "label": "agent scripts",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\scripts\\check_acquired.py",
+      "path": "artifacts/007-check_acquired.py",
+      "sha256": "edb3e4d9adcc9bb8d802692c88507cdd09c54390dae6c5959c5fc7fdd1f59283",
+      "size": 5411,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.483Z"
+    },
+    {
+      "label": "agent scripts",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\scripts\\make_evidence.py",
+      "path": "artifacts/008-make_evidence.py",
+      "sha256": "0ff32959f1389279bcae28deb37889e2116cb46f833fc10973c56730b73146c1",
+      "size": 14530,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.485Z"
+    },
+    {
+      "label": "agent scripts",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\scripts\\operate.py",
+      "path": "artifacts/009-operate.py",
+      "sha256": "2818a6cdc09df4fb1fb2594b416cad51e1aee14dddd699d2ae82819d1437e7d0",
+      "size": 4467,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.486Z"
+    },
+    {
+      "label": "agent scripts",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\scripts\\place_user.py",
+      "path": "artifacts/010-place_user.py",
+      "sha256": "83daacf2565fcc430766738a5cf62b54345e5fab3110df2a444df6a426e91517",
+      "size": 2295,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.488Z"
+    },
+    {
+      "label": "agent scripts",
+      "source": "labs\\rom20-20260926T063100Z\\workspace\\scripts\\read_romlog.py",
+      "path": "artifacts/011-read_romlog.py",
+      "sha256": "1329b1835afd417445edf697966426422ea41e1ab6602600673a5aaf50989a8d",
+      "size": 1189,
+      "phase": "agent",
+      "at": "2026-09-26T06:43:21.489Z"
+    }
+  ],
+  "trajectory_derivation": {
+    "raw_session": {
+      "path": "post-task-freeze\\agent-session.jsonl",
+      "sha256": "46c2e824f46a72b2e68257d416107945e1c3818097b20ce83a1646b285a313b0",
+      "records": 282,
+      "tool_calls": 157
+    },
+    "original_trajectory": {
+      "path": "post-task-freeze\\run-as-agent-left\\trajectory.jsonl",
+      "sha256": "a068b4280c67c5c7be4656db6d6aaf0783b2577bb9181b6fc38e42b25082f284",
+      "records": 30
+    },
+    "canonical": {
+      "trajectory": "trajectory.jsonl",
+      "trajectory_copy": "trajectory.canonical.jsonl",
+      "sha256": "11b5443132588abc7fae2b27ef8e8126bc1459691ef700d1c33777104dde46da"
+    },
+    "merge": {
+      "strategy": "stable sort of all non-header records by their actual `at` timestamp; seq renumbered 1..N; no timestamp, argument, status or result text changed",
+      "original_records": 32,
+      "imported_records": 314,
+      "canonical_records": 347,
+      "fields_added": [
+        "trajectory_origin",
+        "raw_pi_call_ids"
+      ],
+      "labels": {
+        "original-run-operator": "operator prep records from the original run trajectory",
+        "original-run-agent-manual": "key calls/results the agent appended manually with run_trace.py during the task",
+        "pi-session-import": "raw harness tool calls/results imported from the frozen pi session",
+        "external-review-resolution": "reviewer marks appended by run_trace.py review after the independent semantic review"
+      }
+    },
+    "derivation_file": "trajectory-derivation.json",
+    "created_at_preserved": "2026-09-26T06:27:17.874Z"
+  }
+}

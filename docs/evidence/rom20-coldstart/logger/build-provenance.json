@@ -1,0 +1,49 @@
+{
+  "build_tool": "tools/build_mod.py",
+  "jar": {
+    "sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89",
+    "size": 16778,
+    "version": "0.1.0",
+    "compression": "store",
+    "release": 25
+  },
+  "lab": "rom20-exp",
+  "minecraft": "26.2",
+  "javac_version": "javac 25.0.1",
+  "server_jar_sha256": "183c0499c5f855570ee487dd38e141a53f0121f83a0b07a3bac2d8b6698823e8",
+  "classpath_entries": 90,
+  "classpath_sha256": "d2ee8717f58b15420c9a1da91b793785b7a07a1ae840cabd722f6b5c3ceb706a",
+  "sources": [
+    {
+      "path": "src/main/java/dev/mcagent/romlog/mixin/MinecartContainerMixin.java",
+      "sha256": "61dd10d999c5030808cd1052e01cf01e1db58ee26df99489dac6d5da591e4b5a"
+    },
+    {
+      "path": "src/main/java/dev/mcagent/romlog/RomLog.java",
+      "sha256": "4e2b5d0f0cc9defcf5e0f1bc8b36c8c9954678fd07120e89895d650cdf458777"
+    },
+    {
+      "path": "src/main/java/dev/mcagent/romlog/RomLogMod.java",
+      "sha256": "32ca8d636776833a062edb8fd93ab21c93bdca31b2cf4f8aa1d34731f7d394ff"
+    },
+    {
+      "path": "src/main/resources/fabric.mod.json",
+      "sha256": "46ed94d210c6b25a12647c9ceefb2b7f036f008b83aae252a1c88bae1e083e97"
+    },
+    {
+      "path": "src/main/resources/romlog.mixins.json",
+      "sha256": "d7b86c84a46077f81f4946916a178fde852d2bedd380df38ce664d5517ef2e92"
+    }
+  ],
+  "builtAt_epoch": 1790404648.2829683,
+  "reproducible_rebuild": {
+    "sha256": "e445f461ab0de331189ce609dac60d53f2ffb4529fc22b5dfb6c77d5a8593f89",
+    "match": true,
+    "command": "python tools/build_mod.py --source <frozen-workspace>/agent-logger --lab rom20-exp --out <tmp>/rom20-agent-logger.jar --version 0.1.0"
+  },
+  "raw_sidecar": {
+    "path": "labs/rom20-20260926T063100Z/operator/post-task-freeze/workspace-as-agent-left/artifacts/rom20-agent-logger.jar.build.json",
+    "sha256": "64862d75fa4a00b1fe36a043fa2cdd66265526ab31b5f1464021b291c4bbb300",
+    "note": "raw sidecar contains the machine JDK path; documented by hash, not committed"
+  }
+}

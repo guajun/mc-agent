@@ -1,0 +1,126 @@
+{
+  "format": "mc-agent/minecart-rom-oracle@1",
+  "run_id": "rom20-20260926T063100Z",
+  "instance": "experiment",
+  "status": "verified",
+  "source": "independent test mod mc-minecart-audit-0.1.0 raw audit log, cart_remove inventories captured before destruction",
+  "evidence_refs": [
+    "testmod:seq954",
+    "testmod:seq964",
+    "testmod:seq974",
+    "testmod:seq984",
+    "testmod:seq994",
+    "testmod:seq1010",
+    "testmod:seq1015",
+    "testmod:seq1019",
+    "testmod:seq1022",
+    "testmod:seq1024"
+  ],
+  "carts": [
+    {
+      "uuid": "5304524c-6dbf-472e-ad88-bedf9456d95c",
+      "items": [
+        {
+          "slot": 7,
+          "item": "minecraft:iron_ingot",
+          "count": 5
+        },
+        {
+          "slot": 15,
+          "item": "minecraft:sand",
+          "count": 1
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:gold_ingot",
+          "count": 3
+        }
+      ],
+      "capturedPath": "minecart_container_remove_before_drop",
+      "removeSeq": 1010,
+      "removeTick": 3027
+    },
+    {
+      "uuid": "4431ae3d-f0f4-4f51-9d14-b9a915ec1531",
+      "items": [
+        {
+          "slot": 0,
+          "item": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 7,
+          "item": "minecraft:glass",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "item": "minecraft:sand",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:glass",
+          "count": 3
+        }
+      ],
+      "capturedPath": "minecart_container_remove_before_drop",
+      "removeSeq": 1015,
+      "removeTick": 3044
+    },
+    {
+      "uuid": "d494cb2c-bdb9-43fc-9e14-314c3a561008",
+      "items": [
+        {
+          "slot": 7,
+          "item": "minecraft:iron_ingot",
+          "count": 1
+        }
+      ],
+      "capturedPath": "minecart_container_remove_before_drop",
+      "removeSeq": 1019,
+      "removeTick": 3060
+    },
+    {
+      "uuid": "5f2f69ba-c4ff-4cfe-98b1-9f709c241119",
+      "items": [
+        {
+          "slot": 0,
+          "item": "minecraft:coal",
+          "count": 3
+        },
+        {
+          "slot": 13,
+          "item": "minecraft:redstone",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 26,
+          "item": "minecraft:gold_ingot",
+          "count": 1
+        }
+      ],
+      "capturedPath": "minecart_container_remove_before_drop",
+      "removeSeq": 1022,
+      "removeTick": 3077
+    },
+    {
+      "uuid": "1c23aa8e-81a4-404c-8942-a706fc777d93",
+      "items": [
+        {
+          "slot": 26,
+          "item": "minecraft:coal",
+          "count": 2
+        }
+      ],
+      "capturedPath": "minecart_container_remove_before_drop",
+      "removeSeq": 1024,
+      "removeTick": 3093
+    }
+  ]
+}

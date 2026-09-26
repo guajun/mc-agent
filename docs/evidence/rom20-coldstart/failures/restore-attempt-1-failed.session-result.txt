@@ -1,0 +1,120 @@
+/directory = F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-src/mc-agent-server/snapshots/rom20-acquire
+/target = None
+/targetIsLabel = True
+/orderHash = 545a11e87afce73b
+/dimension = minecraft:overworld
+/levelName = Minecart ROM base
+/count = 6
+/summonable = 6
+/skipped list len 0
+/playersExcluded = 1
+/warnings list len 0
+/endpoint/instance = server
+/endpoint/modPort = 27195
+/endpoint/worldDir = F:\mc-agent-worktrees\rom13\coldstart\labs\rom20-exp\.\world\.
+/endpoint/levelName = Minecart ROM base
+/endpoint/serverVersion = 26.2
+/endpoint/tick = 321
+/endpoint/players = 0
+/endpoint/dimensions list len 3
+/endpoint/dimensions[0] = minecraft:overworld
+/endpoint/dimensions[1] = minecraft:the_nether
+/endpoint/dimensions[2] = minecraft:the_end
+/checks/endpoint/verified = True
+/checks/endpoint/proofs list len 3
+/checks/endpoint/proofs[0] = expect_instance
+/checks/endpoint/proofs[1] = expect_world_dir
+/checks/endpoint/proofs[2] = expect_level
+/checks/endpoint/overridden = False
+/checks/endpoint/instance = server
+/checks/endpoint/worldDir = F:\mc-agent-worktrees\rom13\coldstart\labs\rom20-exp\.\world\.
+/checks/endpoint/levelName = Minecart ROM base
+/checks/endpoint/expectInstance = server
+/checks/endpoint/expectWorldDir = F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/world
+/checks/endpoint/expectLevel = Minecart ROM base
+/checks/dimension/ok = True
+/checks/dimension/verified = True
+/checks/dimension/expected = minecraft:overworld
+/checks/dimension/actual = minecraft:overworld
+/checks/dimension/reason = None
+/checks/existing/destinationEntities = 0
+/checks/existing/collisions = 0
+/checks/existing/uuidCollisions/count = 0
+/checks/existing/uuidCollisions/sample list len 0
+/checks/existing/spatialCollisions/count = 0
+/checks/existing/spatialCollisions/sample list len 0
+/checks/existing/action = none
+/checks/tick/prior = running
+/checks/tick/priorSource = query
+/checks/tick/frozenByBridge = True
+/checks/tick/clearedWhileRunning = False
+/checks/tick/restored = True
+/checks/tick/preserved = True
+/baselineSnapshotDir = F:\mc-agent-worktrees\rom13\coldstart\labs\rom20-exp\mc-agent-server\snapshots\restore-pre
+/verifiedSnapshotDir = F:\mc-agent-worktrees\rom13\coldstart\labs\rom20-exp\mc-agent-server\snapshots\restore-check
+/dryRun = False
+/issued = 6
+/failed list len 6
+/failed[0]/index = 0
+/failed[0]/uuid = 5a42ee72-f00b-43cc-a373-a7dae3e38a50
+/failed[0]/command = /summon minecraft:armor_stand 11.5 -53.0 -24.5 {"NoGravity":1b,"Brain":{"memories":{}},"Invulnerable":0b,"FallFlying":0b,"ShowArms":0b,"PortalCooldown":0,"AbsorptionAmount":0.0f,"DisabledSlots":0,"DeathTime":0s,"Pose":{},"Invisible":1b,"UUID":[I;1514335858,-267697204,-1552701478,-471627184],"Tags":[
+/failed[0]/error = the entity is not present in the post-restore snapshot
+/failed[0]/gameOutput list len 1
+/failed[0]/gameOutput[0] = Summoned new Armor Stand
+/failed[1]/index = 1
+/failed[1]/uuid = 5304524c-6dbf-472e-ad88-bedf9456d95c
+/failed[1]/command = /summon minecraft:chest_minecart 14.5 -51.9375 -21.5 {"Motion":[0.0d,0.0d,0.0d],"Invulnerable":0b,"fall_distance":0.0d,"Air":300s,"OnGround":0b,"PortalCooldown":0,"Rotation":[0.0f,0.0f],"Pos":[14.5d,-51.9375d,-21.5d],"Fire":0s,"Items":[{"count":5,"Slot":7b,"id":"minecraft:iron_ingot"},{"count":1,"Sl
+/failed[1]/error = the entity is not present in the post-restore snapshot
+/failed[1]/gameOutput list len 1
+/failed[1]/gameOutput[0] = Summoned new Minecart with Chest
+/failed[2]/index = 2
+/failed[2]/uuid = 4431ae3d-f0f4-4f51-9d14-b9a915ec1531
+/failed[2]/command = /summon minecraft:chest_minecart 14.5 -51.9375 -21.5 {"Motion":[0.0d,0.0d,0.0d],"Invulnerable":0b,"fall_distance":0.0d,"Air":300s,"OnGround":0b,"PortalCooldown":0,"Rotation":[0.0f,0.0f],"Pos":[14.5d,-51.9375d,-21.5d],"Fire":0s,"Items":[{"count":4,"Slot":0b,"id":"minecraft:stone"},{"count":4,"Slot":7
+/failed[2]/error = the entity is not present in the post-restore snapshot
+/failed[2]/gameOutput list len 1
+/failed[2]/gameOutput[0] = Summoned new Minecart with Chest
+/notAttempted = 0
+/partial = True
+/verification/ok = False
+/verification/strict = True
+/verification/dimension/expected = minecraft:overworld
+/verification/dimension/actual = minecraft:overworld
+/verification/dimension/match = True
+/verification/actualMalformed/count = 0
+/verification/actualMalformed/sample list len 0
+/verification/actualDuplicateUuids/count = 0
+/verification/actualDuplicateUuids/sample list len 0
+/verification/orderHash/expected = 545a11e87afce73b
+/verification/orderHash/actual = e3b0c44298fc1c14
+/verification/orderHash/match = False
+/verification/uuidOrder/match = False
+/verification/uuidOrder/commonPrefix = 0
+/verification/uuidOrder/expectedCount = 6
+/verification/uuidOrder/actualCount = 0
+/verification/uuidOrder/divergence/index = 0
+/verification/uuidOrder/divergence/expected = 5a42ee72-f00b-43cc-a373-a7dae3e38a50
+/verification/uuidOrder/divergence/actual = None
+/verification/counts/match = False
+/verification/counts/byType list len 2
+/verification/counts/byType[0]/type = minecraft:chest_minecart
+/verification/counts/byType[0]/expected = 5
+/verification/counts/byType[0]/actual = 0
+/verification/counts/byType[0]/delta = -5
+/verification/counts/byType[1]/type = minecraft:armor_stand
+/verification/counts/byType[1]/expected = 1
+/verification/counts/byType[1]/actual = 0
+/verification/counts/byType[1]/delta = -1
+/verification/missing/count = 6
+/verification/missing/sample list len 6
+/verification/missing/sample[0] = 5a42ee72-f00b-43cc-a373-a7dae3e38a50
+/verification/missing/sample[1] = 5304524c-6dbf-472e-ad88-bedf9456d95c
+/verification/missing/sample[2] = 4431ae3d-f0f4-4f51-9d14-b9a915ec1531
+/verification/unexpected/count = 0
+/verification/unexpected/sample list len 0
+/verification/typeMismatches/count = 0
+/verification/typeMismatches/sample list len 0
+/verification/positionDeltas/count = 0
+/verification/positionDeltas/tolerance = 0.01
+/verification/positionDeltas/sample list len 0
+/verification/velocityDeltas/count = 0
+/verification/velocityDeltas/tolerance = 0.01

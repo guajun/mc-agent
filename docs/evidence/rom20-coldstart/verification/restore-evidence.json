@@ -1,0 +1,24 @@
+{
+  "format": "mc-agent/minecart-rom-restore@1",
+  "status": "ok",
+  "directory": "F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-src/mc-agent-server/snapshots/rom20-acquire",
+  "sourceOrderHash": "545a11e87afce73b",
+  "apply": {
+    "issued": 6,
+    "failed": 0,
+    "ok": true,
+    "verdict": "ok",
+    "orderHashMatch": true,
+    "countsMatch": true,
+    "uuidOrderMatch": true,
+    "positionDeltaCount": 0,
+    "velocityDeltaCount": 0,
+    "nbtMismatchCount": 0
+  },
+  "verify": {
+    "ok": true,
+    "orderHashMatch": true,
+    "countsMatch": true,
+    "uuidOrderMatch": true
+  }
+}

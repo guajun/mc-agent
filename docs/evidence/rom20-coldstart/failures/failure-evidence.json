@@ -1,0 +1,36 @@
+{
+  "format": "mc-agent/rom20-failure-evidence@1",
+  "failed_restore_tool_result": {
+    "source": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-freeze\\agent-session.jsonl",
+    "source_sha256": "46c2e824f46a72b2e68257d416107945e1c3818097b20ce83a1646b285a313b0",
+    "session_line": 169,
+    "tool_call_id": "call_00_MR03DuPnyR02Opv6Y1bu4504",
+    "file": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\failures\\restore-attempt-1-failed.session-result.txt",
+    "bytes": 6120,
+    "lines": 120,
+    "sha256": "eeba70d42d9d43a9a86e2574d9492a11ec02520f33325779c9eaa99f5bd3bf93",
+    "note": "byte-exact copy of the frozen session tool result; CRLF preserved"
+  },
+  "failed_restore_walk_history": {
+    "file": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-freeze\\workspace-as-agent-left\\evidence\\restore-attempt-1-failed.walk.txt",
+    "bytes": 6240,
+    "lines": 120,
+    "sha256": "29598705cf535876077a0159029508fa98a266591eb8e0e36fe9e6f7d5991f22",
+    "note": "the task-time reformatted copy in the freeze; kept unchanged, not committed"
+  },
+  "first_spawn_console_excerpt": {
+    "host_local_source": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-exp\\logs\\console.log",
+    "host_local_source_sha256": "a75570222e5d3b0c8e98c9d87d741f465d2ba05e9306cd156a96512881a4b18e",
+    "host_local_source_bytes": 73119,
+    "frozen": false,
+    "line_range_1_indexed": [
+      845,
+      856
+    ],
+    "file": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\failures\\first-spawn-romuser-console-excerpt.txt",
+    "bytes": 915,
+    "lines": 12,
+    "sha256": "2836ea0bdee6a00ef71b10388435dbf01be49de73e82ef0f1717f80a4f47c495",
+    "note": "host-local console excerpt, not part of the 100-file freeze; full source path/hash above"
+  }
+}

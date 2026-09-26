@@ -7,12 +7,14 @@ on:
       - "tools/**"
       - "tests/**"
       - "examples/smoke-mod/**"
+      - "examples/coldstart/**"
       - ".github/workflows/tools.yml"
   pull_request:
     paths:
       - "tools/**"
       - "tests/**"
       - "examples/smoke-mod/**"
+      - "examples/coldstart/**"
       - ".github/workflows/tools.yml"
   workflow_dispatch:
 
