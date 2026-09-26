@@ -1,0 +1,205 @@
+{
+  "kind": "live-negative",
+  "case": "inventory_wrong",
+  "expectedCheck": "inventory_matches_program",
+  "failClosed": true,
+  "verdict": "fail",
+  "failures": [
+    "audit_oracle",
+    "inventory_matches_program",
+    "restore_verified",
+    "source_world"
+  ],
+  "problems": [
+    "audit_oracle: cart_inventory_change seq 76 dimension None != 'minecraft:overworld'",
+    "inventory_matches_program: observed inventories do not match the sealed program (missing=1 unexpected=1)",
+    "restore_verified: the guarded-restore verify record is missing",
+    "source_world: before: source_save_present is not true; after: source_save_present is not true"
+  ],
+  "reconstructedManifest": {
+    "format": "mc-agent/rom21-run@1",
+    "runId": "rom21-neg-inventory_wrong-1790411074",
+    "configId": "calibrated-a",
+    "instance": "rom21-t083500z-inventory-wrong-exp",
+    "dimension": "minecraft:overworld",
+    "program": {
+      "carts": [
+        {
+          "index": 0,
+          "items": [
+            {
+              "slot": 11,
+              "id": "minecraft:gold_ingot",
+              "count": 1
+            },
+            {
+              "slot": 22,
+              "id": "minecraft:redstone",
+              "count": 2
+            },
+            {
+              "slot": 23,
+              "id": "minecraft:copper_ingot",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "items": [
+            {
+              "slot": 1,
+              "id": "minecraft:sand",
+              "count": 2
+            },
+            {
+              "slot": 5,
+              "id": "minecraft:dirt",
+              "count": 4
+            },
+            {
+              "slot": 17,
+              "id": "minecraft:gold_ingot",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "items": [
+            {
+              "slot": 12,
+              "id": "minecraft:copper_ingot",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "items": [
+            {
+              "slot": 9,
+              "id": "minecraft:gold_ingot",
+              "count": 4
+            },
+            {
+              "slot": 11,
+              "id": "minecraft:glass",
+              "count": 3
+            },
+            {
+              "slot": 18,
+              "id": "minecraft:redstone",
+              "count": 2
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "items": [
+            {
+              "slot": 13,
+              "id": "minecraft:redstone",
+              "count": 3
+            }
+          ]
+        }
+      ]
+    },
+    "programSha256": "413289af29c02fae32566a3a7a213003e83633df2ce86f4b68b30a1baf04c42f",
+    "expectedCartCount": 5,
+    "scene": {
+      "dimension": "minecraft:overworld",
+      "playerName": "Romuser",
+      "inputRegion": {
+        "name": "note-block",
+        "from": [
+          11,
+          -54,
+          -23
+        ],
+        "to": [
+          11,
+          -54,
+          -23
+        ]
+      },
+      "stackRegion": {
+        "name": "stack",
+        "from": [
+          13,
+          -53,
+          -23
+        ],
+        "to": [
+          15,
+          -50,
+          -21
+        ]
+      },
+      "outputRegion": {
+        "name": "output",
+        "from": [
+          16,
+          -140,
+          -24
+        ],
+        "to": [
+          24,
+          -45,
+          -20
+        ]
+      },
+      "exitAxis": "x",
+      "exitGreaterThan": 15.0,
+      "cycleTicks": 4
+    },
+    "operations": {
+      "presses": 5,
+      "sprintTicks": 220,
+      "causalMaxTicks": 40,
+      "transientMaxDeltaTicks": 40,
+      "voidMaxDeltaTicks": 400,
+      "timeoutSeconds": 240
+    },
+    "loggerSessionOrdinal": 1,
+    "agentUuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+    "loggerJar": {
+      "sha256": "3c1dae36590b82a26d0fad8cc5daa08d017ae7d27847c99004170a1c55da71ae",
+      "size": 21530,
+      "build": "romlog-rom21-1",
+      "sourceSha256": "same"
+    },
+    "auditJar": {
+      "sha256": "7a77e89d72969f23ce7b7c2543bfe992c2a3674171f3eb190a8e7faa8f2ec4ac"
+    },
+    "sourceWorld": {
+      "before": {
+        "tree_sha256": "x"
+      },
+      "after": {
+        "tree_sha256": "x"
+      }
+    }
+  },
+  "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+  "verifierHead": "b3c09272550b745fe91120ea129479ea77a109be",
+  "verifier": {
+    "path": "tools/rom21_verify.py",
+    "sha256": "171aceeef7348e8e01797909d797fa289bb6a54c5e8119fdee0fa76767eae449"
+  },
+  "inputs": {
+    "logger.jsonl": {
+      "path": "labs/rom21-regression/negatives/neg-inventory_wrong/logger.jsonl",
+      "sha256": "40af8e2d44f185f6782493726aa6b1dee8bd00e7264aed9025b56cf6e7d64f8d"
+    },
+    "audit.jsonl": {
+      "path": "labs/rom21-regression/negatives/neg-inventory_wrong/audit.jsonl",
+      "sha256": "dbc5bd6f62d250417d3a4ae2dd707d1a457d2f0f88d26f4b2885f0d7ac63ad45"
+    },
+    "audit-check.json": {
+      "path": "labs/rom21-regression/negatives/neg-inventory_wrong/audit-check.json",
+      "sha256": "76887da04a47c770579798933624949609e17fc745ee3e7c58a9719c104b071e"
+    }
+  }
+}

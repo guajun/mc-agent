@@ -42,7 +42,8 @@
     "These are regression results: real game instances, no model called. The original autonomous cold-start capability evidence is docs/evidence/rom20-coldstart.",
     "Copied raw records (logger/audit/restore/fork/init) are byte-faithful and therefore keep the host-local absolute paths the server wrote; package-generated fields use repo-relative paths.",
     "audit-<label>.projected.jsonl removes only the periodic cart_sample stream; the full raw audit hashes are pinned per generation in runs/<run-id>/run.json.",
-    "verify-<label>/ is a complete verifier input; packaging re-ran tools/rom21_verify.py against it and required PASS before recording this manifest."
+    "verify-<label>/ is a complete verifier input; packaging re-ran tools/rom21_verify.py against it and required PASS before recording this manifest.",
+    "revalidation/ records the post-review offline re-check: all four committed generation inputs pass and all declared negatives fail closed under verifier head b3c0927; the game execution remains c5fa37b."
   ],
   "committed": {
     "negatives/audit_missing.json": {
@@ -122,8 +123,60 @@
       "sha256": "c01febec25c30945980038a0d4f1e25a028c4d3c626ff06eda8e28e42cad6981"
     },
     "README.md": {
-      "bytes": 9046,
-      "sha256": "8ad721ed5ae54bfdc17e22504d304725a5d68ee56076cd2d3c092b721e59cf5f"
+      "bytes": 11028,
+      "sha256": "9f39abb60c009eb922449be6a5e2f634c71bbb701ad61090d4378957f5d1900a"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-a1-verify-gen1.json": {
+      "bytes": 1583,
+      "sha256": "79c434e8efa5642db00abdf16ab352ca9b8d8a317e1d7c905cabe087eff7f88a"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-a2-verify-gen1.json": {
+      "bytes": 1583,
+      "sha256": "4ad51e7cbdeadc3adb505ab71577274d2edb15c4c383212028d180cad594be2a"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-b1-verify-gen1.json": {
+      "bytes": 1583,
+      "sha256": "f31e29b90d78039a46e91e779293c3934e801346ba3ac3562ba32d067cbbb096"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-b1-verify-gen2.json": {
+      "bytes": 1583,
+      "sha256": "4503445579ed59d784f024e01c68a5a9c0d805912b336199587860940a78c69a"
+    },
+    "revalidation/negative-inventory_wrong.json": {
+      "bytes": 5364,
+      "sha256": "84270c2867d138369c3083c23e1d9211805321d7bd0141f6166771f47b6501d5"
+    },
+    "revalidation/negative-logger_late_capture.json": {
+      "bytes": 5536,
+      "sha256": "45f887485414102cbd0dcc951e11d16aca19690da0985249e4d793b79e99429f"
+    },
+    "revalidation/negative-logger_missed_capture.json": {
+      "bytes": 5546,
+      "sha256": "1f7fee543ff57a55538e8a8dcccb96a7c1276aafe96e3002fa6da6fa4afc38bc"
+    },
+    "revalidation/negative-no_machine_operation.json": {
+      "bytes": 5922,
+      "sha256": "726b3087de996ebfa34929555cd811e1d60295d145f9d8a7fa91695c9154552a"
+    },
+    "revalidation/negative-restore_order_wrong.json": {
+      "bytes": 760,
+      "sha256": "e96e04e2e499b606f3923aafdf6d41cdd74d5bf8eae75713f882b1c4857d9395"
+    },
+    "revalidation/offline-audit_missing.json": {
+      "bytes": 660,
+      "sha256": "73307fe0b35d706c30a87585804dc84d1b35051036a78821e946686e48b8ec00"
+    },
+    "revalidation/offline-output_order_wrong.json": {
+      "bytes": 647,
+      "sha256": "5928d69d69c6d3a345a4b7aca09f5ebb467ebd596d32076a60c3c8ddabd253d4"
+    },
+    "revalidation/offline-wrong_instance.json": {
+      "bytes": 564,
+      "sha256": "bb0ecad88495dfa6a74a584ae141c9b38e24dac1022851d3975020306489d4ae"
+    },
+    "revalidation/summary.json": {
+      "bytes": 3686,
+      "sha256": "96cc97fa11cc345c5cb5e1fa89aaa36e9fb4658a22f0662fcdf575a6e9820223"
     },
     "runs/rom21-20260926T083500Z-a1/audit-check-gen1.json": {
       "bytes": 5423,
@@ -369,5 +422,12 @@
       "bytes": 5343,
       "sha256": "fbe51a67b3259cbbd37371958a3650d467fa90ef740ab6a2e2547c0de6349a00"
     }
+  },
+  "revalidation": {
+    "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+    "verifierHead": "b3c09272550b745fe91120ea129479ea77a109be",
+    "verifierSha256": "171aceeef7348e8e01797909d797fa289bb6a54c5e8119fdee0fa76767eae449",
+    "summary": "revalidation/summary.json",
+    "note": "offline re-check of the retained raw evidence under the hardened verifier; no game rerun and no raw/older-report rewrite"
   }
 }

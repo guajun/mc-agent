@@ -1,0 +1,145 @@
+{
+  "format": "mc-agent/rom21-revalidation@1",
+  "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+  "verifierHead": "b3c09272550b745fe91120ea129479ea77a109be",
+  "verifierSha256": "171aceeef7348e8e01797909d797fa289bb6a54c5e8119fdee0fa76767eae449",
+  "results": [
+    {
+      "case": "rom21-20260926T083500Z-a1/verify-gen1",
+      "kind": "committed-generation",
+      "accepted": true,
+      "verdict": "pass",
+      "failures": []
+    },
+    {
+      "case": "rom21-20260926T083500Z-a2/verify-gen1",
+      "kind": "committed-generation",
+      "accepted": true,
+      "verdict": "pass",
+      "failures": []
+    },
+    {
+      "case": "rom21-20260926T083500Z-b1/verify-gen1",
+      "kind": "committed-generation",
+      "accepted": true,
+      "verdict": "pass",
+      "failures": []
+    },
+    {
+      "case": "rom21-20260926T083500Z-b1/verify-gen2",
+      "kind": "committed-generation",
+      "accepted": true,
+      "verdict": "pass",
+      "failures": []
+    },
+    {
+      "case": "inventory_wrong",
+      "kind": "live-negative",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "audit_oracle",
+        "inventory_matches_program",
+        "restore_verified",
+        "source_world"
+      ]
+    },
+    {
+      "case": "logger_missed_capture",
+      "kind": "live-negative",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "transient_captures",
+        "inventory_matches_program",
+        "restore_verified",
+        "source_world",
+        "answer_matches_oracle"
+      ]
+    },
+    {
+      "case": "logger_late_capture",
+      "kind": "live-negative",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "transient_captures",
+        "inventory_matches_program",
+        "restore_verified",
+        "source_world",
+        "answer_matches_oracle"
+      ]
+    },
+    {
+      "case": "no_machine_operation",
+      "kind": "live-negative",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "audit_oracle",
+        "agent_operations",
+        "causal_joins",
+        "transient_captures",
+        "natural_void_captures",
+        "inventory_matches_program",
+        "restore_verified",
+        "source_world",
+        "answer_matches_oracle"
+      ]
+    },
+    {
+      "case": "output_order_wrong",
+      "kind": "offline-mutation",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "capture_timing",
+        "output_order",
+        "inventory_matches",
+        "answer_matches_oracle"
+      ]
+    },
+    {
+      "case": "audit_missing",
+      "kind": "offline-mutation",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "logger_session",
+        "audit_oracle",
+        "agent_operations",
+        "causal_joins",
+        "answer_matches_oracle"
+      ]
+    },
+    {
+      "case": "wrong_instance",
+      "kind": "offline-mutation",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "logger_session"
+      ]
+    },
+    {
+      "case": "restore_order_wrong",
+      "kind": "live-negative",
+      "accepted": true,
+      "verdict": "fail",
+      "failures": [
+        "logger_session",
+        "audit_oracle",
+        "agent_operations",
+        "causal_joins",
+        "transient_captures",
+        "natural_void_captures",
+        "inventory_matches_program",
+        "restore_verified",
+        "source_world",
+        "answer_matches_oracle"
+      ]
+    }
+  ],
+  "allAccepted": true,
+  "finishedAt": "2026-09-26T08:42:19Z"
+}

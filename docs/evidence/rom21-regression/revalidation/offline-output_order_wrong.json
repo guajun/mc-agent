@@ -1,0 +1,19 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "output_order_wrong",
+  "kind": "offline",
+  "injected": "cart_observed records reversed in a copy of the raw logger",
+  "expectedCheck": "output_order",
+  "verdict": "fail",
+  "failedChecks": [
+    "capture_timing",
+    "output_order",
+    "inventory_matches",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-20260926T083500Z-a1",
+  "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+  "verifierHead": "b3c09272550b745fe91120ea129479ea77a109be",
+  "verifierSha256": "171aceeef7348e8e01797909d797fa289bb6a54c5e8119fdee0fa76767eae449"
+}

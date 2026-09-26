@@ -116,6 +116,42 @@ is required to be PASS as well.
 Live probes are produced by real game operations; offline probes mutate copies
 of the real raw evidence. The per-case records are under `negatives/`.
 
+## Post-review revalidation (offline verifier hardening)
+
+The coordinator review of PR #34 reproduced four offline verifier false
+positives at the packaging head `02ee2f9` (they did not invalidate the live
+runs). `tools/rom21_verify.py` was hardened in the later verification-only
+commit `b3c09272550b745fe91120ea129479ea77a109be`:
+
+* `logger_armed` must fall inside the selected audit server session and before
+  the experiment phase, the first processed input, the first pop and the first
+  capture; future-dated, late and cross-session arms fail (`logger_session`);
+* `sourceWorld` requires two real 64-hex `tree_sha256`/`baseline_sha256`
+  observations with positive file/byte counts and equal baselines;
+  `source_save_present` alone, missing hashes or `None == None` fail
+  (`source_world`);
+* the dimension is validated on every relevant logger event and on every audit
+  oracle event (accepting the produced `dimension`/`level` aliases);
+* every transient capture must be **strictly before** its matched audit
+  removal, independent of the configured `transientMaxDeltaTicks` window
+  (`capture_timing`).
+
+The game executions remain `c5fa37b`; no raw log, run manifest or old
+verification report was rewritten. The `revalidation/` directory records the
+offline re-check under the hardened verifier (verifier head/sha256 in each
+record and in `revalidation/summary.json`):
+
+* all four committed generation inputs still **PASS**;
+* all eight declared negatives still **fail closed** (each shows its expected
+  failing check; the reconstructed negative manifests also honestly fail the
+  stronger `source_world`/`restore_verified` checks because the negative probes
+  never recorded those observations);
+* the four reviewed mutations fail with `logger_session`, `source_world`,
+  `audit_oracle` and `capture_timing` respectively.
+
+`verify-<label>/` inputs are unchanged and remain the reproduction entry
+point; re-running them now uses the hardened verifier and still passes.
+
 ## Reproduction
 
 The generators, logger source, configs, drivers and tests are committed:
