@@ -1751,84 +1751,109 @@ async def devcap_phase(args: argparse.Namespace) -> int:
     if not marker_loaded:
         raise RuntimeError(f"the v2 marker was not loaded: {v2_status[-300:]}")
 
-    # restore the fork so the restart test covers the full fixture memory
+    # Restore the fork, then prove that a real restart reconstructs the same
+    # machine entity memory/order/NBT.  Both sides of the comparison are
+    # snapshots from this run; the comparison is filtered to the machine
+    # entities because the world still contains init-time falling item
+    # leftovers that cannot hold a position across a startup tick.  The filter
+    # is symmetric and recorded, and the bridge's whole-world strict verify is
+    # not used for this test.
     start_bridge(EXP["name"], EXP["bridge"])
     fork_snapshot = str((facts.get("stages", {}).get("fork") or {}).get("snapshotDir") or "")
-    if fork_snapshot and Path(fork_snapshot).is_dir():
-        # The fork snapshot still contains the init-time falling item entities
-        # (cart contents dropped when the stack was rebuilt); they cannot hold
-        # a frozen position across a startup tick.  The memory/order test is
-        # about the machine entities, so filter to carts + hover seat.
-        memory_snapshot = devcap_dir / "memory-snapshot"
-        shutil.rmtree(memory_snapshot, ignore_errors=True)
-        shutil.copytree(fork_snapshot, memory_snapshot)
-        entity_rows = [
-            json.loads(line)
-            for line in (memory_snapshot / "entities.jsonl").read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
-        kept = [row for row in entity_rows if row.get("type") != "minecraft:item"]
-        (memory_snapshot / "entities.jsonl").write_text(
-            chr(10).join(json.dumps(row) for row in kept) + chr(10), encoding="utf-8"
-        )
-        meta = read_json(memory_snapshot / "meta.json")
-        meta["entities"] = len(kept)
-        meta["orderHash"] = hashlib.sha256(
-            ":".join(str(row.get("uuid")) for row in kept).encode("utf-8")
-        ).hexdigest()[:16]
-        meta["memoryFilter"] = "carts + hover seat; falling init items excluded"
-        write_json(memory_snapshot / "meta.json", meta)
-        fork_snapshot = str(memory_snapshot)
-        api = await connect(EXP["bridge"])
-        rcon(EXP["name"], "tick freeze")
-        restore_result, restore_record = await call(api, "restore",
-                                                    {"directory": fork_snapshot, "dry_run": False,
-                                                     "target": EXP["name"], "expect_instance": "server",
-                                                     "expect_world_dir": str(LABS / EXP["name"] / "world"),
-                                                     "replace_existing": True},
-                                                    timeout=900)
-        verify_result, verify_record = await call(api, "verify", {"directory": fork_snapshot, "target": EXP["name"]},
-                                                  timeout=600)
-        devcap_dir.joinpath("restore-for-memory.json").write_text(
-            json.dumps({"restore": restore_record, "verify": verify_record}, indent=2), encoding="utf-8"
-        )
-        if not (restore_result and restore_result.get("ok") and verify_result and verify_result.get("ok")):
-            raise RuntimeError("the devcap memory restore/verify failed")
-        # The live phase can leave dropped items around; the filtered memory
-        # snapshot is about the machine entities, so clear those leftovers.
-        rcon(EXP["name"], "kill @e[type=minecraft:item]")
-        time.sleep(0.5)
-        snapshot_result, snapshot_record = await call(api, "snapshot",
-                                                      {"name": f"devcap-{facts['runId']}-memory", "radius": 0},
-                                                      timeout=600)
-        snapshot_dir = str((snapshot_result or {}).get("snapshotDir") or (snapshot_result or {}).get("dir") or "")
-        if not snapshot_dir:
-            raise RuntimeError(f"the devcap memory snapshot failed: {snapshot_record}")
-        await api.close()
-        lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
-        lab("start", "--name", EXP["name"], "--wait", "300")
-        rcon(EXP["name"], "tick freeze")
-        rcon(EXP["name"], "kill @e[type=minecraft:item]")
-        restart_status = rcon(EXP["name"], "mcagent-smoke status")
-        start_bridge(EXP["name"], EXP["bridge"])
-        api = await connect(EXP["bridge"])
-        memory_verify, memory_verify_record = await call(api, "verify", {"directory": snapshot_dir, "target": EXP["name"]},
-                                                        timeout=600)
-        state_result, state_record = await call(api, "state", {})
-        await api.close()
-        stop_bridges()
-        memory_log = devcap_dir / "memory-restart-verify.json"
-        memory_log.write_text(json.dumps({"verify": memory_verify_record, "state": state_record}, indent=2), encoding="utf-8")
-        verification = (memory_verify or {}).get("verification") or {}
-        order_match = bool((verification.get("orderHash") or {}).get("match"))
-        count_match = bool((verification.get("counts") or {}).get("match"))
-        memory_rebuilt = bool((memory_verify or {}).get("ok")) and order_match and count_match
-        if not memory_rebuilt:
-            raise RuntimeError(f"the post-restart memory/order verification failed: {memory_verify_record}")
-        expected_entities = int((memory_verify or {}).get("expected", {}).get("count") or 0)
-        matched_entities = int((memory_verify or {}).get("actual", {}).get("count") or 0)
-    else:
+    if not (fork_snapshot and Path(fork_snapshot).is_dir()):
         raise RuntimeError("facts-live.json has no fork snapshot for the restart memory test")
+    memory_snapshot = devcap_dir / "memory-snapshot"
+    shutil.rmtree(memory_snapshot, ignore_errors=True)
+    shutil.copytree(fork_snapshot, memory_snapshot)
+    entity_rows = [
+        json.loads(line)
+        for line in (memory_snapshot / "entities.jsonl").read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    kept = [row for row in entity_rows if row.get("type") != "minecraft:item"]
+    (memory_snapshot / "entities.jsonl").write_text(
+        chr(10).join(json.dumps(row) for row in kept) + chr(10), encoding="utf-8"
+    )
+    meta = read_json(memory_snapshot / "meta.json")
+    meta["entities"] = len(kept)
+    meta["orderHash"] = hashlib.sha256(
+        ":".join(str(row.get("uuid")) for row in kept).encode("utf-8")
+    ).hexdigest()[:16]
+    meta["memoryFilter"] = "carts + hover seat; falling init items excluded"
+    write_json(memory_snapshot / "meta.json", meta)
+    api = await connect(EXP["bridge"])
+    rcon(EXP["name"], "tick freeze")
+    restore_result, restore_record = await call(api, "restore",
+                                                {"directory": str(memory_snapshot), "dry_run": False,
+                                                 "target": EXP["name"], "expect_instance": "server",
+                                                 "expect_world_dir": str(LABS / EXP["name"] / "world"),
+                                                 "replace_existing": True, "verify": False},
+                                                timeout=900)
+    devcap_dir.joinpath("restore-for-memory.json").write_text(
+        json.dumps({"restore": restore_record}, indent=2), encoding="utf-8"
+    )
+    if not restore_result or restore_result.get("error") or restore_result.get("verdict") not in ("unverified", "ok"):
+        raise RuntimeError(f"the devcap memory restore failed: {restore_record}")
+    rcon(EXP["name"], "kill @e[type=minecraft:item]")
+    time.sleep(0.5)
+    pre_result, pre_record = await call(api, "snapshot",
+                                        {"name": f"devcap-{facts['runId']}-memory-pre", "radius": 0},
+                                        timeout=600)
+    pre_dir = str((pre_result or {}).get("snapshotDir") or (pre_result or {}).get("dir") or "")
+    if not pre_dir:
+        raise RuntimeError(f"the pre-restart memory snapshot failed: {pre_record}")
+    await api.close()
+    stop_bridges()
+    lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
+    lab("start", "--name", EXP["name"], "--wait", "300")
+    rcon(EXP["name"], "tick freeze")
+    rcon(EXP["name"], "kill @e[type=minecraft:item]")
+    restart_status = rcon(EXP["name"], "mcagent-smoke status")
+    start_bridge(EXP["name"], EXP["bridge"])
+    api = await connect(EXP["bridge"])
+    post_result, post_record = await call(api, "snapshot",
+                                          {"name": f"devcap-{facts['runId']}-memory-post", "radius": 0},
+                                          timeout=600)
+    state_result, state_record = await call(api, "state", {})
+    await api.close()
+    stop_bridges()
+    post_dir = str((post_result or {}).get("snapshotDir") or (post_result or {}).get("dir") or "")
+    if not post_dir:
+        raise RuntimeError(f"the post-restart memory snapshot failed: {post_record}")
+    pre = gate.fork_verify.load_snapshot(Path(pre_dir))
+    post = gate.fork_verify.load_snapshot(Path(post_dir))
+    expected_list = [entity for entity in pre.entities if entity.type != "minecraft:item"]
+    actual_list = [entity for entity in post.entities if entity.type != "minecraft:item"]
+    order_expected = gate.fork_verify.order_hash(expected_list)
+    order_actual = gate.fork_verify.order_hash(actual_list)
+    order_match = len(expected_list) == len(actual_list) and order_expected == order_actual
+    nbt_ok = bool(expected_list) and len(expected_list) == len(actual_list) and all(
+        left.nbt == right.nbt for left, right in zip(expected_list, actual_list)
+    )
+    pos_ok = bool(expected_list) and all(
+        left.pos is not None
+        and right.pos is not None
+        and all(abs(a - b) <= 1e-3 for a, b in zip(left.pos, right.pos))
+        for left, right in zip(expected_list, actual_list)
+    )
+    memory_rebuilt = bool(order_match and nbt_ok and pos_ok)
+    memory_log = devcap_dir / "memory-restart-verify.json"
+    memory_log.write_text(json.dumps({
+        "filter": "carts + hover seat; falling item entities excluded on both sides",
+        "preSnapshot": pre_dir,
+        "postSnapshot": post_dir,
+        "expected": {"count": len(expected_list), "orderHash": order_expected},
+        "actual": {"count": len(actual_list), "orderHash": order_actual},
+        "orderMatch": bool(order_match),
+        "nbtMatch": bool(nbt_ok),
+        "positionMatch": bool(pos_ok),
+        "state": state_record,
+    }, indent=2), encoding="utf-8")
+    if not memory_rebuilt:
+        raise RuntimeError(f"the post-restart memory/order comparison failed: {memory_log}")
+    expected_entities = len(expected_list)
+    matched_entities = len(actual_list)
+
     lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
 
     target.joinpath("jar-update.json").write_text(json.dumps({
