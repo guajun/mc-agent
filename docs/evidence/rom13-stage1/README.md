@@ -1,10 +1,13 @@
 # Stage-one integration evidence
 
-`full-gate-summary.json` (version 1) is the durable, compact record of the
+`full-gate-summary.json` (version 2) is the durable, compact record of the
 **full issue-#14 acceptance run** on branch `codex/rom13-fullgate`: the merged
-#15 fixture, the same-run guarded restore, the positive/negative audit
-sessions, the five smoke suites, the finalized trajectory and the gate verdict
-**pass 8/8** (exit 0, run id `rom13-fullgate-20260925T210725Z`). It pins the
+#15 fixture, three live initializations, the same-run guarded restore, the
+**bounded real ROM calibration** on the source and restored copies, the
+like-for-like no-mod parity, the real hit/miss identity probe, the real
+dev-capability probes (including the post-restart memory verify), the causal
+tool/game joins, the five smoke suites and the gate verdict **pass 8/8**
+(exit 0, run id `rom13-fullgate-20260926T011803Z`). It pins the
 sha256 of every artifact the gate consumed (bundle tree, evidence index,
 canonical audit events, tool trace, joins, snapshots, trajectory, positive log)
 plus the unchanged source-world tree hash. Raw artifacts stay under the

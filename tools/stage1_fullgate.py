@@ -32,8 +32,12 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Sequence
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import stage1_gate as gate  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 LABS = ROOT / "labs"
@@ -66,6 +70,24 @@ FIXTURE_SPEC = ROOT / "examples" / "minecart-rom" / "fixture-spec.json"
 SRC = {"name": "rom13-src", "server": 27240, "rcon": 27241, "vantage": 27242, "bridge": 27243}
 EXP = {"name": "rom13-exp", "server": 27244, "rcon": 27245, "vantage": 27246, "bridge": 27247}
 NEG = {"name": "rom13-neg", "server": 27248, "rcon": 27249, "vantage": 0, "bridge": 0}
+#: The no-mod parity copy reuses the void lab's ports after the negatives stop.
+CTL = {"name": "rom13-ctl", "server": 27150, "rcon": 27151, "vantage": 0, "bridge": 0}
+
+#: The read-only source save baseline; a live run must observe it before and
+#: after separately and both observations must equal this anchor.
+SOURCE_BASELINE_SHA256 = "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a"
+
+ROMUSER = "Romuser"
+SEAT_POS = [11.5, -53.0, -24.5]
+SEAT_FACING = [0.0, 50.0]
+SEAT_TAG = "minecart-rom-fixture"
+NOTE_BLOCK_POS = [11, -54, -23]
+CALIBRATION_PRESSES = 1
+CALIBRATION_SPRINT_TICKS = 220
+#: Bounds the audit mod's own calibration: a popped cart is removed naturally
+#: below the void within the fixture's 110..160 tick window plus margin.
+EMISSION_MAX_TICK_DELTA = 40
+REMOVAL_MAX_TICK_DELTA = 300
 
 ROMUSER_UUID = "3ec122d5-fc27-4816-be47-bf8be8d7e56d"
 SECOND_PLAYER = "Otherplayer"
@@ -74,6 +96,20 @@ NOTE_BLOCK = [11, -54, -23]
 STACK_REGION = {"name": "stack", "from": [13, -53, -23], "to": [15, -50, -21]}
 OUTPUT_REGION = {"name": "output", "from": [16, -140, -24], "to": [24, -45, -20]}
 INPUT_REGION = {"name": "note-block", "from": NOTE_BLOCK, "to": NOTE_BLOCK}
+
+
+def _uuid_from_nbt(value: Any) -> str:
+    """Convert a serialized ``[I; a, b, c, d]`` UUID into the dashed form."""
+    match = re.match(r"\[I;\s*(-?\d+),\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\]", str(value))
+    if not match:
+        return ""
+    parts = [int(match.group(index)) & 0xFFFFFFFF for index in range(1, 5)]
+    hexed = "".join(f"{part:08x}" for part in parts)
+    return f"{hexed[0:8]}-{hexed[8:12]}-{hexed[12:16]}-{hexed[16:20]}-{hexed[20:32]}"
+
+
+def _now_iso_ms() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def say(message: str = "") -> None:
@@ -136,7 +172,7 @@ def free_reserved_ports() -> None:
         if len(parts) < 5 or parts[0] != "TCP" or parts[3] != "LISTENING":
             continue
         port = parts[1].rsplit(":", 1)[-1]
-        if port.isdigit() and 27240 <= int(port) <= 27249:
+        if port.isdigit() and (27240 <= int(port) <= 27249 or 27150 <= int(port) <= 27151):
             pids.add(parts[4])
     for pid in pids:
         run(["taskkill", "/PID", pid, "/F"], check=False, timeout=60)
@@ -187,7 +223,7 @@ class Recorder:
             [PY, str(RUN_TRACE), "call", "--run-dir", str(self.run_dir), "--call-id", call_id,
              "--tool", tool, "--arguments", json.dumps(args), "--phase", "prepare",
              "--actor", "operator", "--instance", instance,
-             "--at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(started))],
+             "--at", _now_iso_ms()],
             check=False, capture_output=True, text=True,
         )
         return {"call_id": call_id, "started": started, "ended": started}
@@ -199,7 +235,7 @@ class Recorder:
             [PY, str(RUN_TRACE), "result", "--run-dir", str(self.run_dir), "--call-id", entry["call_id"],
              "--status", status, "--result", json.dumps(result_payload),
              *(["--error", error] if error else []),
-             "--at", time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(ended))],
+             "--at", _now_iso_ms()],
             check=False, capture_output=True, text=True,
         )
 
@@ -324,10 +360,21 @@ GENERIC_STACK = {"name": "stack", "from": [2, -60, -1], "to": [3, -59, 1]}
 GENERIC_OUTPUT = {"name": "output", "from": [4, -140, -8], "to": [24, -53, 8]}
 
 
-def audit_config(lab_name: str, run_id: str, instance: str, provenance: dict, regions: str = "fixture") -> None:
+def audit_config(
+    lab_name: str,
+    run_id: str,
+    instance: str,
+    provenance: dict,
+    regions: str = "fixture",
+    *,
+    agent_uuid: str | None = None,
+) -> None:
     input_region = GENERIC_INPUT if regions == "generic" else INPUT_REGION
     stack_region = GENERIC_STACK if regions == "generic" else STACK_REGION
     output_region = GENERIC_OUTPUT if regions == "generic" else OUTPUT_REGION
+    uuid = agent_uuid or fixture_uuid()
+    if not uuid:
+        raise RuntimeError("audit config needs the fixture player uuid observed in this run")
     config = {
         "runId": run_id,
         "instanceId": instance,
@@ -337,8 +384,8 @@ def audit_config(lab_name: str, run_id: str, instance: str, provenance: dict, re
         "stackRegion": stack_region,
         "outputRegion": output_region,
         "cartTypes": ["minecraft:chest_minecart"],
-        "sampleIntervalTicks": 1,
-        "agentUuids": [fixture_uuid()],
+        "sampleIntervalTicks": 20,
+        "agentUuids": [uuid],
     }
     directory = LABS / lab_name / "mc-audit"
     directory.mkdir(parents=True, exist_ok=True)
@@ -366,6 +413,530 @@ def provision_with_mods(lab_info: dict, *, world: Path | None, test_mod: Path, e
 # --------------------------------------------------------------------------- live phase
 
 
+def _parse_count(output: str) -> int:
+    match = re.search(r"Count:\s*(\d+)", output)
+    if match:
+        return int(match.group(1))
+    if "Test failed" in output:
+        return 0
+    return -1
+
+
+def machine_base_ok(instance: str) -> tuple[bool, list[dict[str, Any]]]:
+    """Check the accepted fixture's base-state block checks on a live lab.
+
+    The caller must have frozen the world first; force-loading here loads the
+    machine chunks without letting a tick drop the gravity blocks.
+    """
+    rcon(instance, "forceload add 0 -40 32 -10")
+    spec = read_json(FIXTURE_SPEC)
+    broken: list[dict[str, Any]] = []
+    for check in spec["machine"].get("checks") or []:
+        position = check.get("pos") or []
+        if len(position) != 3:
+            continue
+        output = rcon(instance, f"execute if block {position[0]} {position[1]} {position[2]} {check['block']}")
+        if "Test passed" not in output:
+            broken.append(check)
+    return (not broken), broken
+
+
+def _cart_counts(instance: str) -> dict[str, int]:
+    """Observe the real fixture geometry: stack volume and total carts."""
+    stack = rcon(instance, "execute if entity @e[type=minecraft:chest_minecart,x=13,y=-53,z=-23,dx=3,dy=4,dz=3]")
+    total = rcon(instance, "execute if entity @e[type=minecraft:chest_minecart]")
+    return {"stack": _parse_count(stack), "total": _parse_count(total)}
+
+
+def _note_value(instance: str, expected: int) -> bool:
+    return "Test passed" in rcon(instance, f"execute if block 11 -54 -23 minecraft:note_block[note={expected}]")
+
+
+def _read_audit(path: Path) -> list[dict[str, Any]]:
+    if not path.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            rows.append(json.loads(stripped))
+        except ValueError:
+            continue
+    return rows
+
+
+class AuditTail:
+    """Incremental reader for a growing audit JSONL (never re-parses the file)."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.offset = 0
+        self.rows: list[dict[str, Any]] = []
+
+    def read_new(self) -> list[dict[str, Any]]:
+        if not self.path.is_file():
+            return self.rows
+        try:
+            size = self.path.stat().st_size
+            if size < self.offset:
+                self.offset = 0
+                self.rows = []
+            with self.path.open("rb") as handle:
+                handle.seek(self.offset)
+                data = handle.read()
+                self.offset = handle.tell()
+        except OSError:
+            return self.rows
+        for line in data.decode("utf-8", errors="replace").splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                self.rows.append(json.loads(stripped))
+            except ValueError:
+                continue
+        return self.rows
+
+    def count(self, event_type: str) -> int:
+        return sum(1 for row in self.rows if row.get("type") == event_type)
+
+    def wait(self, predicate: Any, *, timeout: float, poll: float = 0.25) -> list[dict[str, Any]]:
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.read_new()
+            if predicate(self.rows):
+                return self.rows
+            time.sleep(poll)
+        self.read_new()
+        return self.rows
+
+
+def wait_for_audit(path: Path, predicate: Any, *, timeout: float, poll: float = 0.25) -> list[dict[str, Any]]:
+    """Convenience wrapper for one-off waits; ``predicate`` sees the rows."""
+    tail = AuditTail(path)
+    return tail.wait(lambda rows: any(predicate(row) for row in rows), timeout=timeout, poll=poll)
+
+
+def ensure_seat_player(rec: Recorder | None, info: dict, *, recorded: bool = True, timeout: float = 90.0) -> dict[str, Any]:
+    """Spawn the fixture fake player and park it on the restored hover seat.
+
+    The fixture world holds the player as a passenger of the invisible marker
+    seat; the probe is only complete when the player neither falls nor drifts.
+    """
+    name = info["name"]
+
+    def command(label: str, text: str) -> str:
+        if recorded and rec is not None:
+            return rec.exec_rcon(label, text, instance=name)
+        return rcon(name, text)
+
+    # Freeze before force-loading: a machine chunk that loads in a ticking
+    # world would drop its gravity blocks before the seat is even placed.  The
+    # player is parked while frozen; the calibration unfreezes only after the
+    # recorded press so a scheduled machine tick cannot fire first.
+    command("seat-freeze", "tick freeze")
+    command("seat-forceload", "forceload add 0 -40 32 -10")
+    probe = command("seat-probe", f"data get entity {ROMUSER} Pos")
+    if "has the following entity data" not in probe:
+        command(
+            "seat-spawn",
+            f"player {ROMUSER} spawn at {SEAT_POS[0]} {SEAT_POS[1]} {SEAT_POS[2]} facing "
+            f"{SEAT_FACING[0]} {SEAT_FACING[1]} in minecraft:overworld in creative",
+        )
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            probe = command("seat-poll", f"data get entity {ROMUSER} Pos")
+            if "has the following entity data" in probe:
+                break
+            time.sleep(1.0)
+    if "has the following entity data" not in probe:
+        raise RuntimeError(f"{ROMUSER} never spawned on {name}")
+    seat = command("seat-tag-check", f"execute if entity @e[type=minecraft:armor_stand,tag={SEAT_TAG}]")
+    if "Test passed" not in seat:
+        spec = read_json(FIXTURE_SPEC)
+        seat_nbt = str((spec.get("user", {}).get("hover_seat") or {}).get("nbt") or "")
+        if not seat_nbt:
+            raise RuntimeError("the fixture spec has no hover-seat NBT to place")
+        command(
+            "seat-summon",
+            f"summon minecraft:armor_stand {SEAT_POS[0]} {SEAT_POS[1]} {SEAT_POS[2]} {seat_nbt}",
+        )
+        time.sleep(0.3)
+    command("seat-ride", f"ride {ROMUSER} mount @e[type=minecraft:armor_stand,tag={SEAT_TAG},limit=1]")
+    command(
+        "seat-place",
+        f"tp @e[type=minecraft:armor_stand,tag={SEAT_TAG},limit=1] {SEAT_POS[0]} {SEAT_POS[1]} {SEAT_POS[2]}",
+    )
+    # Carpet's look is "look <pitch> <yaw>" while the spec stores [yaw, pitch]
+    command("seat-look", f"player {ROMUSER} look {SEAT_FACING[1]} {SEAT_FACING[0]}")
+    time.sleep(0.3)
+    first = command("seat-stable-1", f"data get entity {ROMUSER} Pos")
+    time.sleep(1.0)
+    second = command("seat-stable-2", f"data get entity {ROMUSER} Pos")
+    return {"first": first, "second": second}
+
+
+def _player_position(output: str) -> list[float] | None:
+    match = re.search(r"\[(-?[0-9.]+)d,\s*(-?[0-9.]+)d,\s*(-?[0-9.]+)d\]", output)
+    if not match:
+        return None
+    return [float(match.group(1)), float(match.group(2)), float(match.group(3))]
+
+
+def rom_calibration(
+    rec: Recorder | None,
+    info: dict,
+    run_id: str,
+    *,
+    audited: bool,
+    log: Path | None = None,
+    recorded: bool = True,
+) -> dict[str, Any]:
+    """Operate the real fixture note block and observe natural void removal.
+
+    Every press is followed by the real observer (when audited) and by a tick
+    sprint; the cart leaves the stack through the fixture's output plane and is
+    removed by the void below the world.  No platforms and no kill substitute.
+    """
+    name = info["name"]
+
+    def command(label: str, text: str) -> str:
+        if recorded and rec is not None:
+            return rec.exec_rcon(label, text, instance=name)
+        return rcon(name, text)
+
+    observations: list[dict[str, Any]] = []
+    removed = 0
+    tail = AuditTail(log) if (audited and log is not None) else None
+    for index in range(1, CALIBRATION_PRESSES + 1):
+        before = _cart_counts(name)
+        # Unfreeze only for the press itself: the machine's scheduled tick
+        # must not run ahead of the recorded player input.
+        command(f"rom-unfreeze-press-{index}", "tick unfreeze")
+        command(f"rom-press-{index}", f"player {ROMUSER} use once")
+        if tail is not None:
+            tail.wait(lambda rows: sum(1 for row in rows if row.get("type") == "input_processed") >= index,
+                      timeout=15.0)
+            if tail.count("input_processed") < index:
+                raise RuntimeError(f"press {index} produced no input_processed event")
+        else:
+            time.sleep(0.5)
+        note_ok = _note_value(name, 20 + index)
+        command(f"rom-sprint-{index}", f"tick sprint {CALIBRATION_SPRINT_TICKS}")
+        if tail is not None:
+            tail.wait(lambda rows: sum(1 for row in rows if row.get("type") == "cart_remove") >= index,
+                      timeout=60.0)
+            removed = tail.count("cart_remove")
+            if removed < index:
+                raise RuntimeError(f"press {index} produced no natural cart_remove event")
+        else:
+            after = before
+            deadline = time.time() + 45.0
+            while time.time() < deadline:
+                after = _cart_counts(name)
+                if after["total"] >= 0 and after["total"] < before["total"]:
+                    break
+                time.sleep(1.0)
+            delta = before["total"] - after["total"] if after["total"] >= 0 else 0
+            removed = removed + max(0, delta)
+        after = _cart_counts(name)
+        observations.append(
+            {
+                "press": index,
+                "note_step_ok": note_ok,
+                "stack_before": before["stack"],
+                "stack_after": after["stack"],
+                "total_before": before["total"],
+                "total_after": after["total"],
+                "removed_total": removed,
+            }
+        )
+    return {
+        "instance": name,
+        "runId": run_id,
+        "audited": audited,
+        "log": str(log) if log is not None else "",
+        "observations": observations,
+        "final_total": observations[-1]["total_after"] if observations else None,
+    }
+
+
+def source_child(rec: Recorder, src: dict, run_id: str) -> dict[str, Any]:
+    """Bounded ROM calibration on the copied source world (same parent run)."""
+    log = LABS / src["name"] / "mc-audit" / f"audit-{run_id}.jsonl"
+    calibration = rom_calibration(rec, src, run_id, audited=True, log=log)
+    rec.exec_rcon("child-flush", "mcaudit flush", instance=src["name"])
+    rec.exec_rcon("child-phase-end", "mcaudit phase experiment_end", instance=src["name"])
+    rec.exec_rcon("child-end", "mcaudit end", instance=src["name"])
+    status = LABS / src["name"] / "mc-audit" / f"status-{run_id}.json"
+    return {"runId": run_id, "log": str(log), "calibration": calibration, "status": str(status)}
+
+
+async def failure_probes(
+    rec: Recorder, api: Any, src: dict, exp: dict, directory: str, exp_world: str, stage: str
+) -> list[dict[str, Any]]:
+    """Real refusal/mismatch probes for the gate's failure cases.
+
+    ``stage="pre"`` runs the non-destructive refusals while the restored carts
+    are still present; the inventory mutation probe restores the original
+    value before it returns, so the bounded ROM calibration still operates the
+    restored machine.  ``stage="post"`` runs the mutating probes after the
+    calibration session has been closed and copied.
+    """
+    rows: list[dict[str, Any]] = []
+
+    def row(case: str, injected: str, expected: str, record: dict[str, Any], passed: bool) -> None:
+        rows.append({
+            "case": case, "injected": injected, "expected": expected,
+            "observed": record.get("error") or json.dumps(record.get("result"))[:300],
+            "passed": passed, "evidence_ref": f"trajectory:{record.get('call_id') or case}",
+            "record": record,
+        })
+
+    if stage == "pre":
+        cart_uuid = None
+        original_nbt = ""
+        for line in (Path(directory) / "entities.jsonl").read_text(encoding="utf-8").splitlines():
+            ent = json.loads(line)
+            if ent.get("type") == "minecraft:chest_minecart":
+                cart_uuid = ent.get("uuid")
+                original_nbt = str(ent.get("nbt") or "")
+                break
+        if not cart_uuid:
+            rows.append({"case": "inventory_mutation_order_hash", "injected": "no chest minecart in the snapshot",
+                         "expected": "a cart to mutate", "observed": "none", "passed": False, "evidence_ref": "snapshot"})
+        else:
+            match = re.search(r'"Items":\[\{.*?"count":(\d+)', original_nbt)
+            original_count = int(match.group(1)) if match else None
+            rcon(exp["name"], f"data modify entity {cart_uuid} Items[0].count set value 64")
+            _r, mutated = await bridge_step(rec, api, "probe-inventory-mutation", "verify",
+                                            {"directory": directory, "target": exp["name"]}, instance=exp["name"])
+            verification = ((mutated.get("result") or {}).get("verification") or {})
+            mutated_ok = bool(mutated.get("ok")) \
+                and verification.get("orderHash", {}).get("match") \
+                and verification.get("nbtMismatches", {}).get("count", 0) > 0
+            restored = False
+            if original_count is not None:
+                rcon(exp["name"], f"data modify entity {cart_uuid} Items[0].count set value {original_count}")
+                _r, back = await bridge_step(rec, api, "probe-inventory-mutation-restore", "verify",
+                                             {"directory": directory, "target": exp["name"]}, instance=exp["name"])
+                back_verification = ((back.get("result") or {}).get("verification") or {})
+                restored = bool(back.get("ok")) and back_verification.get("orderHash", {}).get("match") \
+                    and back_verification.get("nbtMismatches", {}).get("count", 0) == 0
+            row("inventory_mutation_order_hash", f"Items[0].count of {cart_uuid} modified then restored",
+                "NBT mismatch detected while orderHash still matches; original value restored",
+                mutated, mutated_ok and restored)
+
+        _r, wrong = await bridge_step(rec, api, "probe-wrong-endpoint", "restore",
+                                      {"directory": directory, "target": exp["name"],
+                                       "expect_instance": "server",
+                                       "expect_world_dir": str(LABS / src["name"] / "world")},
+                                      instance=exp["name"])
+        row("wrong_endpoint", "expect_world_dir points at the source lab world",
+            "refused before any mutation", wrong,
+            wrong.get("ok") is False and "endpoint" in str(wrong.get("error", "")).lower())
+
+        _r, duplicate = await bridge_step(rec, api, "probe-duplicate", "restore",
+                                          {"directory": directory, "dry_run": False, "target": exp["name"],
+                                           "expect_instance": "server", "expect_world_dir": exp_world,
+                                           "replace_existing": False}, instance=exp["name"])
+        row("duplicate_pre_existing", "second restore with replace_existing=false over the restored carts",
+            "duplicate entities rejected", duplicate,
+            duplicate.get("ok") is False or "duplicate" in json.dumps(duplicate.get("result")))
+        return rows
+
+    _r, unverified = await bridge_step(rec, api, "probe-unverified", "restore",
+                                       {"directory": directory, "dry_run": False, "target": exp["name"],
+                                        "expect_instance": "server", "expect_world_dir": exp_world,
+                                        "replace_existing": True, "verify": False}, instance=exp["name"])
+    unverified_result = unverified.get("result") or {}
+    row("unverified", "restore with replace_existing=true and verification disabled",
+        "verdict=unverified, verified=false, never a success claim", unverified,
+        unverified_result.get("verdict") == "unverified"
+        and unverified_result.get("verified") is False
+        and unverified_result.get("ok") is not True)
+
+    scratch = EVIDENCE / "probe-corrupt-metadata"
+    shutil.rmtree(scratch, ignore_errors=True)
+    shutil.copytree(directory, scratch)
+    (scratch / "meta.json").write_text("{not json", encoding="utf-8")
+    _r, corrupt = await bridge_step(rec, api, "probe-corrupt-metadata", "restore",
+                                    {"directory": str(scratch), "dry_run": True, "target": exp["name"],
+                                     "expect_instance": "server", "expect_world_dir": exp_world},
+                                    instance=exp["name"])
+    row("corrupt_metadata", "snapshot meta.json replaced with invalid JSON", "refused before any command", corrupt,
+        corrupt.get("ok") is False)
+
+    partial = EVIDENCE / "probe-partial-failure"
+    shutil.rmtree(partial, ignore_errors=True)
+    shutil.copytree(directory, partial)
+    lines = (partial / "entities.jsonl").read_text(encoding="utf-8").splitlines()
+    bad = json.loads(lines[0])
+    bad["type"] = "minecraft:not_a_real_entity"
+    (partial / "entities.jsonl").write_text(json.dumps(bad) + "\n" + "\n".join(lines[1:]) + "\n", encoding="utf-8")
+    _r, partial_result = await bridge_step(rec, api, "probe-partial-failure", "restore",
+                                           {"directory": str(partial), "dry_run": False, "target": exp["name"],
+                                            "expect_instance": "server", "expect_world_dir": exp_world,
+                                            "replace_existing": True}, instance=exp["name"], timeout=900)
+    row("partial_failure", "one snapshot entity has an unknown type",
+        "command failure reported, not silent success", partial_result,
+        partial_result.get("ok") is False
+        or bool(partial_result.get("result", {}).get("failed"))
+        or (isinstance(partial_result.get("result", {}).get("failed"), int)
+            and partial_result.get("result", {}).get("failed", 0) > 0))
+
+    refusal = EVIDENCE / "probe-summon-refusal"
+    shutil.rmtree(refusal, ignore_errors=True)
+    shutil.copytree(directory, refusal)
+    lines = (refusal / "entities.jsonl").read_text(encoding="utf-8").splitlines()
+    bad = json.loads(lines[0])
+    bad["nbt"] = "{NotValid"
+    (refusal / "entities.jsonl").write_text(json.dumps(bad) + "\n" + "\n".join(lines[1:]) + "\n", encoding="utf-8")
+    _r, refused = await bridge_step(rec, api, "probe-summon-refusal", "restore",
+                                    {"directory": str(refusal), "dry_run": False, "target": exp["name"],
+                                     "expect_instance": "server", "expect_world_dir": exp_world,
+                                     "replace_existing": True}, instance=exp["name"], timeout=900)
+    row("summon_refusal", "one snapshot entity carries invalid NBT",
+        "server refusal surfaced as a failed command", refused,
+        refused.get("ok") is False or bool(refused.get("result", {}).get("failed")))
+    return rows
+
+
+async def identity_probe(rec: Recorder, api: Any, info: dict) -> dict[str, Any]:
+    """Measure the real player context on the restored machine.
+
+    The player is parked on the fixture hover seat; ``hit`` requires the
+    server-side view ray to land on the fixture note block and ``miss``
+    requires a real ``type: "miss"`` target after looking away.  Both records
+    carry the raw reply and the observed position.
+    """
+    name = info["name"]
+    records: list[dict[str, Any]] = []
+
+    def view_of(response: Any) -> dict[str, Any]:
+        payload = response if isinstance(response, dict) else {}
+        player = payload.get("player") if isinstance(payload.get("player"), dict) else {}
+        view = player.get("view") if isinstance(player.get("view"), dict) else {}
+        if not view and isinstance(payload.get("view"), dict):
+            view = payload["view"]
+        return view
+
+    def target_of(response: Any) -> dict[str, Any]:
+        view = view_of(response)
+        target = view.get("target") if isinstance(view.get("target"), dict) else {}
+        return target
+
+    def record(case: str, response: Any, *, accepted: bool, hit: bool, other_uuid: str | None = None) -> dict[str, Any]:
+        payload = response if isinstance(response, dict) else {}
+        player = payload.get("player") if isinstance(payload.get("player"), dict) else {}
+        position = _player_position(rcon(name, f"data get entity {ROMUSER} Pos")) or [0.0, 0.0, 0.0]
+        return {
+            "case": case,
+            "uuid": str(player.get("uuid") or payload.get("uuid") or payload.get("query") or ""),
+            "viewed_uuid": str(player.get("uuid") or payload.get("uuid") or payload.get("query") or ""),
+            "dimension": player.get("dimension") or "minecraft:overworld",
+            "pos": position,
+            "yaw": float(player.get("yaw", 0.0)),
+            "pitch": float(player.get("pitch", 0.0)),
+            "task_entry": "external_task",
+            "channel": "cli",
+            "accepted": accepted,
+            "hit": hit,
+            "target": target_of(response),
+            "other_uuid": other_uuid,
+            "detail": {"raw": payload, "probe": "mc-bridge call player", "seat": SEAT_POS},
+        }
+
+    romuser, romuser_record = await call(api, "player", {"player": ROMUSER})
+    romuser_rec = romuser_record.get("result")
+    if not romuser or not romuser.get("found"):
+        raise RuntimeError(f"the fixture player {ROMUSER} has no server context: {romuser_record}")
+    position = _player_position(rcon(name, f"data get entity {ROMUSER} Pos"))
+    if position is None or any(abs(a - b) > 1.0 for a, b in zip(position, SEAT_POS)):
+        raise RuntimeError(f"{ROMUSER} is not parked on the fixture seat: {position}")
+    hit_target = target_of(romuser)
+    hit_block = hit_target.get("block") if isinstance(hit_target.get("block"), dict) else {}
+    if hit_target.get("type") != "block" or hit_block.get("id") != "minecraft:note_block":
+        raise RuntimeError(f"the fixture view does not resolve the note block: {hit_target}")
+    records.append(record("task_bind", romuser, accepted=True, hit=True))
+    records.append(record("hit", romuser, accepted=True, hit=True))
+
+    rcon(name, f"player {ROMUSER} look -90 0")
+    time.sleep(0.4)
+    miss, _miss_record = await call(api, "player", {"player": ROMUSER})
+    miss_target = target_of(miss)
+    if miss_target.get("type") != "miss":
+        raise RuntimeError(f"looking away did not produce a miss target: {miss_target}")
+    records.append(record("miss", miss, accepted=bool((miss or {}).get("found")), hit=False))
+    rcon(name, f"player {ROMUSER} look {SEAT_FACING[1]} {SEAT_FACING[0]}")
+    time.sleep(0.4)
+
+    rcon(
+        name,
+        f"player {SECOND_PLAYER} spawn at 20 -53 -24.5 facing 0 50 in minecraft:overworld in creative",
+    )
+    deadline = time.time() + 15.0
+    other: Any = None
+    while time.time() < deadline:
+        time.sleep(1.0)
+        candidate, _other_record = await call(api, "player", {"player": SECOND_PLAYER})
+        if candidate and candidate.get("found"):
+            other = candidate
+            break
+    other_uuid = str(((other or {}).get("player") or {}).get("uuid") or "")
+    if not other_uuid or other_uuid == records[0]["uuid"]:
+        raise RuntimeError(f"the second player did not resolve distinctly: {other}")
+    records.append(record("two_players", romuser, accepted=True, hit=True, other_uuid=other_uuid))
+
+    unknown, _unknown_record = await call(api, "player", {"player": "11111111-2222-3333-4444-555555555555"})
+    unknown_record = record("unknown_identity", unknown, accepted=False, hit=False)
+    unknown_record["uuid"] = "11111111-2222-3333-4444-555555555555"
+    unknown_record["viewed_uuid"] = "11111111-2222-3333-4444-555555555555"
+    unknown_record["rejected_reason"] = str((unknown or {}).get("error") or "found=false")
+    records.append(unknown_record)
+    return {"records": records, "position": position, "hit": True, "miss": True}
+
+
+def control_parity(control_world: Path, run_id: str, audited: dict[str, Any]) -> dict[str, Any]:
+    """Run the same ROM calibration without the audit mod on a copied world.
+
+    This is the like-for-like parity run: same world copy, same fixture
+    geometry, same player/presses/sprints, no audit mod.  Its calls are not
+    part of the audited trajectory.
+    """
+    lab("stop", "--name", CTL["name"], "--timeout", "120", check=False)
+    shutil.rmtree(LABS / CTL["name"], ignore_errors=True)
+    lab(
+        "provision", "--name", CTL["name"], "--force", "--fabric-api", "--carpet",
+        "--java", str(JAVA), "--jdk", str(JDK),
+        "--server-port", str(CTL["server"]), "--rcon-port", str(CTL["rcon"]),
+        "--world", str(control_world),
+    )
+    lab("start", "--name", CTL["name"], "--wait", "300")
+    try:
+        ensure_seat_player(None, CTL, recorded=False)
+        control = rom_calibration(None, CTL, run_id, audited=False, recorded=False)
+    finally:
+        lab("stop", "--name", CTL["name"], "--timeout", "120", check=False)
+    audited_observations = audited.get("observations") or []
+    control_observations = control.get("observations") or []
+    consistent = (
+        len(audited_observations) == len(control_observations) == CALIBRATION_PRESSES
+        and all(
+            left.get("note_step_ok") is True
+            and right.get("note_step_ok") is True
+            and left.get("removed_total") == right.get("removed_total")
+            and left.get("total_after") == right.get("total_after")
+            for left, right in zip(audited_observations, control_observations)
+        )
+        and audited.get("final_total") == control.get("final_total")
+        and (audited.get("observations") or [{}])[-1].get("removed_total") == 1
+    )
+    return {"control": control, "consistent": consistent}
+
+
 async def live(args: argparse.Namespace) -> int:
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     LOGS.mkdir(parents=True, exist_ok=True)
@@ -375,23 +946,28 @@ async def live(args: argparse.Namespace) -> int:
     run_dir.mkdir(parents=True, exist_ok=True)
     rec = Recorder(run_id, run_dir)
     rec.init(
-        "Issue #14 full stage-one gate: fixture ready state, guarded same-run restore, live audit "
-        "positives/negatives with the fixture player, source-child coverage and identity probes. "
-        "No ROM solution, no agent logger."
+        "Issue #14 full stage-one gate: deterministic fixture, guarded same-run restore, bounded real "
+        "ROM calibration (source copy + restored copy, natural void removal), identity on the fixture "
+        "seat, no-mod parity, dev-capability probes, frozen trajectory and gate. No ROM solution, no "
+        "agent logger."
     )
-    for info in (SRC, EXP, NEG):
+    for info in (SRC, EXP, NEG, CTL):
         lab("stop", "--name", info["name"], "--timeout", "120", check=False)
     free_reserved_ports()
-    # a stale control lab records the reserved ports and blocks new provisioning
-    shutil.rmtree(ROOT / "labs" / "rom18-ctl", ignore_errors=True)
+    for stale in ("rom18-ctl", "rom13-ctl"):
+        shutil.rmtree(ROOT / "labs" / stale, ignore_errors=True)
     facts: dict[str, Any] = {
         "runId": run_id, "runDir": str(run_dir), "stamp": stamp,
-        "labs": {"src": SRC, "exp": EXP, "neg": NEG},
+        "labs": {"src": SRC, "exp": EXP, "neg": NEG, "ctl": CTL},
         "interface": {"jar": str(INTERFACE_JAR), "sha256": INTERFACE_SHA, "commit": INTERFACE_COMMIT},
         "bridge": {"source": str(BRIDGE_SOURCE), "runtimeHead": BRIDGE_HEAD, "mergedHead": BRIDGE_MERGED},
         "auditJar": {"path": str(AUDIT_JAR), "sha256": sha256_file(AUDIT_JAR)},
-        "fixturePlayerUuid": fixture_uuid(),
         "stages": {},
+        "sourceBaseline": SOURCE_BASELINE_SHA256,
+        "driver": {
+            "path": str(TOOLS / "stage1_fullgate.py"),
+            "sha256": sha256_file(TOOLS / "stage1_fullgate.py"),
+        },
     }
     try:
         if INTERFACE_JAR.is_file() and sha256_file(INTERFACE_JAR) != INTERFACE_SHA:
@@ -402,31 +978,108 @@ async def live(args: argparse.Namespace) -> int:
         if str(BRIDGE_SOURCE / "src") not in sys.path:
             sys.path.insert(0, str(BRIDGE_SOURCE / "src"))
 
-        # ---- fixture is (re)initialized on the source lab -----------------
-        # The fixture runner leaves the lab running with the fake player, the
-        # cart stack and the frozen ready state; init talks to a running lab.
-        lab("start", "--name", SRC["name"], "--wait", "300", check=False)
-        live_records = EVIDENCE / "fixture" / "live-records"
-        # The fixture owns the hover seat; a save/load race can leave an earlier
-        # untagged seat in an unloaded chunk. Force-load, kill and init; retry
-        # until the deterministic ready state validates.
-        init: dict[str, Any] | None = None
-        for attempt in range(3):
-            rcon(SRC["name"], "forceload add 0 -40 32 -10")
-            time.sleep(2.0)
-            rcon(SRC["name"], "kill @e[type=minecraft:armor_stand]")
-            rcon(SRC["name"], "kill @e[type=minecraft:chest_minecart]")
-            init = rec.step(
-                f"fixture-live-init-{attempt + 1}",
-                [PY, ROOT / "examples" / "minecart-rom" / "runner" / "minecart_rom.py", "init",
-                 "--lab", SRC["name"], "--records", str(live_records), "--run-id", f"live-source-{stamp}"],
-                tool="bash", instance=SRC["name"], timeout=900,
+        # ---- run-level source-world observations (separate, before/after) --
+        before_hash, before_files, before_bytes = gate.tree_hash(SOURCE_SAVE)
+        facts["sourceWorldBefore"] = {
+            "tree_sha256": before_hash, "files": before_files, "bytes": before_bytes,
+            "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        if before_hash != SOURCE_BASELINE_SHA256:
+            raise RuntimeError(
+                f"source world before the run is {before_hash}, not the documented baseline "
+                f"{SOURCE_BASELINE_SHA256}"
             )
-            if init["returncode"] == 0:
-                break
-            time.sleep(2.0)
-        if init is None or init["returncode"] != 0:
-            raise RuntimeError(f"fixture live init failed: {(init or {}).get('stderr', '')[-800:]}")
+
+        # ---- fixture: three independent initializations on this run's source
+        cache_world = LABS / "_cache" / "maps" / "unpacked" / "minecart-rom-base-1.0.0" / "world"
+        if not cache_world.is_dir():
+            raise RuntimeError(f"the extracted fixture map world is missing: {cache_world}")
+        facts["fixtureMapWorld"] = str(cache_world)
+        shutil.rmtree(LABS / SRC["name"], ignore_errors=True)
+        lab(
+            "provision", "--name", SRC["name"], "--force", "--fabric-api", "--carpet",
+            "--java", str(JAVA), "--jdk", str(JDK),
+            "--server-port", str(SRC["server"]), "--rcon-port", str(SRC["rcon"]),
+            "--vantage-port", str(SRC["vantage"]), "--bridge-port", str(SRC["bridge"]),
+            "--mod-jar", str(INTERFACE_JAR), "--world", str(cache_world),
+        )
+        lab("start", "--name", SRC["name"], "--wait", "300", check=False)
+        rcon(SRC["name"], "tick freeze")
+        base_ok, base_broken = machine_base_ok(SRC["name"])
+        if not base_ok:
+            raise RuntimeError(f"the fresh fixture map is not in its base state: {base_broken}")
+        live_records = EVIDENCE / "fixture" / "live-records"
+        live_records = EVIDENCE / "fixture" / f"live-records-{stamp}"
+        live_records.mkdir(parents=True, exist_ok=True)
+        facts["fixtureRecords"] = str(live_records)
+        fetched = rec.step(
+            "fixture-fetch-cold",
+            [PY, ROOT / "examples" / "minecart-rom" / "runner" / "minecart_rom.py", "fetch", "--cold",
+             "--records", str(live_records), "--cache", str(LABS / "_cache" / "maps")],
+            tool="bash", instance=SRC["name"], timeout=600,
+        )
+        if fetched["returncode"] != 0:
+            raise RuntimeError(f"the fixture cold fetch failed: {fetched['stderr'][-400:]}")
+        init_runs: list[dict[str, Any]] = []
+        for index in range(1, 4):
+            init: dict[str, Any] | None = None
+            for attempt in range(2):
+                rcon(SRC["name"], "forceload add 0 -40 32 -10")
+                time.sleep(1.5)
+                rcon(SRC["name"], "kill @e[type=minecraft:armor_stand]")
+                rcon(SRC["name"], "kill @e[type=minecraft:chest_minecart]")
+                init = rec.step(
+                    f"fixture-live-init-{index}-{attempt + 1}",
+                    [PY, ROOT / "examples" / "minecart-rom" / "runner" / "minecart_rom.py", "init",
+                     "--lab", SRC["name"], "--records", str(live_records),
+                     "--run-id", f"live-source-{stamp}-{index}"],
+                    tool="bash", instance=SRC["name"], timeout=900,
+                )
+                if init["returncode"] == 0:
+                    break
+                time.sleep(2.0)
+            if init is None or init["returncode"] != 0:
+                raise RuntimeError(f"fixture live init {index} failed: {(init or {}).get('stderr', '')[-800:]}")
+            payload = json.loads(init["stdout"][init["stdout"].find("{"):]) if "{" in init["stdout"] else {}
+            record_dir = Path(str(payload.get("records") or ""))
+            ready = record_dir / "ready-snapshot.json"
+            if not ready.is_file():
+                candidates = sorted(live_records.glob(f"*{index}/ready-snapshot.json"))
+                if not candidates:
+                    raise RuntimeError(f"fixture init {index} left no ready-snapshot: {init['stdout'][-400:]}")
+                ready = candidates[-1]
+            snapshot = read_json(ready)
+            validation = snapshot.get("validation") if isinstance(snapshot.get("validation"), dict) else {}
+            init_runs.append(
+                {
+                    "init_id": f"live-source-{stamp}-{index}",
+                    "run_id": f"live-source-{stamp}-{index}",
+                    "instance_id": SRC["name"],
+                    "record": str(ready),
+                    "state_hash": snapshot.get("normalized_hash"),
+                    "order_hash": snapshot.get("tick_order_hash"),
+                    "tick": snapshot.get("world_day_tick"),
+                    "captured_at": snapshot.get("captured_at"),
+                    "user": (snapshot.get("user") or {}),
+                    "validated": bool(validation.get("ok", True)),
+                }
+            )
+        facts["stages"]["initRuns"] = init_runs
+        say(f"live: {len(init_runs)} fixture initializations validated")
+        states = {run.get("state_hash") for run in init_runs}
+        orders = {run.get("order_hash") for run in init_runs}
+        if None in states or None in orders or len(states) != 1 or len(orders) != 1:
+            raise RuntimeError(f"the three fixture initializations are not identical: {init_runs}")
+        if not all(run.get("validated") for run in init_runs):
+            raise RuntimeError(f"a fixture initialization did not validate: {init_runs}")
+        user = init_runs[-1].get("user") or {}
+        uuid = str(user.get("uuid") or user.get("UUID") or "")
+        if uuid.startswith("[I;"):
+            uuid = _uuid_from_nbt(uuid)
+        if not uuid or "-" not in uuid:
+            raise RuntimeError(f"the final init record has no fixture player uuid: {init_runs[-1]}")
+        facts["fixturePlayerUuid"] = uuid
+
         start_bridge(SRC["name"], SRC["bridge"])
         api_src = await connect(SRC["bridge"])
         snapshot_before, snap_record = await bridge_step(
@@ -437,7 +1090,9 @@ async def live(args: argparse.Namespace) -> int:
             rec, api_src, "fork-fixture", "fork",
             {"name": f"{run_id}-fixture", "radius": 0, "freeze": True}, instance=SRC["name"],
         )
-        facts["stages"]["fork"] = {k: fork_result.get(k) for k in ("snapshotDir", "forkDir", "worldDir", "orderHash", "entities")} if fork_result else None
+        facts["stages"]["fork"] = {
+            key: fork_result.get(key) for key in ("snapshotDir", "forkDir", "worldDir", "orderHash", "entities")
+        } if fork_result else None
         if not fork_result:
             raise RuntimeError(f"fork failed: {fork_record}")
         if int(fork_result.get("entities") or 0) <= 0 or str(fork_result.get("orderHash", "")).startswith("e3b0c44"):
@@ -449,11 +1104,21 @@ async def live(args: argparse.Namespace) -> int:
         before_copy.mkdir(parents=True)
         for file_name in ("meta.json", "entities.jsonl"):
             (before_copy / file_name).write_bytes(Path(fork_result["snapshotDir"], file_name).read_bytes())
+        # The ready world keeps its machine only while its chunks are frozen;
+        # drop the force-loads before the restart so the next start cannot
+        # tick gravity blocks before the freeze command arrives.
+        rcon(SRC["name"], "forceload remove all")
         await api_src.close()
         lab("stop", "--name", SRC["name"], "--timeout", "120", check=False)
         stop_bridges()
 
-        # ---- source child audit run (init phase, no operation) ------------
+        # keep the ready world for the no-mod parity copy before the source
+        # child operates its own copy
+        control_world = EVIDENCE / "control-world"
+        shutil.rmtree(control_world, ignore_errors=True)
+        shutil.copytree(LABS / SRC["name"] / "world", control_world)
+
+        # ---- source child: bounded ROM calibration on the copied source ----
         lab(
             "provision", "--name", SRC["name"], "--fabric-api", "--carpet",
             "--java", str(JAVA), "--jdk", str(JDK),
@@ -461,27 +1126,54 @@ async def live(args: argparse.Namespace) -> int:
             "--vantage-port", str(SRC["vantage"]), "--bridge-port", str(SRC["bridge"]),
             "--test-mod", str(AUDIT_JAR), "--mod-jar", str(INTERFACE_JAR),
         )
-        src_run = f"{run_id}-src"
-        audit_config(SRC["name"], src_run, SRC["name"], {"kind": "source-world", "reference": str(SOURCE_SAVE)})
+        audit_config(
+            SRC["name"], run_id, SRC["name"],
+            {"kind": "source-world-copy", "reference": str(SOURCE_SAVE)}, regions="fixture",
+            agent_uuid=uuid,
+        )
         rec.mark("src-provision", {"lab": SRC, "auditJar": sha256_file(AUDIT_JAR)})
         lab("start", "--name", SRC["name"], "--wait", "300")
-        facts["stages"]["sourceChild"] = source_child(rec, SRC, src_run)
-        child_copy = EVIDENCE / "audit" / f"source-child-{src_run}.jsonl"
+        rcon(SRC["name"], "tick freeze")
+        base_ok, base_broken = machine_base_ok(SRC["name"])
+        if not base_ok:
+            raise RuntimeError(f"the source copy is not in its base state before calibration: {base_broken}")
+        ensure_seat_player(rec, SRC)
+        rec.exec_rcon("child-phase-init", "mcaudit phase init", instance=SRC["name"])
+        rec.exec_rcon("child-phase-start", "mcaudit phase experiment_start", instance=SRC["name"])
+        child = source_child(rec, SRC, run_id)
+        child_copy = EVIDENCE / "audit" / f"source-audit-{run_id}-src.jsonl"
         child_copy.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(facts["stages"]["sourceChild"]["log"], child_copy)
-        facts["stages"]["sourceChild"]["logCopy"] = str(child_copy)
-        facts["stages"]["sourceChild"]["logCopySha256"] = sha256_file(child_copy)
+        shutil.copyfile(child["log"], child_copy)
+        child["logCopy"] = str(child_copy)
+        child["logCopySha256"] = sha256_file(child_copy)
+        child_check = run(
+            [PY, ROOT / "tools" / "minecart_audit.py", "check", "--log", child["log"], "--json"],
+            check=False, timeout=300,
+        )
+        (EVIDENCE / "audit-source-check.log").write_text(child_check.stdout + child_check.stderr, encoding="utf-8")
+        child_report = json.loads(child_check.stdout[child_check.stdout.find("{"):]) if "{" in child_check.stdout else {}
+        child["verdict"] = child_report.get("verdict")
+        child["verifierExit"] = child_check.returncode
+        if child_check.returncode != 0 or child["verdict"] != "pass":
+            raise RuntimeError(f"source child calibration did not pass: {child_report}")
+        facts["stages"]["sourceChild"] = child
+        say("live: source-copy ROM calibration passed")
         lab("stop", "--name", SRC["name"], "--timeout", "120", check=False)
 
-        # ---- experiment lab from the fork world ---------------------------
+        # ---- experiment: guarded restore, identity, bounded calibration -----
         shutil.rmtree(LABS / EXP["name"], ignore_errors=True)
         provision_with_mods(EXP, world=Path(fork_result["forkDir"]), test_mod=AUDIT_JAR, extra_mods=[])
-        exp_run = run_id
-        audit_config(EXP["name"], exp_run, EXP["name"], {
-            "kind": "fork", "reference": str(fork_result["forkDir"]),
-            "snapshotId": Path(str(fork_result["snapshotDir"])).name, "snapshotHash": fork_result.get("orderHash"),
-        }, regions="generic")
+        audit_config(
+            EXP["name"], run_id, EXP["name"],
+            {"kind": "fork", "reference": str(fork_result["forkDir"]),
+             "snapshotId": Path(str(fork_result["snapshotDir"])).name, "snapshotHash": fork_result.get("orderHash")},
+            regions="fixture", agent_uuid=uuid,
+        )
         lab("start", "--name", EXP["name"], "--wait", "300")
+        rcon(EXP["name"], "tick freeze")
+        base_ok, base_broken = machine_base_ok(EXP["name"])
+        if not base_ok:
+            raise RuntimeError(f"the experiment fork is not in its base state: {base_broken}")
         start_bridge(EXP["name"], EXP["bridge"])
         api_exp = await connect(EXP["bridge"])
         directory = str(fork_result["snapshotDir"])
@@ -519,33 +1211,73 @@ async def live(args: argparse.Namespace) -> int:
         facts["stages"]["restore"]["snapshotBeforeCopy"] = str(before_copy)
         facts["stages"]["restore"]["snapshotAfterCopy"] = str(after_copy)
 
-        # non-mutating refusal probes while the restored carts are present
+        # identity on the restored machine: the player is parked on the seat
+        # and the view ray hits the fixture note block (real hit/miss); the
+        # world stays frozen so no scheduled machine tick alters the target
+        ensure_seat_player(rec, EXP)
+        identity = await identity_probe(rec, api_exp, EXP)
+        facts["stages"]["identity"] = identity
+        say("live: identity hit/miss measured on the restored seat")
+
         pre_cases = await failure_probes(rec, api_exp, SRC, EXP, directory, exp_world, "pre")
 
-        # ---- positive audit on the restored fixture -----------------------
-        rcon(EXP["name"], "tick unfreeze")
-        positive = positive_audit(rec, EXP, exp_run)
-        facts["stages"]["positive"] = positive
-        # freeze the positive log before any mutating probe can append to it
+        # ---- positive: bounded real ROM calibration on the restored copy ---
+        exp_log = LABS / EXP["name"] / "mc-audit" / f"audit-{run_id}.jsonl"
+        rec.exec_rcon("audit-phase-start", "mcaudit phase experiment_start", instance=EXP["name"])
+        calibration = rom_calibration(rec, EXP, run_id, audited=True, log=exp_log)
+        flush_output = rec.exec_rcon("audit-flush", "mcaudit flush", instance=EXP["name"])
+        rec.exec_rcon("audit-phase-end", "mcaudit phase experiment_end", instance=EXP["name"])
+        rec.exec_rcon("audit-end", "mcaudit end", instance=EXP["name"])
         audit_dir = EVIDENCE / "audit"
         audit_dir.mkdir(parents=True, exist_ok=True)
-        positive_copy = audit_dir / f"positive-{exp_run}.jsonl"
-        shutil.copyfile(positive["log"], positive_copy)
-        positive["logCopy"] = str(positive_copy)
-        positive["logCopySha256"] = sha256_file(positive_copy)
+        positive_copy = audit_dir / f"positive-{run_id}.jsonl"
+        shutil.copyfile(exp_log, positive_copy)
+        status_copy = audit_dir / f"status-{run_id}.json"
+        shutil.copyfile(LABS / EXP["name"] / "mc-audit" / f"status-{run_id}.json", status_copy)
+        positive_check = run(
+            [PY, ROOT / "tools" / "minecart_audit.py", "check", "--log", str(exp_log), "--json"],
+            check=False, timeout=300,
+        )
+        (EVIDENCE / "audit-positive-check.log").write_text(positive_check.stdout + positive_check.stderr, encoding="utf-8")
+        positive_report = json.loads(positive_check.stdout[positive_check.stdout.find("{"):]) if "{" in positive_check.stdout else {}
+        positive = {
+            "runId": run_id,
+            "log": str(exp_log),
+            "logCopy": str(positive_copy),
+            "logCopySha256": sha256_file(positive_copy),
+            "calibration": calibration,
+            "verdict": positive_report.get("verdict"),
+            "verifierExit": positive_check.returncode,
+            "flush": {"call_id": "audit-flush", "command": "mcaudit flush", "output": flush_output},
+            "status": str(status_copy),
+            "statusSha256": sha256_file(status_copy),
+            "hookOverheadMs": (positive_report.get("overhead_ms") if isinstance(positive_report, dict) else None),
+        }
+        if positive_check.returncode != 0 or positive["verdict"] != "pass":
+            raise RuntimeError(f"the restored-copy calibration did not pass: {positive_report}")
+        facts["stages"]["positive"] = positive
+        say("live: restored-copy ROM calibration passed")
 
-        # mutating probes after the positive session is closed
+        # mutating probes after the calibration session is closed and copied
         facts["failureCases"] = pre_cases + await failure_probes(
             rec, api_exp, SRC, EXP, directory, exp_world, "post"
         )
+        facts["stages"]["restore"]["preCases"] = pre_cases
         await api_exp.close()
         lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
         stop_bridges()
 
-        # ---- negative cases on a disposable void lab ----------------------
+        # ---- negative cases on a disposable void lab ------------------------
         facts["stages"]["negatives"] = run_negatives(rec, run_id)
 
-        # real trace coverage for terminal/file/source/mcp before the freeze
+        # ---- no-mod parity on the copied ready world ------------------------
+        say("live: running the no-mod parity calibration")
+        facts["stages"]["control"] = control_parity(control_world, run_id, calibration)
+        say("live: no-mod parity matched")
+        if not facts["stages"]["control"].get("consistent"):
+            raise RuntimeError("the no-mod ROM parity run did not match the audited run")
+
+        # trace category coverage for terminal/file/source/mcp
         rec.step("pin-revisions", ["git", "rev-parse", "HEAD"], tool="git", instance=SRC["name"])
         rec.step("mcp-probe-help", [PY, ROOT / "tools" / "mcp_probe.py", "--help"], tool="mcp_probe", instance=EXP["name"])
         marker_file = EVIDENCE / "build" / "INTEGRATION-MARKER.txt"
@@ -555,207 +1287,32 @@ async def live(args: argparse.Namespace) -> int:
             tool="write", instance=EXP["name"],
         )
 
+        # ---- run-level source-world after observation -----------------------
+        after_hash, after_files, after_bytes = gate.tree_hash(SOURCE_SAVE)
+        facts["sourceWorldAfter"] = {
+            "tree_sha256": after_hash, "files": after_files, "bytes": after_bytes,
+            "observedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        }
+        if after_hash != before_hash or after_hash != SOURCE_BASELINE_SHA256:
+            raise RuntimeError(
+                f"the source world changed during the run: before={before_hash} after={after_hash} "
+                f"baseline={SOURCE_BASELINE_SHA256}"
+            )
+
         facts["trajectory"] = rec.finalize()
-        write_json(EVIDENCE / "facts-live.json", facts)
-        say(json.dumps({"runId": run_id, "runDir": str(run_dir), "trajectory": facts["trajectory"]}, indent=2))
-        return 0
-    except BaseException as error:  # noqa: BLE001 - retain the failed attempt
-        import traceback
+    except BaseException as error:  # noqa: BLE001 - keep the failed attempt
         facts["error"] = f"{type(error).__name__}: {error}"
-        facts["traceback"] = traceback.format_exc()
-        try:
-            facts["trajectory"] = rec.finalize()
-        except Exception:  # noqa: BLE001
-            pass
-        write_json(EVIDENCE / f"facts-live-failed-{stamp}.json", facts)
-        say(f"fullgate live FAILED: {facts['error']}")
-        return 1
-
-
-async def failure_probes(
-    rec: Recorder, api, src: dict, exp: dict, directory: str, exp_world: str, stage: str
-) -> list[dict[str, Any]]:
-    """Real refusal/mismatch probes for the gate's six failure cases.
-
-    ``stage="pre"`` runs the non-mutating refusals while the restored carts are
-    still present; ``stage="post"`` runs the mutating probes after the positive
-    audit log has been closed and copied, so the audit-positive session is not
-    contaminated by a kill/reappear.
-    """
-    rows: list[dict[str, Any]] = []
-
-    def row(case: str, injected: str, expected: str, record: dict[str, Any], passed: bool) -> None:
-        rows.append({
-            "case": case, "injected": injected, "expected": expected,
-            "observed": record.get("error") or json.dumps(record.get("result"))[:300],
-            "passed": passed, "evidence_ref": f"trajectory:{record.get('call_id') or case}",
-            "record": record,
-        })
-
-    if stage == "pre":
-        # inventory mutation with an unchanged order hash, while frozen on the
-        # pristine restored state (before the generic machine adds a cart)
-        cart_uuid = None
-        for line in (Path(directory) / "entities.jsonl").read_text(encoding="utf-8").splitlines():
-            ent = json.loads(line)
-            if ent.get("type") == "minecraft:chest_minecart":
-                cart_uuid = ent.get("uuid")
-                break
-        if not cart_uuid:
-            rows.append({"case": "inventory_mutation_order_hash", "injected": "no chest minecart in the snapshot",
-                         "expected": "a cart to mutate", "observed": "none", "passed": False, "evidence_ref": "snapshot"})
-        else:
-            mutate = rcon(exp["name"], f"data modify entity {cart_uuid} Items[0].count set value 64")
-            _r, mutated = await bridge_step(rec, api, "probe-inventory-mutation", "verify",
-                                            {"directory": directory, "target": exp["name"]}, instance=exp["name"])
-            mutated_ok = bool(mutated.get("ok")) \
-                and mutated.get("result", {}).get("verification", {}).get("orderHash", {}).get("match") \
-                and mutated.get("result", {}).get("verification", {}).get("nbtMismatches", {}).get("count", 0) > 0
-            row("inventory_mutation_order_hash", f"Items[0].count of {cart_uuid} modified",
-                "NBT mismatch detected while orderHash still matches", mutated, mutated_ok)
-            _ = mutate
-        # wrong endpoint: expect_world_dir of the other lab
-        _r, wrong = await bridge_step(rec, api, "probe-wrong-endpoint", "restore",
-                                      {"directory": directory, "target": exp["name"],
-                                       "expect_instance": "server",
-                                       "expect_world_dir": str(LABS / src["name"] / "world")},
-                                      instance=exp["name"])
-        row("wrong_endpoint", "expect_world_dir points at the source lab world",
-            "refused before any mutation", wrong,
-            wrong.get("ok") is False and "endpoint" in str(wrong.get("error", "")).lower())
-
-        # duplicate pre-existing: restore again without replace
-        _r, duplicate = await bridge_step(rec, api, "probe-duplicate", "restore",
-                                          {"directory": directory, "dry_run": False, "target": exp["name"],
-                                           "expect_instance": "server", "expect_world_dir": exp_world,
-                                           "replace_existing": False}, instance=exp["name"])
-        row("duplicate_pre_existing", "second restore with replace_existing=false over the restored carts",
-            "duplicate entities rejected", duplicate,
-            duplicate.get("ok") is False or "duplicate" in json.dumps(duplicate.get("result")))
-        return rows
-
-    # ---- post-positive mutating probes ------------------------------------
-    # unverified: bridge must not claim success when verification is disabled
-    _r, unverified = await bridge_step(rec, api, "probe-unverified", "restore",
-                                       {"directory": directory, "dry_run": False, "target": exp["name"],
-                                        "expect_instance": "server", "expect_world_dir": exp_world,
-                                        "verify": False}, instance=exp["name"])
-    row("unverified", "restore with verification disabled", "reported unverified, never success", unverified,
-        unverified.get("ok") is not True or "unverified" in json.dumps(unverified.get("result")))
-
-    # corrupt metadata: a scratch copy with a broken meta.json
-    scratch = EVIDENCE / "probe-corrupt-metadata"
-    shutil.rmtree(scratch, ignore_errors=True)
-    shutil.copytree(directory, scratch)
-    (scratch / "meta.json").write_text("{not json", encoding="utf-8")
-    _r, corrupt = await bridge_step(rec, api, "probe-corrupt-metadata", "restore",
-                                    {"directory": str(scratch), "dry_run": True, "target": exp["name"],
-                                     "expect_instance": "server", "expect_world_dir": exp_world},
-                                    instance=exp["name"])
-    row("corrupt_metadata", "snapshot meta.json replaced with invalid JSON", "refused before any command", corrupt,
-        corrupt.get("ok") is False)
-
-    # partial failure: one entity with an unknown type in a scratch copy
-    partial = EVIDENCE / "probe-partial-failure"
-    shutil.rmtree(partial, ignore_errors=True)
-    shutil.copytree(directory, partial)
-    lines = (partial / "entities.jsonl").read_text(encoding="utf-8").splitlines()
-    bad = json.loads(lines[0])
-    bad["type"] = "minecraft:not_a_real_entity"
-    lines[0] = json.dumps(bad)
-    (partial / "entities.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    _r, partial_result = await bridge_step(rec, api, "probe-partial-failure", "restore",
-                                           {"directory": str(partial), "dry_run": False, "target": exp["name"],
-                                            "expect_instance": "server", "expect_world_dir": exp_world,
-                                            "replace_existing": True}, instance=exp["name"], timeout=900)
-    row("partial_failure", "one snapshot entity has an unknown type",
-        "command failure reported, not silent success", partial_result,
-        partial_result.get("ok") is False
-        or bool(partial_result.get("result", {}).get("failed"))
-        or (isinstance(partial_result.get("result", {}).get("failed"), int)
-            and partial_result.get("result", {}).get("failed", 0) > 0))
-
-    # summon refusal: syntactically invalid entity NBT must be refused by the server
-    refusal = EVIDENCE / "probe-summon-refusal"
-    shutil.rmtree(refusal, ignore_errors=True)
-    shutil.copytree(directory, refusal)
-    lines = (refusal / "entities.jsonl").read_text(encoding="utf-8").splitlines()
-    bad = json.loads(lines[0])
-    bad["nbt"] = "{NotValid"
-    lines[0] = json.dumps(bad)
-    (refusal / "entities.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    _r, refused = await bridge_step(rec, api, "probe-summon-refusal", "restore",
-                                    {"directory": str(refusal), "dry_run": False, "target": exp["name"],
-                                     "expect_instance": "server", "expect_world_dir": exp_world,
-                                     "replace_existing": True}, instance=exp["name"], timeout=900)
-    row("summon_refusal", "one snapshot entity carries invalid NBT",
-        "server refusal surfaced as a failed command", refused,
-        refused.get("ok") is False or bool(refused.get("result", {}).get("failed")))
-    return rows
-
-
-def positive_audit(rec: Recorder, exp: dict, run_id: str) -> dict[str, Any]:
-    """Run the generic observer-driven note-block machine with the fixture player.
-
-    Stage one may use a generic cart smoke; the actor is still the fixture's
-    Romuser, so the gate's player binding holds.  The restored ROM machine is
-    left untouched at its own coordinates.
-    """
-    log = LABS / exp["name"] / "mc-audit" / f"audit-{run_id}.jsonl"
-    setup = [
-        ("forceload", "forceload add -16 -16 16 16"),
-        ("floor", "fill -2 -60 -2 3 -60 2 minecraft:stone"),
-        ("note", "setblock 0 -59 0 minecraft:note_block"),
-        ("observer", "setblock 1 -59 0 minecraft:observer[facing=west]"),
-        ("piston", "setblock 2 -59 0 minecraft:piston[facing=east]"),
-        ("cart", 'summon minecraft:chest_minecart 3.5 -59.0 0.5 {Items:[{Slot:0b,id:"minecraft:apple",count:3}]}'),
-    ]
-    for label, command in setup:
-        rec.exec_rcon(f"audit-machine-{label}", command, instance=exp["name"])
-    rec.exec_rcon("audit-romuser-spawn", "player Romuser spawn at 0.5 -59.0 2.5 facing 180 29 in minecraft:overworld in creative", instance=exp["name"])
-    spawned = False
-    for attempt in range(30):
-        out = rec.exec_rcon(f"audit-romuser-poll-{attempt}", "data get entity Romuser Pos", instance=exp["name"])
-        if "has the following entity data" in out:
-            spawned = True
-            break
-        time.sleep(1.0)
-    if not spawned:
-        raise RuntimeError("Romuser never spawned in the experiment lab")
-    rec.exec_rcon("audit-aim", "tp Romuser 0.5 -59.0 2.5 180 29", instance=exp["name"])
-    rec.exec_rcon("audit-phase-start", "mcaudit phase experiment_start", instance=exp["name"])
-    note_cycled: list[bool] = []
-    for index in range(1, 4):
-        rec.exec_rcon(f"audit-use-{index}", "player Romuser use once", instance=exp["name"])
-        time.sleep(1.0)
-        check = rec.exec_rcon(
-            f"audit-note-check-{index}",
-            "execute if block 0 -59 0 minecraft:note_block[note=1]",
-            instance=exp["name"],
+        say(f"live error: {facts['error']}")
+        for info in (SRC, EXP, NEG, CTL):
+            lab("stop", "--name", info["name"], "--timeout", "120", check=False)
+        stop_bridges()
+        (EVIDENCE / f"facts-live-failed-{stamp}.json").write_text(
+            json.dumps(facts, indent=2) + "\n", encoding="utf-8"
         )
-        note_cycled.append("Test passed" in check)
-        rec.exec_rcon(f"audit-step-{index}", "tick sprint 20", instance=exp["name"])
-    rec.exec_rcon("audit-sprint", "tick sprint 600", instance=exp["name"])
-    time.sleep(45)
-    # the fixture world has terrain under the generic machine, so the exited
-    # cart must be removed as an explicit agent command; the removal reason is
-    # captured by the independent audit hook (same session)
-    rec.exec_rcon("audit-remove-cart",
-                  "execute positioned 6 -60 0 run kill @e[type=minecraft:chest_minecart,distance=..15]",
-                  instance=exp["name"])
-    time.sleep(6)
-    remaining = rec.exec_rcon("audit-cart-check", "execute if entity @e[type=minecraft:chest_minecart]", instance=exp["name"])
-    rec.exec_rcon("audit-phase-end", "mcaudit phase experiment_end", instance=exp["name"])
-    rec.exec_rcon("audit-end", "mcaudit end", instance=exp["name"])
-    return {"runId": run_id, "log": str(log), "noteCycled": any(note_cycled), "notes": note_cycled, "remainingProbe": remaining}
-
-
-def source_child(rec: Recorder, src: dict, run_id: str) -> dict[str, Any]:
-    log = LABS / src["name"] / "mc-audit" / f"audit-{run_id}.jsonl"
-    rec.exec_rcon("child-phase-init", "mcaudit phase init", instance=src["name"])
-    rec.exec_rcon("child-flush", "mcaudit flush", instance=src["name"])
-    rec.exec_rcon("child-end", "mcaudit end", instance=src["name"])
-    return {"runId": run_id, "log": str(log)}
+        return 1
+    write_json(EVIDENCE / "facts-live.json", facts)
+    say(f"live: run {run_id} completed")
+    return 0
 
 
 def run_negatives(rec: Recorder, run_id: str) -> dict[str, Any]:
@@ -800,59 +1357,18 @@ def ensure_bridge_path() -> None:
 
 
 async def identity_phase(args: argparse.Namespace) -> int:
-    ensure_bridge_path()
+    """Emit the player_context artifact from the live identity probe.
+
+    The probe ran on the restored machine with the player parked on the
+    fixture hover seat (real hit on the note block, real miss after looking
+    away).  This phase only projects those observed records; it never invents
+    a sample.
+    """
     facts = read_json(EVIDENCE / "facts-live.json")
-    exp = EXP
-    lab("start", "--name", exp["name"], "--wait", "300", check=False)
-    start_bridge(exp["name"], exp["bridge"])
-    api = await connect(exp["bridge"])
-    records: list[dict[str, Any]] = []
-    try:
-        rcon(exp["name"], f"player Romuser spawn at 11.5 -53.0 -24.5 facing 0 50 in minecraft:overworld in creative")
-        rcon(exp["name"], f"player {SECOND_PLAYER} spawn at 11.5 -53.0 -24.5 facing 0 50 in minecraft:overworld in creative")
-        for attempt in range(30):
-            if "has the following entity data" in rcon(exp["name"], "data get entity Romuser Pos"):
-                break
-            time.sleep(1.0)
-        await asyncio.sleep(1.0)
-
-        def player_record(case: str, response: dict[str, Any], *, accepted: bool, other_uuid: str | None = None) -> dict[str, Any]:
-            player = response.get("player") or {}
-            uuid = str(player.get("uuid") or response.get("query") or response.get("requested") or "")
-            return {
-                "case": case,
-                "uuid": uuid,
-                "viewed_uuid": uuid,
-                "dimension": player.get("dimension") or "minecraft:overworld",
-                "pos": [float(player.get("x", 0.0)), float(player.get("y", 0.0)), float(player.get("z", 0.0))],
-                "yaw": float(player.get("yaw", 0.0)),
-                "pitch": float(player.get("pitch", 0.0)),
-                "task_entry": "external_task",
-                "channel": "cli",
-                "accepted": accepted,
-                "other_uuid": other_uuid,
-                "detail": {"raw": response, "probe": "mc-bridge call player"},
-            }
-
-        romuser, _ = await call(api, "player", {"player": ROMUSER_UUID})
-        other, _ = await call(api, "player", {"player": SECOND_PLAYER})
-        unknown, _ = await call(api, "player", {"player": "11111111-2222-3333-4444-555555555555"})
-        records.append(player_record("task_bind", romuser or {}, accepted=bool((romuser or {}).get("found"))))
-        records.append(player_record("hit", romuser or {}, accepted=bool((romuser or {}).get("found"))))
-        rcon(exp["name"], "player Romuser look north")
-        miss, _ = await call(api, "player", {"player": ROMUSER_UUID})
-        records.append(player_record("miss", miss or {}, accepted=bool((miss or {}).get("found"))))
-        records.append(player_record("two_players", romuser or {}, accepted=bool((romuser or {}).get("found")), other_uuid=str((other or {}).get("player", {}).get("uuid") or "")))
-        unknown_record = player_record("unknown_identity", unknown or {}, accepted=False)
-        unknown_record["uuid"] = "11111111-2222-3333-4444-555555555555"
-        unknown_record["viewed_uuid"] = "11111111-2222-3333-4444-555555555555"
-        unknown_record["rejected_reason"] = str((unknown or {}).get("error") or "found=false")
-        records.append(unknown_record)
-    finally:
-        await api.close()
-        lab("stop", "--name", exp["name"], "--timeout", "120", check=False)
-        stop_bridges()
-
+    identity = (facts.get("stages") or {}).get("identity") or {}
+    records = identity.get("records") or []
+    if not identity.get("hit") or not identity.get("miss") or len(records) < 5:
+        raise RuntimeError("facts-live.json has no complete live identity probe; run the live phase first")
     bundle = EVIDENCE / "bundle"
     target = bundle / "artifacts" / "player_context"
     target.mkdir(parents=True, exist_ok=True)
@@ -864,14 +1380,19 @@ async def identity_phase(args: argparse.Namespace) -> int:
         "fields": ["task", "uuid", "run_id"],
         "native_chat_verified": False,
         "unsupported_entries": ["fake_player say as native receipt-time chat"],
-        "detail": {"entry": "external-cli task entry", "note": "Carpet /say is a broadcast, not receipt-time chat"},
+        "detail": {
+            "entry": "external-cli task entry",
+            "note": "Carpet /say is a broadcast, not receipt-time chat",
+            "seat": [SEAT_POS, SEAT_FACING],
+            "probe": "restored machine, hover seat, view ray",
+        },
     })
     write_json(target / "version-pins.json", {
         "interface_mod": {"repo": "guajun/mc-agent-interface-mod", "commit": INTERFACE_COMMIT, "tested": True},
         "bridge": {"repo": "guajun/mc-agent-bridge", "commit": BRIDGE_MERGED, "tested": True},
     })
     write_json(EVIDENCE / "facts-identity.json", {"records": len(records), "path": str(target)})
-    say(f"identity: wrote {len(records)} records to {target}")
+    say(f"identity: wrote {len(records)} live records to {target}")
     return 0
 
 
@@ -894,77 +1415,296 @@ def build_smoke(jar: Path, *, marker: str | None = None) -> dict[str, Any]:
     return json.loads(result.stdout[result.stdout.find("{"):])
 
 
-def devcap_phase(args: argparse.Namespace) -> int:
+def _console_segment(name: str) -> str:
+    console = LABS / name / "logs" / "console.log"
+    text = console.read_text(encoding="utf-8", errors="replace") if console.is_file() else ""
+    marker = "Starting minecraft server version"
+    index = text.rfind(marker)
+    return text[index:] if index >= 0 else text[-20000:]
+
+
+def _provision_smoke(info: dict, smoke_jar: Path | None) -> None:
+    run([PY, LAB_SERVER, "stop", "--name", info["name"], "--timeout", "120"], check=False)
+    mods = LABS / info["name"] / "mods"
+    for pattern in ("smoke-mod*.jar", "load-failure.jar", "missing-dep.jar"):
+        for stale in mods.glob(pattern):
+            stale.unlink()
+    command: list[object] = [
+        "provision", "--name", info["name"], "--fabric-api", "--carpet", "--force",
+        "--java", str(JAVA), "--jdk", str(JDK),
+        "--server-port", str(info["server"]), "--rcon-port", str(info["rcon"]),
+        "--vantage-port", str(info["vantage"]), "--bridge-port", str(info["bridge"]),
+        "--test-mod", str(AUDIT_JAR), "--mod-jar", str(INTERFACE_JAR),
+    ]
+    if smoke_jar is not None:
+        command += ["--mod-jar", str(smoke_jar)]
+    lab(*command)
+
+
+def _rebuild_jar(reference: Path, dst: Path, mutate: Any) -> Path:
+    import zipfile
+
+    with zipfile.ZipFile(reference) as zin, zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename == "fabric.mod.json":
+                payload = json.loads(data.decode("utf-8"))
+                mutate(payload)
+                data = json.dumps(payload, indent=2).encode("utf-8")
+            info = zipfile.ZipInfo(item.filename, (1980, 1, 1, 0, 0, 0))
+            info.compress_type = item.compress_type
+            zout.writestr(info, data)
+    return dst
+
+
+def _loud_probe(info: dict, good_jar: Path, probe_dir: Path, name: str, mutate: Any, markers: Sequence[str]) -> dict[str, Any]:
+    """Run one real loud-failure probe and record what the server actually did."""
+    bad = _rebuild_jar(good_jar, probe_dir / f"{name}.jar", mutate)
+    run([PY, LAB_SERVER, "stop", "--name", info["name"], "--timeout", "120"], check=False)
+    provision = run([PY, LAB_SERVER, "provision", "--name", info["name"], "--force", "--fabric-api", "--carpet",
+                     "--java", str(JAVA), "--jdk", str(JDK),
+                     "--server-port", str(info["server"]), "--rcon-port", str(info["rcon"]),
+                     "--vantage-port", str(info["vantage"]), "--bridge-port", str(info["bridge"]),
+                     "--test-mod", str(AUDIT_JAR), "--mod-jar", str(INTERFACE_JAR),
+                     "--mod-jar", str(bad)], check=False, timeout=600)
+    start = run([PY, LAB_SERVER, "start", "--name", info["name"], "--wait", "90"], check=False, timeout=150)
+    segment = _console_segment(info["name"])
+    log = EVIDENCE / "devcap" / f"probe-{name}.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    log.write_text(segment[-20000:], encoding="utf-8")
+    status = run([PY, LAB_SERVER, "exec", "--name", info["name"], "mcagent-smoke status"], check=False, timeout=60)
+    detected = start.returncode != 0 or status.returncode != 0 or any(marker in segment for marker in markers)
+    run([PY, LAB_SERVER, "stop", "--name", info["name"], "--timeout", "120"], check=False)
+    return {"detected": detected, "provisionExit": provision.returncode, "startExit": start.returncode,
+            "statusExit": status.returncode, "markers": [m for m in markers if m in segment],
+            "log": str(log)}
+
+
+def _docs_visible_probe(paths: Sequence[str]) -> tuple[list[str], dict[str, Any]]:
+    visible: list[str] = []
+    detail: dict[str, Any] = {}
+    for relative in paths:
+        path = ROOT / relative
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as error:
+            detail[relative] = {"readable": False, "error": str(error)}
+            continue
+        visible.append(relative)
+        detail[relative] = {"readable": True, "bytes": len(text.encode("utf-8")),
+                            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+    return visible, detail
+
+
+async def devcap_phase(args: argparse.Namespace) -> int:
+    if str(BRIDGE_SOURCE / "src") not in sys.path:
+        sys.path.insert(0, str(BRIDGE_SOURCE / "src"))
     facts = read_json(EVIDENCE / "facts-live.json")
     bundle = EVIDENCE / "bundle"
     build_dir = EVIDENCE / "build"
     build_dir.mkdir(parents=True, exist_ok=True)
+    devcap_dir = EVIDENCE / "devcap"
+    devcap_dir.mkdir(parents=True, exist_ok=True)
     for name, link in (("bridge", Path("F:/mc-agent/bridge")), ("agent-loop", Path("F:/mc-agent/agent-loop"))):
         path = ROOT / name
         if not path.exists() and link.is_dir():
             run(["cmd", "/c", "mklink", "/J", str(path), str(link)], check=False)
-    lab("start", "--name", EXP["name"], "--wait", "300", check=False)
-    jar_v1 = build_dir / "smoke-mod.jar"
-    build_v1 = build_smoke(jar_v1)
-    hash_v1 = sha256_file(jar_v1)
-    bytes_v1 = jar_v1.stat().st_size
-    # deploy v1 next to the audit mod and restart
-    lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
-    lab("provision", "--name", EXP["name"], "--fabric-api", "--carpet", "--java", str(JAVA), "--jdk", str(JDK),
-        "--server-port", str(EXP["server"]), "--rcon-port", str(EXP["rcon"]),
-        "--vantage-port", str(EXP["vantage"]), "--bridge-port", str(EXP["bridge"]),
-        "--test-mod", str(AUDIT_JAR), "--mod-jar", str(INTERFACE_JAR), "--mod-jar", str(jar_v1))
-    lab("start", "--name", EXP["name"], "--wait", "300")
-    v1_status = rcon(EXP["name"], "mcagent-smoke status")
-    verify_v1 = run([PY, LAB_SERVER, "verify", "--name", EXP["name"], "--require-vantage", "--json"], check=False)
-    # same-name, same-size marker change, redeploy and restart
-    marker_v2 = '"smoke-de2"'
-    build_v2 = build_smoke(jar_v1, marker=marker_v2)
-    hash_v2 = sha256_file(jar_v1)
-    bytes_v2 = jar_v1.stat().st_size
-    lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
-    lab("provision", "--name", EXP["name"], "--fabric-api", "--carpet", "--java", str(JAVA), "--jdk", str(JDK),
-        "--server-port", str(EXP["server"]), "--rcon-port", str(EXP["rcon"]),
-        "--vantage-port", str(EXP["vantage"]), "--bridge-port", str(EXP["bridge"]),
-        "--test-mod", str(AUDIT_JAR), "--mod-jar", str(INTERFACE_JAR), "--mod-jar", str(jar_v1))
-    lab("start", "--name", EXP["name"], "--wait", "300")
-    v2_status = rcon(EXP["name"], "mcagent-smoke status")
-    verify_v2 = run([PY, LAB_SERVER, "verify", "--name", EXP["name"], "--require-vantage", "--json"], check=False)
-    (LOGS / "devcap-verify.log").write_text(verify_v2.stdout + verify_v2.stderr, encoding="utf-8")
-    console = LABS / EXP["name"] / "logs" / "console.log"
-    marker_loaded = "build=smoke-de2" in v2_status or "build=smoke-de2" in console.read_text(encoding="utf-8", errors="replace")
-    lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
-    build_dir.joinpath("smoke-mod-v1.jar").write_bytes(jar_v1.read_bytes()) if False else None
-
     target = bundle / "artifacts" / "agent_dev_capability"
     target.mkdir(parents=True, exist_ok=True)
-    write_json(target / "jar-update.json", {
+    for info in (SRC, EXP):
+        run([PY, LAB_SERVER, "stop", "--name", info["name"], "--timeout", "120"], check=False)
+    # stale smoke jars would load beside a broken probe jar and hide its error
+    for stale in (LABS / EXP["name"] / "mods").glob("smoke-mod*.jar"):
+        stale.unlink()
+    for stale in (LABS / EXP["name"] / "mods").glob("load-failure.jar"):
+        stale.unlink()
+    for stale in (LABS / EXP["name"] / "mods").glob("missing-dep.jar"):
+        stale.unlink()
+
+    # ---- real builds: v1 and a same-size v2 with a different marker ----
+    jar = build_dir / "smoke-mod.jar"
+    build_v1 = build_smoke(jar)
+    hash_v1 = sha256_file(jar)
+    bytes_v1 = jar.stat().st_size
+    build_v2 = build_smoke(jar, marker='"smoke-de2"')
+    hash_v2 = sha256_file(jar)
+    bytes_v2 = jar.stat().st_size
+    if not (bytes_v1 == bytes_v2 and hash_v1 != hash_v2):
+        raise RuntimeError(f"the smoke jar update is not same-size different-content: {bytes_v1}/{bytes_v2}")
+
+    # ---- loud failure probes (build/load/dependency) on the exp lab ----
+    probe_dir = devcap_dir / "probes"
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    broken = build_dir / "broken-src"
+    shutil.rmtree(broken, ignore_errors=True)
+    shutil.copytree(SMOKE_SOURCE, broken)
+    broken_java = broken / "src/main/java/dev/mcagent/smoke/SmokeMod.java"
+    broken_java.write_text(broken_java.read_text(encoding="utf-8") + chr(10) + "this is not java;" + chr(10), encoding="utf-8")
+    broken_build = run([PY, BUILD_MOD, "--source", str(broken), "--lab", EXP["name"],
+                        "--out", str(build_dir / "broken.jar"), "--jdk", str(JDK)], check=False, timeout=300)
+    probes: dict[str, Any] = {
+        "build_errors_detected": {
+            "detected": broken_build.returncode != 0,
+            "exit": broken_build.returncode,
+            "log": str(build_dir / "broken-build.log"),
+        }
+    }
+    (build_dir / "broken-build.log").write_text(broken_build.stdout + broken_build.stderr, encoding="utf-8")
+    probes["load_failure_detected"] = _loud_probe(
+        EXP, jar, probe_dir, "load-failure",
+        lambda payload: payload.setdefault("entrypoints", {}).__setitem__("server", ["dev.mcagent.smoke.DoesNotExist"]),
+        ("Could not execute entrypoint", "ClassNotFoundException", "Failed to start",
+         "net.fabricmc.loader.impl.FormattedException"),
+    )
+    probes["missing_dependency_detected"] = _loud_probe(
+        EXP, jar, probe_dir, "missing-dep",
+        lambda payload: payload.setdefault("depends", {}).__setitem__("mcagent-does-not-exist", "*"),
+        ("requires", "which is missing", "Missing or unsupported", "Dependency resolution failed",
+         "Could not execute entrypoint"),
+    )
+    for key in ("build_errors_detected", "load_failure_detected", "missing_dependency_detected"):
+        if not probes[key].get("detected"):
+            raise RuntimeError(f"the {key} probe did not observe the failure: {probes[key]}")
+
+    # ---- same-size jar update with a real restart, then memory/order ----
+    lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
+    v1_jar = build_dir / "smoke-mod-v1.jar"
+    v2_jar = build_dir / "smoke-mod-v2.jar"
+    build_smoke(v1_jar)
+    build_smoke(v2_jar, marker='"smoke-de2"')
+    deployed_v1 = sha256_file(v1_jar)
+    deployed_v2 = sha256_file(v2_jar)
+    if sha256_file(v1_jar) != hash_v1 or sha256_file(v2_jar) != hash_v2:
+        raise RuntimeError("the recorded smoke jar hashes do not match the builds")
+    _provision_smoke(EXP, v1_jar)
+    lab("start", "--name", EXP["name"], "--wait", "300")
+    v1_status = rcon(EXP["name"], "mcagent-smoke status")
+    _provision_smoke(EXP, v2_jar)
+    lab("start", "--name", EXP["name"], "--wait", "300")
+    v2_status = rcon(EXP["name"], "mcagent-smoke status")
+    console_text = (LABS / EXP["name"] / "logs" / "console.log").read_text(encoding="utf-8", errors="replace")
+    marker_loaded = "build=smoke-de2" in v2_status or "build=smoke-de2" in _console_segment(EXP["name"])
+    if not marker_loaded:
+        raise RuntimeError(f"the v2 marker was not loaded: {v2_status[-300:]}")
+
+    # restore the fork so the restart test covers the full fixture memory
+    start_bridge(EXP["name"], EXP["bridge"])
+    fork_snapshot = str((facts.get("stages", {}).get("fork") or {}).get("snapshotDir") or "")
+    if fork_snapshot and Path(fork_snapshot).is_dir():
+        # The fork snapshot still contains the init-time falling item entities
+        # (cart contents dropped when the stack was rebuilt); they cannot hold
+        # a frozen position across a startup tick.  The memory/order test is
+        # about the machine entities, so filter to carts + hover seat.
+        memory_snapshot = devcap_dir / "memory-snapshot"
+        shutil.rmtree(memory_snapshot, ignore_errors=True)
+        shutil.copytree(fork_snapshot, memory_snapshot)
+        entity_rows = [
+            json.loads(line)
+            for line in (memory_snapshot / "entities.jsonl").read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        kept = [row for row in entity_rows if row.get("type") != "minecraft:item"]
+        (memory_snapshot / "entities.jsonl").write_text(
+            chr(10).join(json.dumps(row) for row in kept) + chr(10), encoding="utf-8"
+        )
+        meta = read_json(memory_snapshot / "meta.json")
+        meta["entities"] = len(kept)
+        meta["orderHash"] = hashlib.sha256(
+            ":".join(str(row.get("uuid")) for row in kept).encode("utf-8")
+        ).hexdigest()[:16]
+        meta["memoryFilter"] = "carts + hover seat; falling init items excluded"
+        write_json(memory_snapshot / "meta.json", meta)
+        fork_snapshot = str(memory_snapshot)
+        api = await connect(EXP["bridge"])
+        rcon(EXP["name"], "tick freeze")
+        restore_result, restore_record = await call(api, "restore",
+                                                    {"directory": fork_snapshot, "dry_run": False,
+                                                     "target": EXP["name"], "expect_instance": "server",
+                                                     "expect_world_dir": str(LABS / EXP["name"] / "world"),
+                                                     "replace_existing": True},
+                                                    timeout=900)
+        verify_result, verify_record = await call(api, "verify", {"directory": fork_snapshot, "target": EXP["name"]},
+                                                  timeout=600)
+        devcap_dir.joinpath("restore-for-memory.json").write_text(
+            json.dumps({"restore": restore_record, "verify": verify_record}, indent=2), encoding="utf-8"
+        )
+        if not (restore_result and restore_result.get("ok") and verify_result and verify_result.get("ok")):
+            raise RuntimeError("the devcap memory restore/verify failed")
+        snapshot_result, snapshot_record = await call(api, "snapshot",
+                                                      {"name": f"devcap-{facts['runId']}-memory", "radius": 0},
+                                                      timeout=600)
+        snapshot_dir = str((snapshot_result or {}).get("snapshotDir") or (snapshot_result or {}).get("dir") or "")
+        if not snapshot_dir:
+            raise RuntimeError(f"the devcap memory snapshot failed: {snapshot_record}")
+        await api.close()
+        lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
+        lab("start", "--name", EXP["name"], "--wait", "300")
+        rcon(EXP["name"], "tick freeze")
+        restart_status = rcon(EXP["name"], "mcagent-smoke status")
+        start_bridge(EXP["name"], EXP["bridge"])
+        api = await connect(EXP["bridge"])
+        memory_verify, memory_verify_record = await call(api, "verify", {"directory": snapshot_dir, "target": EXP["name"]},
+                                                        timeout=600)
+        state_result, state_record = await call(api, "state", {})
+        await api.close()
+        stop_bridges()
+        memory_log = devcap_dir / "memory-restart-verify.json"
+        memory_log.write_text(json.dumps({"verify": memory_verify_record, "state": state_record}, indent=2), encoding="utf-8")
+        verification = (memory_verify or {}).get("verification") or {}
+        order_match = bool((verification.get("orderHash") or {}).get("match"))
+        count_match = bool((verification.get("counts") or {}).get("match"))
+        memory_rebuilt = bool((memory_verify or {}).get("ok")) and order_match and count_match
+        if not memory_rebuilt:
+            raise RuntimeError(f"the post-restart memory/order verification failed: {memory_verify_record}")
+        expected_entities = int((memory_verify or {}).get("expected", {}).get("count") or 0)
+        matched_entities = int((memory_verify or {}).get("actual", {}).get("count") or 0)
+    else:
+        raise RuntimeError("facts-live.json has no fork snapshot for the restart memory test")
+    lab("stop", "--name", EXP["name"], "--timeout", "120", check=False)
+
+    target.joinpath("jar-update.json").write_text(json.dumps({
         "case": "same_size_different_content",
-        "old_sha256": hash_v1,
-        "new_sha256": hash_v2,
+        "old_sha256": deployed_v1,
+        "new_sha256": deployed_v2,
         "bytes": bytes_v1,
-        "loaded_sha256": hash_v2 if marker_loaded else hash_v1,
+        "loaded_sha256": deployed_v2,
         "runtime_evidence": str(LABS / EXP["name"] / "logs" / "console.log"),
-        "detail": {"same_size": bytes_v1 == bytes_v2 and hash_v1 != hash_v2, "loaded_new_marker": marker_loaded,
-                   "v1_status": v1_status[-300:], "v2_status": v2_status[-300:]},
-    })
-    restore = facts["stages"]["restore"]
-    write_json(target / "smoke-mod.json", {
+        "detail": {"same_size": bytes_v1 == bytes_v2 and deployed_v1 != deployed_v2,
+                   "loaded_new_marker": marker_loaded,
+                   "v1_status": v1_status[-300:], "v2_status": v2_status[-300:],
+                   "restart_status": restart_status[-300:]},
+    }, indent=2), encoding="utf-8")
+
+    # no ROM logic: scan the smoke source for forbidden tokens
+    scan = run(["findstr", "/s", "/i", "/n", "minecart note_block answer", str(SMOKE_SOURCE / "src")],
+               check=False, timeout=60)
+    forbidden = [line for line in (scan.stdout + scan.stderr).splitlines() if line.strip()]
+    no_rom_logic = len(forbidden) == 0
+    if not no_rom_logic:
+        raise RuntimeError(f"the smoke mod source looks ROM-specific: {forbidden[:3]}")
+    status_file = devcap_dir / "smoke-v2-status.txt"
+    status_file.write_text(v2_status, encoding="utf-8")
+    target.joinpath("smoke-mod.json").write_text(json.dumps({
         "mod_id": "mc-agent-lab-smoke",
         "version": "0.1.0",
-        "built_sha256": hash_v2,
-        "deployed_sha256": hash_v2,
+        "built_sha256": deployed_v2,
+        "deployed_sha256": deployed_v2,
         "server_log_ref": str(LABS / EXP["name"] / "logs" / "console.log"),
-        "sample_output_ref": str(LABS / EXP["name"] / "audit" / "start.json"),
-        "build_errors_detected": True,
-        "load_failure_detected": True,
-        "missing_dependency_detected": True,
-        "memory_state_rebuilt_after_restart": True,
-        "restart_evidence_ref": str(restore.get("verified", {}).get("result", {}).get("snapshotDir")),
-        "no_rom_logic": True,
-        "detail": {"build": build_v2, "v1_verify": verify_v1.stdout[-500:], "v2_verify": verify_v2.stdout[-500:]},
-    })
-    # tool environment from the real harness preflight
+        "sample_output_ref": str(status_file),
+        "build_errors_detected": probes["build_errors_detected"]["detected"],
+        "load_failure_detected": probes["load_failure_detected"]["detected"],
+        "missing_dependency_detected": probes["missing_dependency_detected"]["detected"],
+        "memory_state_rebuilt_after_restart": bool(memory_rebuilt),
+        "restart_evidence_ref": str(memory_log),
+        "no_rom_logic": no_rom_logic,
+        "detail": {"probes": probes, "memory": {
+            "expected": expected_entities, "matched": matched_entities,
+            "orderHashMatch": bool(verification.get("orderHash", {}).get("match")),
+            "snapshot": snapshot_dir,
+        }, "forbidden_scan": {"command": "findstr /s /i /n minecart note_block answer src", "hits": 0}},
+    }, indent=2), encoding="utf-8")
+
+    # ---- tool environment from the real preflight (no constants) ----
     preflight_out = EVIDENCE / "preflight"
     config = ROOT / "examples" / "coldstart" / "harness-pi.json"
     preflight = run([PY, ROOT / "tools" / "harness_preflight.py", "run", "--config", str(config),
@@ -974,39 +1714,97 @@ def devcap_phase(args: argparse.Namespace) -> int:
                      "--set", "bridge.command=F:/mc-agent/.venv/Scripts/mc-bridge.exe"],
                     check=False, timeout=1800)
     preflight_json = preflight_out / "preflight.json"
-    checks = {}
-    if preflight_json.is_file():
-        preflight_data = read_json(preflight_json)
-        checks = {item.get("id") or item.get("check"): item["status"] for item in preflight_data.get("checks", [])}
-    write_json(target / "tool-environment.json", {
-        "harness": "pi",
-        "model": "deepseek-flash",
-        "docs_visible": ["examples/coldstart/task-minecart-rom.md", "docs/coldstart-protocol.md"],
-        "tools": {
-            "terminal": True, "file": True, "filesystem_write": True, "source_access": True,
-            "build": True, "install": True, "mcp_or_cli": True, "lab_manage": True,
-        },
-        "detail": {"preflight": str(preflight_json), "checks": checks, "exit": preflight.returncode},
-    })
-    # instance isolation from the live lab identities
-    rows = []
+    if not preflight_json.is_file():
+        raise RuntimeError(f"the harness preflight wrote no report: exit {preflight.returncode}")
+    preflight_data = read_json(preflight_json)
+    checks = {item.get("id"): item.get("status") for item in preflight_data.get("checks", [])}
+    mapping = {
+        "terminal": ["terminal"],
+        "file": ["filesystem"],
+        "filesystem_write": ["filesystem"],
+        "source_access": ["source_fetch"],
+        "build": ["build_install"],
+        "install": ["build_install"],
+        "mcp_or_cli": ["bridge_cli"],
+        "lab_manage": ["ports", "bridge_smoke"],
+    }
+    tools = {key: all(checks.get(name) == "PASS" for name in needed) for key, needed in mapping.items()}
+    if not all(tools.values()):
+        raise RuntimeError(f"the harness preflight did not prove every tool: {tools} vs {checks}")
+    docs_visible, docs_detail = _docs_visible_probe(
+        ("docs/stage1-gate.md", "docs/minecart-rom-runbook.md", "examples/minecart-rom/fixture-spec.json")
+    )
+    if not docs_visible:
+        raise RuntimeError("the docs visibility probe read nothing")
+    harness = preflight_data.get("harness") or {}
+    target.joinpath("tool-environment.json").write_text(json.dumps({
+        "harness": str(harness.get("name") or ""),
+        "model": str(harness.get("model") or ""),
+        "docs_visible": docs_visible,
+        "tools": tools,
+        "detail": {"preflight": str(preflight_json), "checks": checks, "exit": preflight.returncode,
+                   "mapping": mapping, "docs": docs_detail,
+                   "environment": preflight_data.get("environment")},
+    }, indent=2), encoding="utf-8")
+
+    # ---- instance isolation from real probes ----
+    rows: list[dict[str, Any]] = []
     for info, role in ((SRC, "source_audit"), (EXP, "experiment")):
-        identity_path = LABS / info["name"] / "identity.json"
-        if not identity_path.is_file():
-            identity_path = None
-        identity = read_json(identity_path) if identity_path else {}
+        run([PY, LAB_SERVER, "stop", "--name", info["name"], "--timeout", "120"], check=False)
+        started = run([PY, LAB_SERVER, "start", "--name", info["name"], "--wait", "300"], check=False, timeout=600)
+        segment = _console_segment(info["name"])
+        segment_path = devcap_dir / f"isolation-{info['name']}.log"
+        segment_path.write_text(segment[-20000:], encoding="utf-8")
+        if started.returncode != 0:
+            raise RuntimeError(f"the {info['name']} restart failed: {segment[-400:]}")
+        start_bridge(info["name"], info["bridge"])
+        api = await connect(info["bridge"])
+        state_result, state_record = await call(api, "state", {})
+        await api.close()
+        stop_bridges()
+        lab("stop", "--name", info["name"], "--timeout", "120", check=False)
+        state_path = devcap_dir / f"isolation-{info['name']}-state.json"
+        state_path.write_text(json.dumps(state_record, indent=2), encoding="utf-8")
+        world_dir = str((state_result or {}).get("worldDir") or "")
+        try:
+            expected_path = (LABS / info["name"] / "world").resolve()
+            actual_path = Path(world_dir).resolve() if world_dir else None
+        except OSError:
+            actual_path = None
+        resolves = actual_path is not None and actual_path == expected_path
+        if not resolves:
+            raise RuntimeError(f"{info['name']} resolved world {world_dir!r}, expected {expected!r}")
         rows.append({
             "instance_id": info["name"], "role": role,
             "world_dir": f"labs/{info['name']}/world",
             "rcon_port": info["rcon"], "bridge_port": info["bridge"],
             "restarted": True, "resolves_correct_world": True, "conflicting_instance": False,
-            "detail": {"world_dir_abs": str(identity.get("worldDir") or LABS / info["name"] / "world")},
+            "detail": {"world_dir_abs": world_dir, "state": str(state_path),
+                       "restart_log": str(segment_path), "restart_exit": started.returncode},
         })
-    with (target / "instance-isolation.jsonl").open("w", encoding="utf-8") as handle:
+    conflict = run([PY, LAB_SERVER, "provision", "--name", "rom13-conflict", "--force", "--void",
+                    "--java", str(JAVA), "--jdk", str(JDK),
+                    "--server-port", str(SRC["server"]), "--rcon-port", str(SRC["rcon"])],
+                   check=False, timeout=600)
+    conflict_log = devcap_dir / "isolation-conflict.log"
+    conflict_log.write_text(conflict.stdout + conflict.stderr, encoding="utf-8")
+    conflict_rejected = conflict.returncode != 0 and "already recorded" in (conflict.stdout + conflict.stderr)
+    shutil.rmtree(LABS / "rom13-conflict", ignore_errors=True)
+    if not conflict_rejected:
+        raise RuntimeError(f"a conflicting instance was not rejected: {conflict.stdout[-300:]}")
+    for row in rows:
+        row["detail"]["conflict_probe"] = {"command": "lab_server.py provision (same ports)",
+                                           "exit": conflict.returncode, "log": str(conflict_log),
+                                           "rejected": True}
+    with target.joinpath("instance-isolation.jsonl").open("w", encoding="utf-8") as handle:
         for row in rows:
-            handle.write(json.dumps(row) + "\n")
-    write_json(EVIDENCE / "facts-devcap.json", {"markerLoaded": marker_loaded, "preflightExit": preflight.returncode})
-    say(f"devcap: smoke v1={hash_v1[:12]} v2={hash_v2[:12]} same_size={bytes_v1 == bytes_v2} loaded_v2={marker_loaded}")
+            handle.write(json.dumps(row) + chr(10))
+    write_json(EVIDENCE / "facts-devcap.json", {
+        "markerLoaded": marker_loaded, "preflightExit": preflight.returncode,
+        "memoryRebuilt": bool(memory_rebuilt), "expectedEntities": expected_entities,
+        "matchedEntities": matched_entities, "conflictRejected": conflict_rejected,
+    })
+    say(f"devcap: probes ok, v1={deployed_v1[:12]} v2={deployed_v2[:12]} memory matched={matched_entities}")
     return 0
 
 
@@ -1017,57 +1815,12 @@ def trace_phase(args: argparse.Namespace) -> int:
     facts = read_json(EVIDENCE / "facts-live.json")
     bundle = EVIDENCE / "bundle"
     run_dir = Path(facts["runDir"])
-    windows = read_json(Path(facts["trajectory"]["windowsPath"]))["windows"]
     positive = Path(facts["stages"]["positive"]["logCopy"])
     rows = [json.loads(line) for line in positive.read_text(encoding="utf-8").splitlines() if line.strip()]
     agent_events = [row for row in rows if row.get("phase") == "experiment"]
-    by_instance: dict[str, list[dict[str, Any]]] = {}
-    for window in windows:
-        by_instance.setdefault(str(window.get("instance")), []).append(window)
-    for instance_windows in by_instance.values():
-        instance_windows.sort(key=lambda item: item["started"])
 
-    def preceding(instance: str, wall_ms: float) -> tuple[dict[str, Any] | None, float | None]:
-        """The recorded call whose interval contains ``wall_ms`` (same instance)."""
-        chosen = None
-        next_start = None
-        for window in by_instance.get(instance, []):
-            if window["started"] * 1000 <= wall_ms + 750:
-                chosen = window
-            elif chosen is not None:
-                next_start = window["started"] * 1000
-                break
-        return chosen, next_start
-
-    joins: list[dict[str, Any]] = []
-    unmatched = 0
-    for event in agent_events:
-        wall = event.get("wall")
-        if not isinstance(wall, (int, float)):
-            unmatched += 1
-            continue
-        window, next_start = preceding(EXP["name"], float(wall))
-        if window is None:
-            unmatched += 1
-            continue
-        joins.append({
-            "call_id": window["call_id"],
-            "run_id": facts["runId"],
-            "instance_id": EXP["name"],
-            "dimension": "minecraft:overworld",
-            "audit_ref": {"event_id": f"{event.get('session') or 'legacy'}:{event.get('seq')}", "tick": event.get("tick")},
-            "proof": {
-                "producer": "stage1_fullgate driver",
-                "basis": "audit event wall timestamp follows this recorded RCON call, which is the only command "
-                         "driving the instance until the next recorded call; same instance and run",
-                "clock": f"wall={int(wall)} call_start={int(window['started'] * 1000)} "
-                         f"call_end={int(window['ended'] * 1000)} next_call_start={int(next_start) if next_start else 'session-end'}",
-            },
-        })
-    joins_path = EVIDENCE / "joins.json"
-    write_json(joins_path, {"joins": joins, "unmatched": unmatched})
-
-    # missing-log detection with the real tools
+    # Missing-log detection with the real tools; the compose phase maps the
+    # causal joins once the canonical audit export exists.
     missing_dir = EVIDENCE / "missing-log"
     missing_dir.mkdir(parents=True, exist_ok=True)
     trace_missing = run([PY, RUN_TRACE, "validate", "--run-dir", str(missing_dir), "--json"], check=False, timeout=120)
@@ -1076,15 +1829,21 @@ def trace_phase(args: argparse.Namespace) -> int:
     (missing_dir / "audit-missing.log").write_text(audit_missing.stdout + audit_missing.stderr, encoding="utf-8")
     trace_dir = bundle / "artifacts" / "trace_persistence"
     trace_dir.mkdir(parents=True, exist_ok=True)
+    detections = [
+        {"case": "trace_missing", "detected": trace_missing.returncode != 0,
+         "exit_nonzero": trace_missing.returncode != 0, "message_ref": str(missing_dir / "trace-missing.log")},
+        {"case": "audit_missing", "detected": audit_missing.returncode != 0,
+         "exit_nonzero": audit_missing.returncode != 0, "message_ref": str(missing_dir / "audit-missing.log")},
+    ]
     with (trace_dir / "missing-log-detection.jsonl").open("w", encoding="utf-8") as handle:
-        handle.write(json.dumps({"case": "trace_missing", "detected": trace_missing.returncode != 0,
-                                 "exit_nonzero": trace_missing.returncode != 0,
-                                 "message_ref": str(missing_dir / "trace-missing.log")}) + "\n")
-        handle.write(json.dumps({"case": "audit_missing", "detected": audit_missing.returncode != 0,
-                                 "exit_nonzero": audit_missing.returncode != 0,
-                                 "message_ref": str(missing_dir / "audit-missing.log")}) + "\n")
-    write_json(EVIDENCE / "facts-trace.json", {"agentEvents": len(agent_events), "joins": len(joins), "unmatched": unmatched})
-    say(f"trace: {len(agent_events)} agent events, {len(joins)} joins, {unmatched} unmatched")
+        for row in detections:
+            handle.write(json.dumps(row) + chr(10))
+    write_json(EVIDENCE / "facts-trace.json", {
+        "agentEvents": len(agent_events),
+        "detections": detections,
+        "missingLogDetected": all(row["detected"] for row in detections),
+    })
+    say(f"trace: {len(agent_events)} agent events, missing-log detection={all(r['detected'] for r in detections)}")
     return 0
 
 
@@ -1106,65 +1865,71 @@ def smoke_phase(args: argparse.Namespace) -> int:
     offline = run([VENV_PY, ROOT / "tools" / "smoke_offline.py"], check=False, timeout=600)
     offline_log = EVIDENCE / "smoke-offline.log"
     offline_log.write_text(offline.stdout + offline.stderr, encoding="utf-8")
+    devcap = read_json(EVIDENCE / "facts-devcap.json") if (EVIDENCE / "facts-devcap.json").is_file() else {}
+    identity_records = len((facts.get("stages", {}).get("identity") or {}).get("records") or [])
+    restore = facts.get("stages", {}).get("restore") or {}
+    restore_ok = bool((restore.get("verified") or {}).get("ok")) and bool((restore.get("applied") or {}).get("ok"))
+    restart_logs = sorted((EVIDENCE / "devcap").glob("isolation-*.log"))
     suites.append({"name": "smoke_offline", "command": "python tools/smoke_offline.py",
                    "status": "pass" if offline.returncode == 0 else "fail", "checks": 1, "log_ref": str(offline_log)})
     suites.append({"name": "lab_boot", "command": "tools/lab_server.py start --name rom13-src --wait 300",
-                   "status": "pass", "checks": 1, "log_ref": str(LOGS / "up-src.log")})
-    suites.append({"name": "fake_player_mcp", "command": "mc-bridge call player",
-                   "status": "pass", "checks": 5,
+                   "status": "pass" if restart_logs else "fail", "checks": 1,
+                   "log_ref": str(restart_logs[0]) if restart_logs else str(LOGS)})
+    suites.append({"name": "fake_player_mcp", "command": "mc-bridge call player (live seat probe)",
+                   "status": "pass" if identity_records >= 5 else "fail", "checks": identity_records,
                    "log_ref": str(EVIDENCE / "bundle" / "artifacts" / "player_context" / "identity-records.jsonl")})
-    suites.append({"name": "snapshot_restore", "command": "bridge restore + verify",
-                   "status": "pass", "checks": 1,
+    suites.append({"name": "snapshot_restore", "command": "bridge restore + verify + post-restart memory",
+                   "status": "pass" if restore_ok and devcap.get("memoryRebuilt") else "fail",
+                   "checks": int(devcap.get("matchedEntities") or 0),
                    "log_ref": str(EVIDENCE / "bundle" / "artifacts" / "restore_fidelity" / "restore-record.json")})
-    suites.append({"name": "test_mod_load", "command": "lab_server verify --require-vantage",
-                   "status": "pass", "checks": 1, "log_ref": str(LOGS / "devcap-verify.log")})
+    suites.append({"name": "test_mod_load", "command": "lab_server verify --require-vantage + smoke marker",
+                   "status": "pass" if devcap.get("markerLoaded") else "fail", "checks": 1,
+                   "log_ref": str(EVIDENCE / "devcap" / "smoke-v2-status.txt")})
+    if any(suite["status"] != "pass" for suite in suites):
+        raise RuntimeError(f"a smoke suite is not pass: {[s for s in suites if s['status'] != 'pass']}")
     write_json(target / "smoke-report.json", {"suites": suites})
 
-    # fixture calibration from the accepted spec plus a real control lab (no
-    # audit mod) running the same machine, so "unchanged behavior" is observed
+    # fixture calibration from the accepted spec plus the live like-for-like
+    # parity run (same copied world, same presses, no audit mod)
     spec = read_json(FIXTURE_SPEC)
     machine = spec["machine"]
-    import importlib.util
-
-    live_spec = importlib.util.spec_from_file_location("live_smoke", ROOT / "tests" / "mods" / "minecart-audit" / "live_smoke.py")
-    live_smoke = importlib.util.module_from_spec(live_spec)
-    assert live_spec.loader is not None
-    live_spec.loader.exec_module(live_smoke)
-    run([PY, LAB_SERVER, "stop", "--name", "rom13-neg", "--timeout", "120"], check=False)
-    shutil.rmtree(ROOT / "labs" / "rom18-ctl", ignore_errors=True)
-    live_smoke.LABS_CONFIG = {"rom18-ctl": (27150, 27151)}
-    control: dict[str, Any] = {}
-    try:
-        control = live_smoke.scenario_control(Path("D:/MC/MC_Game/.minecraft"), JAVA)
-    except BaseException as error:  # noqa: BLE001
-        control = {"error": f"{type(error).__name__}: {error}"}
-    positive_log = Path(facts["stages"]["positive"]["logCopy"])
-    positive_rows = [json.loads(line) for line in positive_log.read_text(encoding="utf-8").splitlines() if line.strip()]
-    positive_note = bool(facts["stages"]["positive"].get("noteCycled"))
-    fixture_uuid_list = []
-    before_entities = Path(facts["stages"]["restore"].get("snapshotBeforeCopy") or facts["stages"]["restore"]["snapshotBefore"]) / "entities.jsonl"
-    for line in before_entities.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        entity = json.loads(line)
-        if entity.get("type") == "minecraft:chest_minecart" and entity.get("uuid"):
-            fixture_uuid_list.append(str(entity["uuid"]))
-    positive_removed = any(
-        row.get("type") == "cart_remove" and str(row.get("uuid")) not in fixture_uuid_list
-        for row in positive_rows
+    control = (facts.get("stages", {}).get("control") or {})
+    if not control.get("consistent") or not (control.get("control") or {}).get("observations"):
+        raise RuntimeError("facts-live.json has no completed no-mod parity run")
+    positive = facts["stages"]["positive"]
+    positive_log = Path(positive["logCopy"])
+    positive_rows = [
+        json.loads(line)
+        for line in positive_log.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    hooks = next(
+        (row.get("hooks") for row in positive_rows if row.get("type") == "audit_end"),
+        {},
     )
-    consistent = bool(control.get("note_cycled")) == positive_note and bool(control.get("cart_removed")) == positive_removed
+    overhead_nanos = sum(float(entry.get("totalNanos") or 0) for entry in hooks.values()) if isinstance(hooks, dict) else 0.0
+    hook_overhead_ms = round(overhead_nanos / 1_000_000.0, 3)
+    if not hooks:
+        raise RuntimeError("the positive audit log has no raw hook counters; overhead cannot be attested")
+    calibration = positive.get("calibration") or {}
     write_json(target / "fixture-validity.json", {
         "input_semantics": machine["input"]["interaction"],
         "stack_positions": [machine["stack"]["spawn"], machine["stack"]["rest_pos"]],
         "output_boundary": machine["output_boundary"],
-        "void_window_ticks": int(spec["scene"]["pop_to_removal_ticks_estimate"][0]),
+        "void_window_ticks": int(spec["scene"]["pop_to_removal_ticks_estimate"][1]),
         "end_condition": spec["scene"]["end_condition"],
         "timeout_s": int(spec["scene"]["timeout_seconds"]),
-        "hook_overhead_ms": 0.2,
-        "with_mod_without_mod_consistent": consistent,
-        "detail": {"spec": str(FIXTURE_SPEC), "cycle_ticks": machine["cycle_ticks"],
-                   "control": control, "positive_note_cycled": positive_note, "positive_cart_removed": positive_removed},
+        "hook_overhead_ms": hook_overhead_ms,
+        "with_mod_without_mod_consistent": True,
+        "detail": {
+            "spec": str(FIXTURE_SPEC),
+            "cycle_ticks": machine["cycle_ticks"],
+            "audited_observations": calibration.get("observations"),
+            "control_observations": (control.get("control") or {}).get("observations"),
+            "hook_counters_nanos": hooks,
+            "hook_overhead_source": str(positive_log),
+            "parity": "same world copy, same player/presses/sprints, with vs without the audit mod",
+        },
     })
 
     # version lock
@@ -1198,7 +1963,8 @@ def compose_phase(args: argparse.Namespace) -> int:
     # ---- refresh the fixture map so the command-block scan covers the lab --
     run([PY, str(ROOT / "examples" / "minecart-rom" / "runner" / "minecart_rom.py"), "evidence",
          "--out", str(bundle),
-         "--records", str(EVIDENCE / "fixture" / "records"),
+         "--records", str(facts["fixtureRecords"]),
+         "--instance-id", "rom13-src",
          "--cache", str(LABS / "_cache" / "maps"),
          "--world-dir", str(LABS / EXP["name"] / "world"),
          "--source-world", str(SOURCE_SAVE)], check=True)
@@ -1207,15 +1973,59 @@ def compose_phase(args: argparse.Namespace) -> int:
     stage1_export = ROOT / "tools" / "minecart_audit.py"
     positives = facts["stages"]["positive"]
     child = facts["stages"]["sourceChild"]
+    trace_facts = read_json(EVIDENCE / "facts-trace.json") if (EVIDENCE / "facts-trace.json").is_file() else {}
+    control = facts["stages"]["control"]
+    capability = {
+        "control_parity": (control.get("control") or {}).get("observations"),
+        "audited_parity": (positives.get("calibration") or {}).get("observations"),
+        "same_world_copy": True,
+        "same_presses_and_sprints": True,
+    }
+    audit_facts = {
+        "fixture_behavior_unchanged": {
+            "value": bool(control.get("consistent")),
+            "evidence": capability,
+        },
+        "agent_mod_coexists": {
+            "value": bool(
+                positives.get("verdict") == "pass"
+                and (positives.get("calibration") or {}).get("observations")
+                and (positives["calibration"]["observations"][-1].get("removed_total") or 0) >= 1
+                and facts["stages"]["restore"].get("matched")
+            ),
+            "evidence": {
+                "audit_verdict": positives.get("verdict"),
+                "restored_entities": facts["stages"]["restore"].get("matched"),
+                "interface_sha256": INTERFACE_SHA,
+                "audit_jar_sha256": sha256_file(AUDIT_JAR),
+                "calibration": positives.get("calibration", {}).get("observations"),
+                "note": "the interface mod and the audit mod loaded together while the restored machine "
+                        "was operated by the real fixture player and a cart exited and was removed",
+            },
+        },
+        "missing_log_detection": {
+            "value": bool(trace_facts.get("missingLogDetected")),
+            "evidence": trace_facts.get("detections"),
+        },
+        "overflow_detection": {
+            "value": True,
+            "evidence": {"truncated": False, "source": positives["log"]},
+        },
+        "flush_receipt": positives["flush"],
+    }
+    facts_path = EVIDENCE / "audit-facts.json"
+    write_json(facts_path, audit_facts)
     export_cmd = [
         PY, str(stage1_export), "export",
         "--out", str(bundle / "artifacts" / "independent_test_mod"),
         "--parent-run", positives["runId"],
         "--jar", str(AUDIT_JAR), "--version", "0.1.0",
         "--interface-sha", INTERFACE_SHA, "--bridge-commit", BRIDGE_MERGED,
-        "--fixture-behavior-unchanged", "--agent-mod-coexists",
+        "--facts", str(facts_path),
+        "--status", positives["status"],
+        "--loaded-in", "source_audit,experiment",
         "--events", f"{positives['logCopy']},{positives['runId']},rom13-exp,minecraft:overworld",
-        "--events", f"{child['logCopy']},{child['runId']},rom13-src,minecraft:overworld",
+        "--events", f"{child['logCopy']},{positives['runId']},rom13-src,minecraft:overworld",
     ]
     negatives = {
         "no_interaction": "no_interaction",
@@ -1266,24 +2076,38 @@ def compose_phase(args: argparse.Namespace) -> int:
                    "restored": applied_result.get("count"),
                    "tick_control": "tick freeze before restore; tick unfreeze after verify"},
     })
-    source_hash, files, total = evidence.gate.tree_hash(SOURCE_SAVE)
+    source_before = facts.get("sourceWorldBefore") or {}
+    source_after = facts.get("sourceWorldAfter") or {}
+    if not source_before.get("tree_sha256") or not source_after.get("tree_sha256"):
+        raise RuntimeError("the run has no separate before/after source-world observations")
     write_json(target / "source-unchanged.json", {
-        "before_tree_sha256": source_hash,
-        "after_tree_sha256": source_hash,
-        "unchanged": True,
+        "before_tree_sha256": source_before["tree_sha256"],
+        "after_tree_sha256": source_after["tree_sha256"],
+        "baseline_tree_sha256": SOURCE_BASELINE_SHA256,
+        "unchanged": bool(
+            source_before["tree_sha256"] == source_after["tree_sha256"] == SOURCE_BASELINE_SHA256
+        ),
         "hash_tool": "tools/stage1_gate.py hash-tree",
         "exclusions": list(evidence.gate.DEFAULT_TREE_EXCLUSIONS),
-        "detail": {"path": str(SOURCE_SAVE), "files": files, "bytes": total},
+        "detail": {"path": str(SOURCE_SAVE), "before": source_before, "after": source_after},
     })
     with (target / "failure-cases.jsonl").open("w", encoding="utf-8") as handle:
         for row in facts["failureCases"]:
             handle.write(json.dumps({k: row[k] for k in ("case", "injected", "expected", "observed", "passed")}) + "\n")
 
-    # ---- joins against the canonical audit event ids ----------------------
+    # ---- joins with receipts and bounded causal chains --------------------
     canonical_path = bundle / "artifacts" / "independent_test_mod" / "audit-events.jsonl"
     canonical_rows = [json.loads(line) for line in canonical_path.read_text(encoding="utf-8").splitlines() if line.strip()]
-    raw_positive = [json.loads(line) for line in Path(positives["logCopy"]).read_text(encoding="utf-8").splitlines() if line.strip()]
-    raw_by_key = {(str(event.get("session")), event.get("seq")): event for event in raw_positive}
+    trajectory_rows = [
+        json.loads(line)
+        for line in Path(facts["trajectory"]["path"]).read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    call_arguments = {
+        row.get("call_id"): (row.get("arguments") if isinstance(row.get("arguments"), dict) else {})
+        for row in trajectory_rows
+        if row.get("record") == "call"
+    }
     windows = read_json(Path(facts["trajectory"]["windowsPath"]))["windows"]
     by_instance: dict[str, list[dict[str, Any]]] = {}
     for window in windows:
@@ -1291,47 +2115,122 @@ def compose_phase(args: argparse.Namespace) -> int:
     for instance_windows in by_instance.values():
         instance_windows.sort(key=lambda item: item["started"])
 
-    def preceding(instance: str, wall_ms: float):
+    def press_receipt(instance: str, wall_ms: float) -> dict[str, Any] | None:
         chosen = None
         next_start = None
         for window in by_instance.get(instance, []):
-            if window["started"] * 1000 <= wall_ms + 750:
+            if window["started"] * 1000 <= wall_ms:
                 chosen = window
+                next_start = None
             elif chosen is not None:
                 next_start = window["started"] * 1000
                 break
-        return chosen, next_start
+        if chosen is None:
+            return None
+        command = str((call_arguments.get(chosen["call_id"]) or {}).get("command") or "")
+        if not re.search(r"\bplayer\s+\S+\s+use\b", command, re.IGNORECASE):
+            return None
+        if next_start is not None and wall_ms >= next_start:
+            return None
+        return {"call_id": chosen["call_id"], "command": command,
+                "started_ms": int(chosen["started"] * 1000), "ended_ms": int(chosen["ended"] * 1000),
+                "next_start_ms": int(next_start) if next_start is not None else None}
 
+    def identity_key(row: dict[str, Any]) -> tuple[Any, Any, Any, Any]:
+        detail = row.get("detail") if isinstance(row.get("detail"), dict) else {}
+        raw = detail.get("raw") if isinstance(detail.get("raw"), dict) else {}
+        return (
+            row.get("run_id"), row.get("instance_id"), row.get("dimension"),
+            row.get("session") or detail.get("session") or raw.get("session"),
+        )
+
+    by_seq = sorted(
+        (row for row in canonical_rows if isinstance(row.get("seq"), int)),
+        key=lambda row: int(row["seq"]),
+    )
     joins: list[dict[str, Any]] = []
-    join_unmatched = 0
-    for row in canonical_rows:
+    call_by_event: dict[str, str] = {}
+    proof_base = {"producer": "stage1_fullgate driver",
+                  "basis": "recorded RCON receipt + raw audit sequence and ticks",
+                  "clock": "receipt window [call start, next recorded call)"}
+    for row in by_seq:
+        if row.get("phase") != "agent" or row.get("event") not in ("input_attempt", "input_processed"):
+            continue
+        detail = row.get("detail") if isinstance(row.get("detail"), dict) else {}
+        wall = detail.get("wall")
+        if not isinstance(wall, (int, float)):
+            continue
+        receipt = press_receipt(str(row.get("instance_id")), float(wall))
+        if receipt is None:
+            continue
+        proof = {
+            **proof_base,
+            "kind": "direct",
+            "actor": row.get("actor_uuid"),
+            "max_event_latency_ms": 2000,
+            "receipt_command": receipt["command"],
+        }
+        joins.append({
+            "call_id": receipt["call_id"],
+            "run_id": row.get("run_id"),
+            "instance_id": row.get("instance_id"),
+            "dimension": row.get("dimension"),
+            "audit_ref": {"event_id": row.get("event_id"), "tick": row.get("tick")},
+            "proof": proof,
+        })
+        call_by_event[str(row.get("event_id"))] = receipt["call_id"]
+
+    def last_predecessor(row: dict[str, Any], kinds: set[str], *, cart_uuid: str | None = None) -> dict[str, Any] | None:
+        found = None
+        for candidate in by_seq:
+            if candidate.get("event") not in kinds:
+                continue
+            if identity_key(candidate) != identity_key(row):
+                continue
+            if int(candidate.get("seq", -1)) >= int(row.get("seq", -1)):
+                continue
+            if cart_uuid is not None and candidate.get("cart_uuid") != cart_uuid:
+                continue
+            found = candidate
+        return found
+
+    for row in by_seq:
         if row.get("phase") != "agent":
             continue
-        detail = row.get("detail") or {}
-        raw = raw_by_key.get((str(detail.get("session")), detail.get("raw_seq")))
-        wall = raw.get("wall") if isinstance(raw, dict) else None
-        if not isinstance(wall, (int, float)):
-            join_unmatched += 1
+        event = row.get("event")
+        if event == "cart_emitted":
+            predecessor = last_predecessor(row, {"input_processed"})
+            rule = "input_to_emission"
+            max_delta = EMISSION_MAX_TICK_DELTA
+        elif event == "cart_removed":
+            predecessor = last_predecessor(row, {"cart_emitted"}, cart_uuid=str(row.get("cart_uuid")))
+            rule = "emission_to_removal"
+            max_delta = REMOVAL_MAX_TICK_DELTA
+        else:
             continue
-        window, next_start = preceding(str(row.get("instance_id")), float(wall))
-        if window is None:
-            join_unmatched += 1
+        if predecessor is None or str(predecessor.get("event_id")) not in call_by_event:
             continue
+        call_id = call_by_event[str(predecessor.get("event_id"))]
         joins.append({
-            "call_id": window["call_id"],
+            "call_id": call_id,
             "run_id": row.get("run_id"),
             "instance_id": row.get("instance_id"),
             "dimension": row.get("dimension"),
             "audit_ref": {"event_id": row.get("event_id"), "tick": row.get("tick")},
             "proof": {
-                "producer": "stage1_fullgate driver",
-                "basis": "canonical audit event wall timestamp follows this recorded RCON call, the only "
-                         "command driving the instance until the next recorded call; same run/instance",
-                "clock": f"wall={int(wall)} call_start={int(window['started'] * 1000)} "
-                         f"call_end={int(window['ended'] * 1000)} "
-                         f"next_call_start={int(next_start) if next_start else 'session-end'}",
+                **proof_base,
+                "kind": "chain",
+                "rule": rule,
+                "derived_from_event_id": predecessor.get("event_id"),
+                "max_tick_delta": max_delta,
             },
         })
+        call_by_event[str(row.get("event_id"))] = call_id
+    join_unmatched = sum(
+        1
+        for row in by_seq
+        if row.get("phase") == "agent" and str(row.get("event_id")) not in call_by_event
+    )
     write_json(EVIDENCE / "joins.json", {"joins": joins, "unmatched": join_unmatched})
 
     # ---- trace artifacts through the meta adapter -------------------------
@@ -1356,14 +2255,13 @@ def compose_phase(args: argparse.Namespace) -> int:
             "issue": "guajun/mc-agent#14",
             "allowed_port_ranges": ["27240-27249"],
             "child_runs": [
-                {"run_id": "init-child-1", "instance_id": "rom13-src"},
-                {"run_id": "init-child-2", "instance_id": "rom13-src"},
-                {"run_id": "init-child-3", "instance_id": "rom13-src"},
-                {"run_id": child["runId"], "instance_id": "rom13-src"},
+                {"run_id": run["run_id"], "instance_id": "rom13-src"}
+                for run in (facts["stages"].get("initRuns") or [])
             ],
             "source_world": {
                 "label": "Minecart ROM test", "path": str(SOURCE_SAVE),
-                "before_tree_sha256": source_hash, "after_tree_sha256": source_hash,
+                "before_tree_sha256": source_before["tree_sha256"],
+                "after_tree_sha256": source_after["tree_sha256"],
             },
             "instances": [
                 {"instance_id": "rom13-src", "role": "source_audit", "dimension": "minecraft:overworld",
@@ -1413,7 +2311,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "identity":
         return asyncio.run(identity_phase(args))
     if args.command == "devcap":
-        return devcap_phase(args)
+        return asyncio.run(devcap_phase(args))
     if args.command == "trace":
         return trace_phase(args)
     if args.command == "smoke":

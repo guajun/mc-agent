@@ -32,20 +32,30 @@ def load_module(name: str, relative: str):
 
 EVIDENCE = load_module("stage1_evidence", "tools/stage1_evidence.py")
 
+from datetime import datetime, timezone  # noqa: E402
+
+#: The synthetic audit walls live on the same timeline as the trajectory
+#: fixture (2026-09-26T00:00:00Z..09Z).
+BASE_WALL_MS = int(datetime(2026, 9, 26, tzinfo=timezone.utc).timestamp() * 1000)
+
 
 def audit_fixture() -> list[dict]:
     return [
         {"seq": 1, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "session_start"},
         {"seq": 2, "tick": 0, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "ready", "type": "audit_ready"},
         {"seq": 3, "tick": 10, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "init", "type": "phase", "from": "bootstrap", "to": "init"},
-        {"seq": 4, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}},
-        {"seq": 5, "tick": 20, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
-        {"seq": 6, "tick": 21, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "targetInput": True, "agentOp": True, "requestSeq": 5, "attemptSeq": 4, "note": 0, "instrument": "harp"},
-        {"seq": 7, "tick": 30, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_tracked", "uuid": "cart-1", "epoch": 1, "inventory": []},
-        {"seq": 8, "tick": 40, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_exit", "uuid": "cart-1", "epoch": 1, "pos": [2.5, 60.0, 0.5]},
-        {"seq": 9, "tick": 80, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_remove", "uuid": "cart-1", "epoch": 1, "reason": "DISCARDED", "capturedPath": "minecart_container_remove_before_drop", "inventory": [{"slot": 0, "item": "minecraft:stone", "count": 3}]},
-        {"seq": 10, "tick": 90, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete", "truncated": False},
+        {"seq": 4, "tick": 20, "wall": BASE_WALL_MS + 8200, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_attempt", "operator": {"uuid": "aaaa", "name": "Bot"}},
+        {"seq": 5, "tick": 20, "wall": BASE_WALL_MS + 8300, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_request", "source": "player"},
+        {"seq": 6, "tick": 21, "wall": BASE_WALL_MS + 8400, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "input_processed", "operator": {"uuid": "aaaa", "name": "Bot"}, "targetInput": True, "agentOp": True, "requestSeq": 5, "attemptSeq": 4, "note": 0, "instrument": "harp"},
+        {"seq": 7, "tick": 30, "wall": BASE_WALL_MS + 8600, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_tracked", "uuid": "cart-1", "epoch": 1, "inventory": []},
+        {"seq": 8, "tick": 40, "wall": BASE_WALL_MS + 9000, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_exit", "uuid": "cart-1", "epoch": 1, "pos": [2.5, 60.0, 0.5]},
+        {"seq": 9, "tick": 80, "wall": BASE_WALL_MS + 9500, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "experiment", "type": "cart_remove", "uuid": "cart-1", "epoch": 1, "reason": "DISCARDED", "capturedPath": "minecart_container_remove_before_drop", "inventory": [{"slot": 0, "item": "minecraft:stone", "count": 3}]},
+        {"seq": 10, "tick": 90, "wall": BASE_WALL_MS + 10000, "run": "r1", "inst": "exp-1", "session": "s1", "phase": "end", "type": "audit_end", "status": "complete", "truncated": False},
     ]
+
+
+#: The wall values above are aligned with the press call c5 (08.0s-09.0s) in
+#: ``trajectory_fixture``: the fixtures intentionally share one timeline.
 
 
 def trajectory_fixture() -> list[dict]:
@@ -58,6 +68,8 @@ def trajectory_fixture() -> list[dict]:
         {"record": "result", "call_id": "c3", "status": "ok", "result": "abc", "at": "2026-09-26T00:00:05Z"},
         {"record": "call", "call_id": "c4", "tool": "mcp_probe", "arguments": {"tool": "mc_state"}, "at": "2026-09-26T00:00:06Z", "phase": "prepare", "actor": "operator", "instance": "exp-1"},
         {"record": "result", "call_id": "c4", "status": "ok", "result": {"tick": 21}, "at": "2026-09-26T00:00:07Z"},
+        {"record": "call", "call_id": "c5", "tool": "bash", "arguments": {"command": "player Bot use once"}, "at": "2026-09-26T00:00:08Z", "phase": "experiment", "actor": "operator", "instance": "exp-1"},
+        {"record": "result", "call_id": "c5", "status": "ok", "result": "used", "at": "2026-09-26T00:00:09Z"},
     ]
 
 
@@ -69,6 +81,45 @@ def map_audit(events: list[dict] | None = None):
         dimension="minecraft:overworld",
         source_sha256="0" * 64,
     )
+
+
+def join_rows() -> list[dict]:
+    return [
+        row
+        for row in map_audit()[0]
+        if row.get("event") in {"input_attempt", "input_processed", "cart_emitted", "cart_removed"}
+    ]
+
+
+def join_fixture() -> list[dict]:
+    return [
+        {
+            "call_id": "c5", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld",
+            "audit_ref": {"event_id": "s1:4", "tick": 20},
+            "proof": {"producer": "driver", "basis": "press receipt", "clock": "wall in call",
+                      "actor": "aaaa", "max_event_latency_ms": 2000},
+        },
+        {
+            "call_id": "c5", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld",
+            "audit_ref": {"event_id": "s1:6", "tick": 21},
+            "proof": {"producer": "driver", "basis": "attemptSeq 4", "clock": "wall in call",
+                      "actor": "aaaa", "max_event_latency_ms": 2000},
+        },
+        {
+            "call_id": "c5", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld",
+            "audit_ref": {"event_id": "s1:8", "tick": 40},
+            "proof": {"kind": "chain", "producer": "driver", "basis": "s1:6 popped it",
+                      "clock": "tick chain", "derived_from_event_id": "s1:6",
+                      "rule": "input_to_emission", "max_tick_delta": 60},
+        },
+        {
+            "call_id": "c5", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld",
+            "audit_ref": {"event_id": "s1:9", "tick": 80},
+            "proof": {"kind": "chain", "producer": "driver", "basis": "s1:8 fell",
+                      "clock": "tick chain", "derived_from_event_id": "s1:8",
+                      "rule": "emission_to_removal", "max_tick_delta": 300},
+        },
+    ]
 
 
 def map_trace(trajectory: list[dict], *, joins=None, audit=None):
@@ -230,7 +281,7 @@ class TraceMappingTests(unittest.TestCase):
     def test_calls_pair_and_keep_explicit_instances(self):
         rows, join_doc, gaps, candidates = map_trace(trajectory_fixture())
         self.assertEqual(gaps, [])
-        self.assertEqual({row["call_id"] for row in rows}, {"c1", "c2", "c3", "c4"})
+        self.assertEqual({row["call_id"] for row in rows}, {"c1", "c2", "c3", "c4", "c5"})
         self.assertEqual({row["instance_id"] for row in rows}, {"exp-1", "src-1"})
         self.assertIsNone(join_doc)
         self.assertEqual(candidates, [])
@@ -271,8 +322,8 @@ class TraceMappingTests(unittest.TestCase):
         self.assertTrue(any(gap.code == "run_id_mismatch" for gap in gaps))
 
     def test_unproven_join_stays_a_candidate(self):
-        unproven = [{"call_id": "c4", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld", "audit_ref": {"event_id": "s1:6", "tick": 21}, "basis": "nearest call"}]
-        _, join_doc, gaps, candidates = map_trace(trajectory_fixture(), joins=unproven)
+        unproven = [{"call_id": "c5", "run_id": "r1", "instance_id": "exp-1", "dimension": "minecraft:overworld", "audit_ref": {"event_id": "s1:6", "tick": 21}, "basis": "nearest call"}]
+        _, join_doc, gaps, candidates = map_trace(trajectory_fixture(), joins=unproven, audit=join_rows())
         self.assertEqual(gaps, [])
         self.assertIsNone(join_doc)
         self.assertEqual(len(candidates), 1)
@@ -280,20 +331,87 @@ class TraceMappingTests(unittest.TestCase):
         self.assertTrue(any("no explicit proof" in problem for problem in candidates[0]["problems"]))
 
     def test_proven_join_is_verified_and_counts_are_computed(self):
-        proven = [{
-            "call_id": "c4",
-            "run_id": "r1",
-            "instance_id": "exp-1",
-            "dimension": "minecraft:overworld",
-            "audit_ref": {"event_id": "s1:6", "tick": 21},
-            "proof": {"producer": "integration driver", "basis": "requestSeq 5 -> attemptSeq 4", "clock": "tick 21"},
-        }]
-        _, join_doc, gaps, candidates = map_trace(trajectory_fixture(), joins=proven)
+        _, join_doc, gaps, candidates = map_trace(trajectory_fixture(), joins=join_fixture(), audit=join_rows())
         self.assertEqual(gaps, [])
         self.assertIsNotNone(join_doc)
-        self.assertEqual(len(join_doc["joins"]), 1)
-        self.assertEqual(join_doc["unmatched_agent_events"], 5)
+        self.assertEqual(len(join_doc["joins"]), 4)
+        self.assertEqual(join_doc["unmatched_agent_events"], 0)
         self.assertEqual(candidates, [])
+        receipt = join_doc["joins"][0]["proof"]["receipt"]
+        self.assertEqual(receipt["call_id"], "c5")
+        self.assertEqual(join_doc["joins"][3]["proof"]["derived_from"]["tick_delta"], 40)
+
+    def test_read_command_cannot_attest_an_input(self):
+        joins = join_fixture()
+        joins[0]["call_id"] = "c1"  # status: a read command
+        _, join_doc, _, candidates = map_trace(trajectory_fixture(), joins=joins, audit=join_rows())
+        self.assertIsNone(join_doc)
+        self.assertTrue(any("not a player-use operation" in problem for problem in candidates[0]["problems"]))
+
+    def test_future_event_beyond_declared_latency_fails_closed(self):
+        joins = join_fixture()
+        joins[0]["proof"]["max_event_latency_ms"] = 0
+        rows = [dict(row) for row in join_rows()]
+        attempt = next(row for row in rows if row["event_id"] == "s1:4")
+        attempt["detail"] = {**attempt["detail"], "wall": BASE_WALL_MS + 9500}
+        _, join_doc, _, candidates = map_trace(trajectory_fixture(), joins=joins, audit=rows)
+        self.assertIsNone(join_doc)
+        self.assertTrue(any("beyond the call end" in problem for problem in candidates[0]["problems"]))
+
+    def test_ambiguous_next_call_fails_closed(self):
+        joins = join_fixture()
+        rows = [dict(row) for row in join_rows()]
+        attempt = next(row for row in rows if row["event_id"] == "s1:4")
+        attempt["detail"] = {**attempt["detail"], "wall": BASE_WALL_MS + 8500}  # after c5 ended
+        delayed = trajectory_fixture() + [
+            {"record": "call", "call_id": "c6", "tool": "bash", "arguments": {"command": "execute if block 0 0 0 minecraft:air"}, "at": "2026-09-26T00:00:08.500Z", "phase": "experiment", "actor": "operator", "instance": "exp-1"},
+            {"record": "result", "call_id": "c6", "status": "ok", "result": "yes", "at": "2026-09-26T00:00:08.600Z"},
+        ]
+        _, join_doc, _, candidates = map_trace(delayed, joins=joins, audit=rows)
+        self.assertIsNone(join_doc)
+        self.assertTrue(any("ambiguous receipt" in problem for problem in candidates[0]["problems"]))
+
+    def test_cross_scope_join_fails_closed(self):
+        joins = join_fixture()
+        rows = [dict(row) for row in join_rows()]
+        next(row for row in rows if row["event_id"] == "s1:4")["instance_id"] = "src-1"
+        _, join_doc, _, candidates = map_trace(trajectory_fixture(), joins=joins, audit=rows)
+        self.assertIsNone(join_doc)
+        self.assertTrue(any("does not match the event" in problem for problem in candidates[0]["problems"]))
+
+    def test_chain_delta_and_predecessor_are_enforced(self):
+        too_far = join_fixture()
+        too_far[2]["proof"]["max_tick_delta"] = 5
+        _, join_doc, _, _ = map_trace(trajectory_fixture(), joins=too_far, audit=join_rows())
+        self.assertIsNotNone(join_doc)
+        self.assertEqual(join_doc["unmatched_agent_events"], 2)
+        orphan_chain = join_fixture()
+        orphan_chain.pop(1)
+        _, join_doc, _, _ = map_trace(trajectory_fixture(), joins=orphan_chain, audit=join_rows())
+        self.assertIsNotNone(join_doc)
+        self.assertEqual(join_doc["unmatched_agent_events"], 3)
+
+    def test_actor_and_attempt_link_are_enforced(self):
+        wrong_actor = join_fixture()
+        wrong_actor[0]["proof"]["actor"] = "bbbb"
+        _, join_doc, _, candidates = map_trace(trajectory_fixture(), joins=wrong_actor, audit=join_rows())
+        self.assertIsNone(join_doc)
+        self.assertTrue(any("proof.actor" in problem for problem in candidates[0]["problems"]))
+        rows = [dict(row) for row in join_rows()]
+        processed = next(row for row in rows if row["event_id"] == "s1:6")
+        processed["detail"] = {**processed["detail"]}
+        processed["detail"]["raw"] = {**processed["detail"]["raw"], "attemptSeq": 999}
+        processed["attempt_seq"] = 999
+        _, join_doc, _, candidates = map_trace(trajectory_fixture(), joins=join_fixture(), audit=rows)
+        self.assertIsNotNone(join_doc)
+        self.assertEqual(join_doc["unmatched_agent_events"], 3)
+        self.assertTrue(
+            any(
+                "does not resolve to an attempt" in problem
+                for candidate in candidates
+                for problem in candidate["problems"]
+            )
+        )
 
     def test_unresolved_join_event_is_a_candidate(self):
         bogus = [{"call_id": "c4", "audit_ref": {"tick": 21, "event_id": "nope"}, "proof": {"producer": "x", "basis": "y", "clock": "z"}}]

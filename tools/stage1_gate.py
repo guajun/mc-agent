@@ -1338,10 +1338,12 @@ def _validate_audit_provenance(
     (an independent initialization), but the agent phase must belong to the
     parent run.  Mixing evidence from an undeclared run, instance or dimension
     is an ordinary stale-evidence failure: the events must not be joined at
-    all.  Event ids must be unique, and ``(tick, seq)`` must be strictly
-    increasing per full identity, so a repeated or colliding sequence cannot
-    silently establish an ordering.  Returns the ``phase == "agent"`` subset
-    for chain checks.
+    all.  Event ids must be unique, and ``seq`` (the raw append sequence, which
+    survives server restarts and tick resets) must be strictly increasing per
+    full identity, so a repeated or colliding sequence cannot silently
+    establish an ordering.  ``tick`` stays the real server tick and is not
+    forced to increase, because a restart legitimately resets it.  Returns the
+    ``phase == "agent"`` subset for chain checks.
     """
     child_runs = child_runs or {}
     agent_events: list[dict[str, Any]] = []
@@ -1356,7 +1358,7 @@ def _validate_audit_provenance(
         return [row for row in events if row.get("phase") == "agent"]
 
     seen_ids: set[str] = set()
-    last_order: dict[tuple[Any, Any, Any], tuple[int, int]] = {}
+    last_order: dict[tuple[Any, Any, Any], int] = {}
     for index, row in enumerate(events):
         where = f"audit_events[{index}]."
         event_id = row.get("event_id")
@@ -1402,24 +1404,22 @@ def _validate_audit_provenance(
                 f"{where}dimension {dimension!r} does not match the declared "
                 f"{instance_id!r}/{instance_dimensions[instance_id]!r}",
             )
-        tick = row.get("tick")
         seq = row.get("seq")
         if (
-            _is_int(tick)
-            and _is_int(seq)
+            _is_int(seq)
             and isinstance(row_run, str)
             and isinstance(instance_id, str)
             and isinstance(dimension, str)
         ):
             key = (row_run, instance_id, dimension)
             previous = last_order.get(key)
-            if previous is not None and (tick, seq) <= previous:
+            if previous is not None and seq <= previous:
                 ctx.fail(
                     "audit_order",
-                    f"{where}non-strict tick/seq {tick}/{seq} after "
-                    f"{previous[0]}/{previous[1]} for {key[0]}/{key[1]}/{key[2]}",
+                    f"{where}seq {seq} does not increase after {previous} for "
+                    f"{key[0]}/{key[1]}/{key[2]}",
                 )
-            last_order[key] = (tick, seq)
+            last_order[key] = seq
         if phase == "agent":
             agent_events.append(row)
     return agent_events
@@ -1523,8 +1523,10 @@ def _check_independent_test_mod(ctx: CheckContext) -> None:
             if not isinstance(row.get("removal_reason"), str) or not row.get("removal_reason"):
                 ctx.fail("audit_removal_reason", "audit_events: cart_removed needs a removal_reason")
 
-        def order_of(row: dict[str, Any]) -> tuple[int, int]:
-            return (int(row.get("tick", -1)), int(row.get("seq", -1)))
+        def order_of(row: dict[str, Any]) -> int:
+            # seq is the append order; tick is an observation and may reset
+            # when the server restarts between sessions.
+            return int(row.get("seq", -1))
 
         # The chain is only meaningful on the full run/instance/dimension identity.
         matched = 0
@@ -3085,11 +3087,11 @@ def _build_valid_bundle(root: Path, source_world: Path | None = None) -> None:
     _write_jsonl(
         root / "artifacts/independent_test_mod/audit-events.jsonl",
         [
-            {"event_id": "e1", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "init", "dimension": "minecraft:overworld", "tick": 100, "seq": 0, "event": "machine_ready", "pos": [0, 64, 0]},
-            {"event_id": "e2", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 0, "event": "input_attempt", "actor_uuid": player_uuid, "pos": [1, 64, 0], "detail": {"tool_call_id": "call-3"}},
-            {"event_id": "e3", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 1, "event": "input_processed", "actor_uuid": player_uuid, "pos": [1, 64, 0]},
-            {"event_id": "e4", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 113, "seq": 0, "event": "cart_emitted", "cart_uuid": records[0]["uuid"], "pos": [2, 64, 0], "captured_before_removal": True},
-            {"event_id": "e5", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 125, "seq": 0, "event": "cart_removed", "cart_uuid": records[0]["uuid"], "pos": [2, -70, 0], "removal_reason": "void"},
+            {"event_id": "e1", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "init", "dimension": "minecraft:overworld", "tick": 100, "seq": 0, "session": "s1", "event": "machine_ready", "pos": [0, 64, 0]},
+            {"event_id": "e2", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 1, "session": "s1", "event": "input_attempt", "actor_uuid": player_uuid, "pos": [1, 64, 0], "detail": {"tool_call_id": "call-3"}},
+            {"event_id": "e3", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 110, "seq": 2, "session": "s1", "event": "input_processed", "actor_uuid": player_uuid, "pos": [1, 64, 0]},
+            {"event_id": "e4", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 113, "seq": 3, "session": "s1", "event": "cart_emitted", "cart_uuid": records[0]["uuid"], "pos": [2, 64, 0], "captured_before_removal": True},
+            {"event_id": "e5", "run_id": SELFTEST_RUN_ID, "instance_id": "exp-1", "phase": "agent", "dimension": "minecraft:overworld", "tick": 125, "seq": 4, "session": "s1", "event": "cart_removed", "cart_uuid": records[0]["uuid"], "pos": [2, -70, 0], "removal_reason": "void"},
         ],
     )
     _write_jsonl(
@@ -3651,6 +3653,25 @@ def run_selftest(out: TextIO | None = None) -> int:
             "duplicate event id reason",
             _has_reason(_report_check(report, "independent_test_mod"), "audit_event_id_duplicate"),
         )
+
+        restart = _copy_bundle(base, valid, "session-restart")
+        _edit_jsonl(
+            restart / "artifacts/independent_test_mod/audit-events.jsonl",
+            lambda rows: (rows[3].update(tick=5, session="s2"), rows[4].update(tick=6, session="s2")),
+        )
+
+        def _retick_joins(join: dict) -> None:
+            for item in join.get("joins", []):
+                if item.get("audit_ref", {}).get("event_id") == "e4":
+                    item["audit_ref"]["tick"] = 5
+                elif item.get("audit_ref", {}).get("event_id") == "e5":
+                    item["audit_ref"]["tick"] = 6
+
+        _edit_json(restart / "artifacts/trace_persistence/trace-join.json", _retick_joins)
+        _refresh_index(restart, "artifacts/independent_test_mod/audit-events.jsonl")
+        _refresh_index(restart, "artifacts/trace_persistence/trace-join.json")
+        report = run_gate(restart)
+        test.equal("restart tick reset with increasing seq passes", report.overall, STATUS_PASS)
 
         seq_collision = _copy_bundle(base, valid, "seq-collision")
         _edit_jsonl(

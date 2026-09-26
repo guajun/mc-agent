@@ -287,7 +287,8 @@ cross-checked against `version_lock.test-mod`), `read_only` (true),
 | `run_id` | s | parent `run.run_id`, or a `run.child_runs` id for `init`/`restore` phases |
 | `instance_id` | s | declared in `run.instances`; for a child run, its declared instance |
 | `dimension` | s | must equal the declared `dimension` of that `instance_id` |
-| `tick` | i | >= 0; `(tick, seq)` strictly increasing per `run_id/instance_id/dimension` |
+| `tick` | i | >= 0; the real server tick, which may reset across a restart |
+| `seq` | i | >= 0; strictly increasing per `run_id/instance_id/dimension` (the append sequence is the ordering key) |
 | `seq` | i | >= 0; equal/colliding pairs fail, they cannot establish ordering |
 | `event` | s | see below |
 | `phase` | s | `init`, `agent` or `restore`; `agent` events must belong to the parent run |

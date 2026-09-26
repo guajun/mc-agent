@@ -42,7 +42,7 @@ extracts the reviewed #20 artifacts into a parameterized regression.
 | stage-one gate tool | merged (#22) | `tools/stage1_gate.py`; `selftest` **152 checks** |
 | cold-start protocol tools | merged (#25) | `tools/coldstart.py`, `harness_preflight.py`, `run_trace.py`, `run_audit.py` |
 | combined integration driver | merged (#28, `2675825`) | `tools/stage1_integration.py`; [stage-one integration run](stage1-integration.md) |
-| full gate acceptance driver | on branch `codex/rom13-fullgate` (PR for #14) | `tools/stage1_fullgate.py`; [full gate summary](evidence/rom13-stage1/full-gate-summary.json) |
+| full gate acceptance driver | on branch `codex/rom13-fullgate` (PR #30 for #14), review-fix run | `tools/stage1_fullgate.py`; real bounded ROM calibration + no-mod parity + post-restart memory verify; [full gate summary](evidence/rom13-stage1/full-gate-summary.json) |
 | fixture #15 | merged (#27, `8dd75c6`) | `examples/minecart-rom/` |
 | audit mod #18 | merged (#26, `824c15d`) | `tests/mods/minecart-audit/` |
 | live stage-one gate | **PASS 8/8** (exit 0) on branch `codex/rom13-fullgate`, pending human review | [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json) |

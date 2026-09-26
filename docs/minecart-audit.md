@@ -123,8 +123,10 @@ mc-audit/
 ```
 
 Every event carries `seq` (strictly increasing in the file, seeded across
-server restarts), `tick` (server tick), `wall`, `run`, `inst`, `session`,
-`phase` and `type`. A restart appends a new `session_start`; one `runId` can
+server restarts), `tick` (the **real** server tick, which a restart resets),
+`wall`, `run`, `inst`, `session`, `phase` and `type`. The gate exporter keeps
+the real tick and the append sequence, plus the session and wall clock, so an
+ordering decision names its clock scope instead of renumbering ticks. A restart appends a new `session_start`; one `runId` can
 therefore span several server sessions (needed for mod redeploys and snapshot
 restores) without losing ordering. `maxBytes` caps the whole file, not one
 session: the byte counter is seeded from the existing file size, so a run
@@ -137,7 +139,7 @@ Key event types:
 | --- | --- |
 | `input_attempt` | player interaction with a note block, with operator UUID, hand, item, result and whether the position is a configured input |
 | `input_request` | `NoteBlock.playNote`, the actual request; carries the triggering entity (`player`, `entity`, or `redstone_or_environment`) |
-| `input_processed` | `NoteBlock.triggerEvent`, the server processing the note; links `requestSeq`/`attemptSeq`, records note/instrument and `agentOp` |
+| `input_processed` | The server processing the note; links `requestSeq`/`attemptSeq`, records note/instrument and `agentOp`. `path` names the vanilla path: `triggerEvent` when the block event is scheduled, or `playNote` when the note block's instrument does not work above the block and the block above is not air, so the play itself is the processing (the fixture's harp note block with leaves above uses `playNote`). |
 | `cart_tracked` | a configured cart loaded inside the stack region, with ordered inventory and origin phase |
 | `cart_sample` | periodic position/motion/inventory sample, deduplicated per cart and tick |
 | `cart_exit` | first time the cart left the stack region / entered the output region (via sample or removal) |

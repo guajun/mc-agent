@@ -1,11 +1,11 @@
 # 阶段一集成运行
 
-!!! success "完整门禁通过（2026-09-25，分支 `codex/rom13-fullgate`）"
+!!! success "完整门禁通过（评审修复运行，分支 `codex/rom13-fullgate`）"
     issue #14 的验收运行（`tools/stage1_fullgate.py`，run id
-    `rom13-fullgate-20260925T210725Z`）已在已合并的 #15 fixture 与 #18 审计 mod
+    `rom13-fullgate-20260926T011803Z`）在已合并的 #15 fixture 与 #18 审计 mod
     上执行**完整**组合阶段一流程，门禁结果为 **pass 8/8**（exit 0），并通过只读源世界重新哈希。带全部固定哈希的版本化摘要见
     [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json)。
-    下文记录的 blocked 结果是更早的通用接线运行（#28，head `32aa245`），仅作历史保留；本分支的完整门禁已取代它，等待人工评审。
+    下文记录的 blocked 结果是更早的通用接线运行（#28，head `32aa245`），仅作历史保留。
 
 本页记录可复现的**组合式**阶段一集成：两个真实 Fabric 实验室、自构建的 smoke mod、已提交的 #18 审计 mod、最终冻结的工具轨迹、已合并的 bridge#6 恢复证据，以及门禁结论。并停在门禁线上：这里不做任何阶段二工作。
 

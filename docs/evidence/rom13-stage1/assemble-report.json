@@ -34,7 +34,7 @@
     "schema_version": 1,
     "gate": "rom13-stage1",
     "issue": "guajun/mc-agent#14",
-    "generated_at": "2026-09-25T21:17:40Z",
+    "generated_at": "2026-09-26T01:44:46Z",
     "bundle": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\fullgate-evidence\\bundle",
     "overall": "pass",
     "checks": [
@@ -60,9 +60,9 @@
             "kind": "fixture_manifest",
             "path": "artifacts/fixture_map/fixture-manifest.json",
             "status": "ok",
-            "sha256": "304343eb62997364944f03611dadc89a75f999f8bbdb94cda69b1bca413481ed",
+            "sha256": "990ea3f78a6205d76592664b7f10d4aa744cbf0af317fe38741fd4dc6ecc117f",
             "tree_sha256": null,
-            "bytes": 1969,
+            "bytes": 1991,
             "files": null,
             "detail": ""
           },
@@ -70,9 +70,9 @@
             "kind": "init_runs",
             "path": "artifacts/fixture_map/init-runs.jsonl",
             "status": "ok",
-            "sha256": "11f50e30eb8ab9bf3da832763ebab97736556385ba2be6a678cf268a2bca20d7",
+            "sha256": "1838396fbac1a1ed93e56a51012d1fc6092c879c4c172550d6e46cbb49992d27",
             "tree_sha256": null,
-            "bytes": 2478,
+            "bytes": 2586,
             "files": null,
             "detail": ""
           },
@@ -100,9 +100,9 @@
             "kind": "cleanup_rebuild",
             "path": "artifacts/fixture_map/cleanup-rebuild.json",
             "status": "ok",
-            "sha256": "9d03d544d9d13899d9def557ffcc0d4530006ac50d92614039a13a4f070ba1ae",
+            "sha256": "2150668edea1f354d2b545a051033d4eb5196410ec7b091faea5f7c28c89dda4",
             "tree_sha256": null,
-            "bytes": 1796,
+            "bytes": 1818,
             "files": null,
             "detail": ""
           }
@@ -117,7 +117,7 @@
           {
             "name": "restore order reproduced",
             "ok": true,
-            "detail": "cc76834fd15c0e21"
+            "detail": "2df69346a566a2ba"
           },
           {
             "name": "restore full state equal",
@@ -136,8 +136,8 @@
             "path": "artifacts/restore_fidelity/snapshot-before",
             "status": "ok",
             "sha256": null,
-            "tree_sha256": "2db987f0b210cbb3e621029ed682d7dfbbfe055d2d04d3a6cb9ac6fa374826de",
-            "bytes": 9232,
+            "tree_sha256": "b25e30d0ee33539e7346841322f5c0450996b6c5e56caa6b178f32ef87654fa7",
+            "bytes": 7637,
             "files": 2,
             "detail": "2 file(s)"
           },
@@ -146,8 +146,8 @@
             "path": "artifacts/restore_fidelity/snapshot-after",
             "status": "ok",
             "sha256": null,
-            "tree_sha256": "a41c14ceee13f4b1cbc8a3a1ad3d296647cf390215496adc31f238f8673de016",
-            "bytes": 9098,
+            "tree_sha256": "08dd888ad8c1df2441e0f775c54ba9221545529f8a3ea2cc9665475a264848db",
+            "bytes": 7499,
             "files": 2,
             "detail": "2 file(s)"
           },
@@ -155,9 +155,9 @@
             "kind": "restore_record",
             "path": "artifacts/restore_fidelity/restore-record.json",
             "status": "ok",
-            "sha256": "a0104150c1f0135b64789e6e81361fc4a7bdc64ac4e90d1a9e2edb774de3b260",
+            "sha256": "3202a9b4abeb27716616baa43ad3756906e03ba00230edcefe8ef2a5721af0f8",
             "tree_sha256": null,
-            "bytes": 10351,
+            "bytes": 10352,
             "files": null,
             "detail": ""
           },
@@ -165,9 +165,9 @@
             "kind": "source_unchanged",
             "path": "artifacts/restore_fidelity/source-unchanged.json",
             "status": "ok",
-            "sha256": "188f90a8168403466b8466008315bf8d6022be3cf776ce80c499c71d4b52e8b6",
+            "sha256": "73fb5d8bc81ff9fa5f9c10cd8008af88a5730468178abd9b1301197d6ec5e484",
             "tree_sha256": null,
-            "bytes": 545,
+            "bytes": 1007,
             "files": null,
             "detail": ""
           },
@@ -175,9 +175,9 @@
             "kind": "failure_cases",
             "path": "artifacts/restore_fidelity/failure-cases.jsonl",
             "status": "ok",
-            "sha256": "9ed11aea5d7105cfe7e735e500183d6cec2f4541c068b4ad3c64f81b68ed56e2",
+            "sha256": "75b57d53c90bb115b70ba1a69d2699f6ba23444ebcc2dfb22d19793ac49dbfa6",
             "tree_sha256": null,
-            "bytes": 3410,
+            "bytes": 3549,
             "files": null,
             "detail": ""
           }
@@ -200,9 +200,9 @@
             "kind": "identity_records",
             "path": "artifacts/player_context/identity-records.jsonl",
             "status": "ok",
-            "sha256": "2b19d3863ecc69d1fccc77857cbfaf2c88d534f6e7e0cc92ca8641564d40148b",
+            "sha256": "b46601c3b47ac7ee048c541142a9a864f8976e9a86cac47e59241d99acf7a09c",
             "tree_sha256": null,
-            "bytes": 5708,
+            "bytes": 6877,
             "files": null,
             "detail": ""
           },
@@ -210,9 +210,9 @@
             "kind": "entry_contract",
             "path": "artifacts/player_context/entry-contract.json",
             "status": "ok",
-            "sha256": "05a6995dbdf543750524192f59557b360843b6c33fbed2ac668398a37a777063",
+            "sha256": "69ea46c0a689c391d3c9ceffcbc1499fda975f5fbacbed805b1b7a1d3c3fbcf3",
             "tree_sha256": null,
-            "bytes": 340,
+            "bytes": 530,
             "files": null,
             "detail": ""
           },
@@ -250,9 +250,9 @@
             "kind": "tool_environment",
             "path": "artifacts/agent_dev_capability/tool-environment.json",
             "status": "ok",
-            "sha256": "5d544f539ad7e50a27c4b8ac3cb2aff01c6908d971b9d0be673e204c544fa920",
+            "sha256": "02f3e26977d1da2a41867d7ecead1dac8f2465664d97d9f376624ca021e94b14",
             "tree_sha256": null,
-            "bytes": 787,
+            "bytes": 2230,
             "files": null,
             "detail": ""
           },
@@ -260,9 +260,9 @@
             "kind": "jar_update",
             "path": "artifacts/agent_dev_capability/jar-update.json",
             "status": "ok",
-            "sha256": "e4418a82d9e5e5cbbd3606d30bc18c508e14728f13b13963e043e1c6d8e31d5a",
+            "sha256": "4625cf80e8fcd410a549cc38416a4baf68d73106c1d32a410428f3ce8c890672",
             "tree_sha256": null,
-            "bytes": 909,
+            "bytes": 1116,
             "files": null,
             "detail": ""
           },
@@ -270,9 +270,9 @@
             "kind": "smoke_mod",
             "path": "artifacts/agent_dev_capability/smoke-mod.json",
             "status": "ok",
-            "sha256": "3872afaaf06c1c23e54e3b97b007928ab1972820c3d1c489a4e0ef00966eae2b",
+            "sha256": "e593a1a4a081b6ec6fae8b2e4dd45b1abaaedb44bb46da07ff19246fdbb2aa05",
             "tree_sha256": null,
-            "bytes": 3333,
+            "bytes": 2140,
             "files": null,
             "detail": ""
           },
@@ -280,9 +280,9 @@
             "kind": "instance_isolation",
             "path": "artifacts/agent_dev_capability/instance-isolation.jsonl",
             "status": "ok",
-            "sha256": "84eda7a60e49e9aba7799978b716709893e6131d498f541c58d4f5f4c3a53533",
+            "sha256": "882d7d561e722d1c70f766d13caf77ec1eb99eb8a73dadc1a86c85916e6a98a0",
             "tree_sha256": null,
-            "bytes": 620,
+            "bytes": 1550,
             "files": null,
             "detail": ""
           }
@@ -310,9 +310,9 @@
             "kind": "test_mod_manifest",
             "path": "artifacts/independent_test_mod/test-mod-manifest.json",
             "status": "ok",
-            "sha256": "9aca7adcc6eeb31119a604aae9659f7795b49470a58f69065d978d9c33a0520e",
+            "sha256": "40218b1506ddd587f6afe9a756d4fee0ae0f80991a552b47d18692d61af3a47e",
             "tree_sha256": null,
-            "bytes": 2283,
+            "bytes": 3737,
             "files": null,
             "detail": ""
           },
@@ -320,9 +320,9 @@
             "kind": "audit_events",
             "path": "artifacts/independent_test_mod/audit-events.jsonl",
             "status": "ok",
-            "sha256": "1ac5cec2a35a5645781aa26c695519da6e0e0c137b27c92344aedb979734835c",
+            "sha256": "12d18f073d7f8c899a135c5cc9d0436cc0cf21f932b9f75242e96e3c3f27f1fe",
             "tree_sha256": null,
-            "bytes": 5511,
+            "bytes": 5910,
             "files": null,
             "detail": ""
           },
@@ -330,7 +330,7 @@
             "kind": "negative_cases",
             "path": "artifacts/independent_test_mod/negative-cases.jsonl",
             "status": "ok",
-            "sha256": "6772f3c83edd0df7821b04ee0cdf2aa3ac9efd0c9f168e853343e740d5a7ff61",
+            "sha256": "d15586b7e4a36782c82b2ff5a72a37a96fb38aa5c7cc3e9e83b7b6a2a2a175aa",
             "tree_sha256": null,
             "bytes": 1111,
             "files": null,
@@ -340,9 +340,9 @@
             "kind": "audit_lifecycle",
             "path": "artifacts/independent_test_mod/audit-lifecycle.json",
             "status": "ok",
-            "sha256": "f0aeb8466b31e826885d80cabcaa39d5b843cfb21875d6cbba9ffd336ab1014a",
+            "sha256": "a6de3090c20a817af13cc9a19b2baf0b8b53658bd2e2131c3eb5b383382c58d0",
             "tree_sha256": null,
-            "bytes": 640,
+            "bytes": 2687,
             "files": null,
             "detail": ""
           }
@@ -357,7 +357,7 @@
           {
             "name": "tool categories covered",
             "ok": true,
-            "detail": "errors preserved: 5"
+            "detail": "errors preserved: 3"
           },
           {
             "name": "tool trace joins game events",
@@ -370,9 +370,9 @@
             "kind": "tool_trace",
             "path": "artifacts/trace_persistence/tool-trace.jsonl",
             "status": "ok",
-            "sha256": "e68a45d726bea9551cd093f49d36326269b582f06bac071a389b62fd5368e1e6",
+            "sha256": "add0a7e2967a7fdfb502741803f4b873d006a839d17f0e07de3ef324eeaed661",
             "tree_sha256": null,
-            "bytes": 135894,
+            "bytes": 169356,
             "files": null,
             "detail": ""
           },
@@ -380,9 +380,9 @@
             "kind": "trace_join",
             "path": "artifacts/trace_persistence/trace-join.json",
             "status": "ok",
-            "sha256": "f7c1ec27b0cf87fbb1810d5f650d91f8862529acc77c04305a91f7a278ae730c",
+            "sha256": "dc720110fd74d63b2eb3c9c608bdb4a3ffb763f94c200768af057dd8fd626e46",
             "tree_sha256": null,
-            "bytes": 8227,
+            "bytes": 13338,
             "files": null,
             "detail": ""
           },
@@ -415,9 +415,9 @@
             "kind": "smoke_report",
             "path": "artifacts/smoke_fixture_validity/smoke-report.json",
             "status": "ok",
-            "sha256": "8f86c3ae33633feca597915e2e59292ae2e534690ecf9123eb7504a77d525a99",
+            "sha256": "54f535bf83e9f57b3eeebeff31a6d44859367b6c917f9b6335a4a68121826bbc",
             "tree_sha256": null,
-            "bytes": 1340,
+            "bytes": 1433,
             "files": null,
             "detail": ""
           },
@@ -425,9 +425,9 @@
             "kind": "fixture_validity",
             "path": "artifacts/smoke_fixture_validity/fixture-validity.json",
             "status": "ok",
-            "sha256": "a24138a7b49c2d34507cd6196a4570b3823ded99d3794f80e4f5ae191c81759c",
+            "sha256": "028719805d7eb4744f5573cfaf9c59fe8f8e14a538bc26478f2fa300744e67e5",
             "tree_sha256": null,
-            "bytes": 1046,
+            "bytes": 2689,
             "files": null,
             "detail": ""
           },
@@ -435,7 +435,7 @@
             "kind": "version_lock",
             "path": "artifacts/smoke_fixture_validity/version-lock.json",
             "status": "ok",
-            "sha256": "965dbf6ea8c865864da1fd47facef2c7e4ae9b255c7e5ad5b8989fee48314174",
+            "sha256": "d5b3346c900fae58c9db72c8409e03803b867d64e8321a8fa7b4e409dfda1952",
             "tree_sha256": null,
             "bytes": 1117,
             "files": null,
@@ -445,9 +445,9 @@
             "kind": "evidence_index",
             "path": "artifacts/smoke_fixture_validity/evidence-index.json",
             "status": "ok",
-            "sha256": "17212935c829e12bfdb0a6839b4cf4eb235116d8fc110132ef1593621397f869",
+            "sha256": "91fab908d03bfd52b948f5cdea59841f93443958602abb8f69ba326a614c2cd1",
             "tree_sha256": null,
-            "bytes": 5158,
+            "bytes": 5164,
             "files": null,
             "detail": ""
           }
