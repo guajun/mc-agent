@@ -31,3 +31,7 @@ Thumbs.db
 !examples/minecart-rom/dist/**
 !examples/minecart-rom/**/*.log
 !examples/minecart-rom/**/*.jsonl
+
+# ROM20 cold-start evidence: canonical trajectory and canonical test-mod/
+# logger projections are review artifacts, not throwaway lab logs
+!docs/evidence/rom20-coldstart/**/*.jsonl
