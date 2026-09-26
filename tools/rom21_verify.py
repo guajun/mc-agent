@@ -41,6 +41,7 @@ import argparse
 import copy
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -178,6 +179,49 @@ def normalize_items(items: Any) -> list[tuple[int, str, int]]:
 def items_digest(items: Any) -> str:
     text = ";".join(f"{slot}|{identifier}|{count}" for slot, identifier, count in normalize_items(items))
     return sha256_bytes(text.encode("utf-8"))
+
+
+_SHA256_HEX = re.compile(r"^[0-9a-fA-F]{64}$")
+
+
+def _int_field(row: Mapping[str, Any], name: str) -> int | None:
+    """A real integer (never a bool) field, or None."""
+    value = row.get(name)
+    if isinstance(value, bool) or not isinstance(value, int):
+        return None
+    return value
+
+
+def _sha256_hex(value: Any) -> bool:
+    return isinstance(value, str) and bool(_SHA256_HEX.fullmatch(value.strip()))
+
+
+def source_observation_problem(observation: Any) -> str | None:
+    """A source-world observation is only accepted with real, hashed content.
+
+    ``source_save_present`` alone (or an empty object) is not proof of anything:
+    the observation must carry a non-empty 64-hex tree digest and the matching
+    baseline digest, a true ``matches_baseline`` flag and non-zero file/byte
+    counts.
+    """
+    if not isinstance(observation, Mapping):
+        return "no observation recorded"
+    if observation.get("source_save_present") is not True:
+        return "source_save_present is not true"
+    for field in ("tree_sha256", "baseline_sha256"):
+        if not _sha256_hex(observation.get(field)):
+            return f"{field} is not a 64-hex digest"
+    if str(observation["tree_sha256"]).lower() != str(observation["baseline_sha256"]).lower():
+        return "observed tree hash does not equal the recorded baseline"
+    if observation.get("matches_baseline") is not True:
+        return "matches_baseline is not true"
+    files = observation.get("files")
+    total = observation.get("bytes")
+    if isinstance(files, bool) or not isinstance(files, int) or files <= 0:
+        return "files is not a positive integer"
+    if isinstance(total, bool) or not isinstance(total, int) or total <= 0:
+        return "bytes is not a positive integer"
+    return None
 
 
 def program_carts(config: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -419,40 +463,84 @@ def verify_run(
     checks.add("run_manifest", not manifest_problems, "; ".join(manifest_problems) or "run manifest consistent")
 
     # -- logger session -----------------------------------------------------
+    required_dimension = str((run.get("scene") or {}).get("dimension") or run.get("dimension") or "")
+    required_identity = {
+        "instance": str(run.get("instance") or ""),
+        "run_id": str(run.get("runId") or ""),
+        "dimension": required_dimension,
+        "build": str((run.get("loggerJar") or {}).get("build") or ""),
+    }
     session_problems: list[str] = []
     session: list[dict[str, Any]] = []
     try:
         session = pick_logger_session(logger_rows, int(run.get("loggerSessionOrdinal", 1)))
     except (VerifyError, TypeError, ValueError) as error:
         session_problems.append(str(error))
+    if not required_dimension:
+        session_problems.append("the run has no dimension to bind the logger session to")
     armed = next((row for row in session if row.get("event") == "logger_armed"), None)
+    # Every relevant logger event must carry the full identity, dimension
+    # included; a capture from another dimension or instance is not evidence.
+    for row in session:
+        if row.get("event") not in ("logger_armed", "cart_observed", "cart_void_capture", "logger_flushed"):
+            continue
+        for field, wanted in required_identity.items():
+            if wanted and str(row.get(field)) != wanted:
+                session_problems.append(
+                    f"{row.get('event')} seq {row.get('seq')}: {field}={row.get(field)!r} != {wanted!r}"
+                )
     if armed is None:
         session_problems.append("no logger_armed record in the selected session")
     else:
-        for field, key in (("instance", "instance"), ("run_id", "runId"), ("dimension", "dimension")):
-            if str(armed.get(field)) != str(run.get(key)):
-                session_problems.append(f"logger_armed.{field}={armed.get(field)} != run {run.get(key)}")
-        if str(armed.get("build")) != str((run.get("loggerJar") or {}).get("build")):
-            session_problems.append("logger_armed.build does not match the run logger build")
+        armed_tick = _int_field(armed, "tick")
+        armed_wall = _int_field(armed, "wall")
+        if armed_tick is None or armed_tick < 0 or armed_wall is None or armed_wall <= 0:
+            session_problems.append("logger_armed has no valid tick/wall timestamp")
         if int(armed.get("expectedCarts") or -1) != expected:
             session_problems.append("logger_armed.expectedCarts does not match the run program")
         expected_axis = str((run.get("scene") or {}).get("exitAxis", "")).lower()
         if str(armed.get("exitAxis", "")).lower() != expected_axis:
             session_problems.append("logger_armed.exitAxis does not match the run scene")
-    cart_rows = [
-        row for row in session
-        if row.get("event") in ("cart_observed", "cart_void_capture")
-    ]
-    for row in cart_rows:
-        if str(row.get("instance")) != str(run.get("instance")) or str(row.get("run_id")) != str(run.get("runId")):
-            session_problems.append(
-                f"cart record {row.get('seq')} carries instance/run {row.get('instance')}/{row.get('run_id')}"
-            )
-            break
+        # Strong temporal binding to the selected audit server session: the
+        # arm must happen inside that session's lifetime and before every
+        # input and capture.  This rejects missing, future-dated and
+        # cross-session arms instead of trusting the record's presence.
+        processed_rows = experiment_rows(audit_rows, "input_processed")
+        exit_rows = experiment_rows(audit_rows, "cart_exit")
+        session_start = next((row for row in audit_rows if row.get("type") == "session_start"), None)
+        if run.get("auditSessionId") and session_start is None:
+            session_problems.append("cannot bind the logger session: the audit session has no session_start")
+        if session_start is not None:
+            start_wall = _int_field(session_start, "wall")
+            if start_wall is not None and armed_wall is not None and armed_wall < start_wall:
+                session_problems.append("logger_armed.wall precedes the selected audit session start")
+        # The two mods both arm at SERVER_STARTED, so their relative order is
+        # not deterministic; the meaningful binding is: inside the selected
+        # server session and before the experiment window, every input and
+        # every capture.
+        anchors = (
+            ("experiment phase", next(
+                (row for row in audit_rows if row.get("type") == "phase" and row.get("to") == "experiment"), None)),
+            ("first processed input", processed_rows[0] if processed_rows else None),
+            ("first cart exit", exit_rows[0] if exit_rows else None),
+            ("first transient capture", next(
+                (row for row in session if row.get("event") == "cart_observed"), None)),
+            ("first natural capture", next(
+                (row for row in session if row.get("event") == "cart_void_capture"), None)),
+        )
+        for label, anchor in anchors:
+            if anchor is None:
+                continue
+            anchor_tick = _int_field(anchor, "tick")
+            anchor_wall = _int_field(anchor, "wall")
+            if anchor_tick is not None and armed_tick is not None and armed_tick > anchor_tick:
+                session_problems.append(f"logger_armed.tick {armed_tick} is after {label} tick {anchor_tick}")
+            if anchor_wall is not None and armed_wall is not None and armed_wall > anchor_wall:
+                session_problems.append(f"logger_armed.wall {armed_wall} is after {label} wall {anchor_wall}")
     checks.add(
         "logger_session",
         not session_problems,
-        "; ".join(session_problems) or f"logger session {run.get('loggerSessionOrdinal', 1)} scoped and identified",
+        "; ".join(session_problems[:6]) or f"logger session {run.get('loggerSessionOrdinal', 1)} scoped and identified",
     )
 
     # -- audit oracle -------------------------------------------------------
@@ -464,6 +552,29 @@ def verify_run(
         instances = {str(row.get("inst")) for row in audit_rows}
         if runs != {str(run.get("runId"))} or instances != {str(run.get("instance"))}:
             oracle_problems.append(f"audit run/inst {sorted(runs)}/{sorted(instances)} do not match the run")
+        # Every oracle-relevant audit event must be in the run's dimension
+        # (`dimension` and `level` are the produced aliases).
+        cart_event_types = (
+            "cart_tracked", "cart_reload", "cart_reappeared", "cart_sample", "cart_exit",
+            "cart_remove", "cart_inventory_change", "cart_teleport",
+        )
+        dimension_problems: list[str] = []
+        for row in audit_rows:
+            kind = row.get("type")
+            if kind == "audit_ready":
+                config = row.get("config") if isinstance(row.get("config"), Mapping) else {}
+                dimension = config.get("dimension") or row.get("dimension")
+                if str(dimension) != required_dimension:
+                    dimension_problems.append(
+                        f"audit_ready dimension {dimension!r} != {required_dimension!r}"
+                    )
+            elif kind in cart_event_types:
+                dimension = row.get("dimension", row.get("level"))
+                if str(dimension) != required_dimension:
+                    dimension_problems.append(
+                        f"{kind} seq {row.get('seq')} dimension {dimension!r} != {required_dimension!r}"
+                    )
+        oracle_problems.extend(dimension_problems[:4])
         session_id = experiment_session_id(audit_rows)
         if session_id is None:
             oracle_problems.append("no experiment input_processed/cart_exit in the audit log")
@@ -604,6 +715,18 @@ def verify_run(
                 timing_problems.append(f"cart {index}: transient capture tick precedes the audit cart_exit")
             elif delta > transient_max:
                 timing_problems.append(f"cart {index}: transient capture {delta} ticks after the pop (max {transient_max})")
+        if index < len(removes):
+            matched_remove = removes[index]
+            if str(matched_remove.get("uuid")) != cart["uuid"]:
+                timing_problems.append(f"cart {index}: transient capture does not match the removal UUID")
+            remove_tick = int(matched_remove.get("tick", -1))
+            # A capture at or after the destruction tick cannot be a transient
+            # observation, no matter how wide the configured window is.
+            if int(cart["tick"]) >= remove_tick:
+                timing_problems.append(
+                    f"cart {index}: transient capture tick {cart['tick']} is not strictly before the matched "
+                    f"removal tick {remove_tick}"
+                )
         if index < len(removes) and cart["uuid"] in void_by_uuid:
             void = void_by_uuid[cart["uuid"]]
             drift = abs(int(void["tick"]) - int(removes[index].get("tick", -1)))
@@ -612,7 +735,7 @@ def verify_run(
     checks.add(
         "capture_timing",
         not timing_problems,
-        "; ".join(timing_problems[:6]) or "capture and removal ticks inside the calibrated windows",
+        "; ".join(timing_problems[:6]) or "capture before removal and inside the calibrated windows",
     )
 
     # -- order --------------------------------------------------------------
@@ -738,17 +861,22 @@ def verify_run(
 
     # -- source world -------------------------------------------------------
     source_problems: list[str] = []
-    before = (run.get("sourceWorld") or {}).get("before") or {}
-    after = (run.get("sourceWorld") or {}).get("after") or {}
-    if before and after:
-        if before.get("tree_sha256") != after.get("tree_sha256"):
+    source = run.get("sourceWorld") if isinstance(run.get("sourceWorld"), Mapping) else {}
+    before = source.get("before") if isinstance(source.get("before"), Mapping) else None
+    after = source.get("after") if isinstance(source.get("after"), Mapping) else None
+    for label, observation in (("before", before), ("after", after)):
+        problem = source_observation_problem(observation)
+        if problem:
+            source_problems.append(f"{label}: {problem}")
+    if not source_problems:
+        if str(before["tree_sha256"]).lower() != str(after["tree_sha256"]).lower():
             source_problems.append("the read-only source world changed during the run")
-    elif not (run.get("sourceWorld") or {}).get("source_save_present", False):
-        source_problems.append("no source-world before/after observation recorded")
+        if str(before["baseline_sha256"]).lower() != str(after["baseline_sha256"]).lower():
+            source_problems.append("the source-world baseline differs between the before/after observations")
     checks.add(
         "source_world",
         not source_problems,
-        "; ".join(source_problems) or "source world (and map artifact) unchanged",
+        "; ".join(source_problems[:6]) or "source world observed before and after with matching hashed baselines",
     )
 
     # -- answer vs oracle ---------------------------------------------------
@@ -890,6 +1018,14 @@ def _synthetic_run() -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[st
         {"index": 2, "items": [{"slot": 2, "id": "minecraft:gold_ingot", "count": 3}]},
     ]
     program = {"carts": carts}
+    valid_source = {
+        "source_save_present": True,
+        "tree_sha256": "c" * 64,
+        "baseline_sha256": "c" * 64,
+        "matches_baseline": True,
+        "files": 40,
+        "bytes": 123456,
+    }
     run = {
         "format": RUN_FORMAT,
         "runId": "selftest-run",
@@ -900,63 +1036,80 @@ def _synthetic_run() -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[st
         "programSha256": program_sha256(carts),
         "expectedCartCount": 3,
         "agentUuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
-        "scene": {"exitAxis": "x", "exitGreaterThan": 15.0},
+        "scene": {"exitAxis": "x", "exitGreaterThan": 15.0, "dimension": "minecraft:overworld"},
         "operations": {"causalMaxTicks": 40, "transientMaxDeltaTicks": 80},
         "loggerSessionOrdinal": 1,
         "loggerJar": {"sha256": "a" * 64, "size": 100, "build": "romlog-rom21-1", "sourceSha256": "s" * 64,
                       "deployedSha256": "a" * 64},
         "auditJar": {"sha256": "b" * 64},
-        "sourceWorld": {"before": {"tree_sha256": "c" * 64}, "after": {"tree_sha256": "c" * 64}},
+        "sourceWorld": {"before": dict(valid_source), "after": dict(valid_source)},
     }
+    base_wall = 1_790_000_000_000
     logger_rows: list[dict[str, Any]] = [
-        {"event": "logger_armed", "seq": 1, "tick": 0, "instance": "experiment", "run_id": "selftest-run",
-         "dimension": "minecraft:overworld", "build": "romlog-rom21-1", "expectedCarts": 3,
-         "exitAxis": "x", "exitGreaterThan": 15.0},
+        {"event": "logger_armed", "seq": 1, "tick": 0, "wall": base_wall + 10,
+         "instance": "experiment", "run_id": "selftest-run", "dimension": "minecraft:overworld",
+         "build": "romlog-rom21-1", "expectedCarts": 3, "exitAxis": "x", "exitGreaterThan": 15.0},
     ]
     audit_rows: list[dict[str, Any]] = [
-        {"type": "session_start", "seq": 1, "tick": 0, "run": "selftest-run", "inst": "experiment", "session": "s1", "phase": "ready"},
-        {"type": "audit_ready", "seq": 2, "tick": 0, "run": "selftest-run", "inst": "experiment", "session": "s1", "phase": "ready"},
-        {"type": "phase", "seq": 3, "tick": 100, "run": "selftest-run", "inst": "experiment", "session": "s1",
-         "phase": "experiment", "from": "ready", "to": "experiment", "requested": "experiment_start"},
+        {"type": "session_start", "seq": 1, "tick": 0, "wall": base_wall, "run": "selftest-run",
+         "inst": "experiment", "session": "s1", "phase": "ready"},
+        {"type": "audit_ready", "seq": 2, "tick": 0, "wall": base_wall + 1, "run": "selftest-run",
+         "inst": "experiment", "session": "s1", "phase": "ready",
+         "config": {"dimension": "minecraft:overworld"}},
+        {"type": "phase", "seq": 3, "tick": 100, "wall": base_wall + 500, "run": "selftest-run",
+         "inst": "experiment", "session": "s1", "phase": "experiment", "from": "ready",
+         "to": "experiment", "requested": "experiment_start"},
     ]
     seq = 10
     tick = 1000
+    wall = base_wall + 2000
     for index, cart in enumerate(carts):
         request_seq, attempt_seq, processed_seq = seq, seq + 1, seq + 2
-        audit_rows.append({"type": "input_request", "seq": request_seq, "tick": tick, "run": "selftest-run",
-                           "inst": "experiment", "session": "s1", "phase": "experiment",
+        audit_rows.append({"type": "input_request", "seq": request_seq, "tick": tick, "wall": wall,
+                           "run": "selftest-run", "inst": "experiment", "session": "s1",
+                           "phase": "experiment", "operator": {"uuid": run["agentUuid"], "name": "Romuser"}})
+        audit_rows.append({"type": "input_attempt", "seq": attempt_seq, "tick": tick, "wall": wall,
+                           "run": "selftest-run", "inst": "experiment", "session": "s1",
+                           "phase": "experiment", "requestSeq": request_seq,
                            "operator": {"uuid": run["agentUuid"], "name": "Romuser"}})
-        audit_rows.append({"type": "input_attempt", "seq": attempt_seq, "tick": tick, "run": "selftest-run",
-                           "inst": "experiment", "session": "s1", "phase": "experiment", "requestSeq": request_seq,
-                           "operator": {"uuid": run["agentUuid"], "name": "Romuser"}})
-        audit_rows.append({"type": "input_processed", "seq": processed_seq, "tick": tick, "run": "selftest-run",
-                           "inst": "experiment", "session": "s1", "phase": "experiment", "requestSeq": request_seq,
-                           "attemptSeq": attempt_seq, "orderingEvidence": True, "agentOp": True,
+        audit_rows.append({"type": "input_processed", "seq": processed_seq, "tick": tick, "wall": wall,
+                           "run": "selftest-run", "inst": "experiment", "session": "s1",
+                           "phase": "experiment", "requestSeq": request_seq, "attemptSeq": attempt_seq,
+                           "orderingEvidence": True, "agentOp": True,
                            "operator": {"uuid": run["agentUuid"], "name": "Romuser"}})
         exit_tick = tick + 4
         remove_tick = tick + 140
         uuid = f"00000000-0000-0000-0000-00000000000{index}"
-        audit_rows.append({"type": "cart_exit", "seq": seq + 3, "tick": exit_tick, "run": "selftest-run",
-                           "inst": "experiment", "session": "s1", "phase": "experiment", "uuid": uuid, "epoch": 1,
+        audit_rows.append({"type": "cart_exit", "seq": seq + 3, "tick": exit_tick, "wall": wall + 50,
+                           "run": "selftest-run", "inst": "experiment", "session": "s1",
+                           "phase": "experiment", "uuid": uuid, "epoch": 1, "level": "minecraft:overworld",
                            "inventory": cart["items"], "inventoryDigest": f"d{index}"})
-        audit_rows.append({"type": "cart_remove", "seq": seq + 4, "tick": remove_tick, "run": "selftest-run",
-                           "inst": "experiment", "session": "s1", "phase": "experiment", "uuid": uuid, "epoch": 1,
+        audit_rows.append({"type": "cart_remove", "seq": seq + 4, "tick": remove_tick, "wall": wall + 200,
+                           "run": "selftest-run", "inst": "experiment", "session": "s1",
+                           "phase": "experiment", "uuid": uuid, "epoch": 1, "level": "minecraft:overworld",
                            "reason": "DISCARDED", "inventory": cart["items"], "inventoryDigest": f"d{index}"})
-        logger_rows.append({"event": "cart_observed", "seq": seq + 5, "tick": exit_tick + 1, "instance": "experiment",
-                            "run_id": "selftest-run", "dimension": "minecraft:overworld", "uuid": uuid,
+        logger_rows.append({"event": "cart_observed", "seq": seq + 5, "tick": exit_tick + 1, "wall": wall + 60,
+                            "instance": "experiment", "run_id": "selftest-run",
+                            "dimension": "minecraft:overworld", "build": "romlog-rom21-1", "uuid": uuid,
                             "via": "left_stack_region", "items": cart["items"], "inventoryDigest": f"d{index}"})
-        logger_rows.append({"event": "cart_void_capture", "seq": seq + 6, "tick": remove_tick, "instance": "experiment",
-                            "run_id": "selftest-run", "dimension": "minecraft:overworld", "uuid": uuid,
+        logger_rows.append({"event": "cart_void_capture", "seq": seq + 6, "tick": remove_tick, "wall": wall + 200,
+                            "instance": "experiment", "run_id": "selftest-run",
+                            "dimension": "minecraft:overworld", "build": "romlog-rom21-1", "uuid": uuid,
                             "removalReason": "DISCARDED", "items": cart["items"], "inventoryDigest": f"d{index}"})
         seq += 7
         tick += 16
-    logger_rows.append({"event": "logger_flushed", "seq": seq, "tick": tick, "instance": "experiment",
-                        "run_id": "selftest-run", "observed": 3, "voidCaptured": 3})
-    audit_rows.append({"type": "cart_remove", "seq": seq + 1, "tick": tick + 100, "run": "selftest-run",
-                       "inst": "experiment", "session": "s1", "phase": "experiment", "uuid":
-                       "ffffffff-0000-0000-0000-000000000000", "reason": "KILLED"})
-    audit_rows.append({"type": "audit_end", "seq": seq + 2, "tick": tick + 101, "run": "selftest-run",
-                       "inst": "experiment", "session": "s1", "phase": "end", "status": "complete"})
+        wall += 16000
+    logger_rows.append({"event": "logger_flushed", "seq": seq, "tick": tick, "wall": wall + 1000,
+                        "instance": "experiment", "run_id": "selftest-run",
+                        "dimension": "minecraft:overworld", "build": "romlog-rom21-1",
+                        "observed": 3, "voidCaptured": 3})
+    audit_rows.append({"type": "cart_remove", "seq": seq + 1, "tick": tick + 100, "wall": wall + 1100,
+                       "run": "selftest-run", "inst": "experiment", "session": "s1", "phase": "experiment",
+                       "uuid": "ffffffff-0000-0000-0000-000000000000", "level": "minecraft:overworld",
+                       "reason": "KILLED"})
+    audit_rows.append({"type": "audit_end", "seq": seq + 2, "tick": tick + 101, "wall": wall + 1200,
+                       "run": "selftest-run", "inst": "experiment", "session": "s1", "phase": "end",
+                       "status": "complete"})
     restore = {"ok": True, "verification": {"dimension": {"match": True}, "orderHash": {"match": True},
                                             "uuidOrder": {"match": True}, "matched": 4}}
     check = {"verdict": "pass"}
