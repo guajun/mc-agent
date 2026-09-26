@@ -213,13 +213,15 @@
       "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit.json",
       "role": "cold-start run audit after review resolutions (5 PASS)",
       "bytes": 7124,
-      "sha256": "4fb8b8eb84ccc22b731646dfe011dc29e19eecf22452538197ec2ee166e0e224"
+      "sha256": "4fb8b8eb84ccc22b731646dfe011dc29e19eecf22452538197ec2ee166e0e224",
+      "host_snapshot_note": "host snapshot at manifest generation; the post-review audit rerun produced host sha256 e5e341398064ca4984eb452045c2c3d30d03d793ac4ee25c53eb77de62d6a74f (same 5-PASS content, later `at`). The committed verification/audit.json (sha256 0285923bb70ecc9427c8e05dfa05a4e4530207c4eaf4bf92c17149e0d38a8911) is authoritative; this pin is preserved as the generation-time snapshot."
     },
     {
       "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit.md",
       "role": "cold-start run audit report after review resolutions",
       "bytes": 3335,
-      "sha256": "d02a6c69b77269f10ffaa7bceab4e6f990394d4932a049157730a56fd007e699"
+      "sha256": "d02a6c69b77269f10ffaa7bceab4e6f990394d4932a049157730a56fd007e699",
+      "host_snapshot_note": "host snapshot at manifest generation; the post-review rerun produced host sha256 9e51e21e96201242ddab5e2305136d247a212c978b7594e6985b484840b90cf8. The committed verification/audit.md (sha256 977ce197e3f0d368451038a1c30d808530f8865f6759ef98712754f0d2b507fc) is authoritative."
     },
     {
       "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/run/audit/audit-task-time-pending.json",
@@ -267,7 +269,8 @@
       "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/evidence/minecart-audit-check.json",
       "role": "independent test-mod verifier result",
       "bytes": 6373,
-      "sha256": "f608bc12af6373951453bcfb05e40c79976e1d7ab23c573573c7feb3f5c73819"
+      "sha256": "f608bc12af6373951453bcfb05e40c79976e1d7ab23c573573c7feb3f5c73819",
+      "host_snapshot_note": "host snapshot at manifest generation (old CRLF render, sha256 f608bc12af6373951453bcfb05e40c79976e1d7ab23c573573c7feb3f5c73819); the final host file (LF, sha256 73bdd6d6361e124b5c40ea339397011e47e64bf6737f7e5d8022c09ab1effffc) is byte-equal to the committed verification/minecart-audit-check.json and is authoritative."
     },
     {
       "path": "labs/rom20-20260926T063100Z/operator/post-task-derived/build-check/rom20-agent-logger.jar",
@@ -440,8 +443,8 @@
       "bytes": 5411
     },
     "tools/derive_trajectory.py": {
-      "sha256": "d730fb4d4471a059b5c87f997bab5bbab713ea5be4348e52e7355ce057ca1946",
-      "bytes": 12508
+      "sha256": "1e4882e7d8a4853fec36d1a3aec49c2867661e9df233ba31486bb148cca085e3",
+      "bytes": 13027
     },
     "tools/extract_failure_evidence.py": {
       "sha256": "22437f5657d5ef474a14da11cbb85c16ca7c5d57c08032adfd14b2f430a144ff",
@@ -460,12 +463,12 @@
       "bytes": 16458
     },
     "tools/make_manifest.py": {
-      "sha256": "264b423bdb3b0011d98b6c0262b6cbd1d010fc1380dc51f85ea9ebb8298dd1f4",
-      "bytes": 9931
+      "sha256": "c02aae39c64434b203e4a18263a526296675f81b0554f05867989918e958f99d",
+      "bytes": 13938
     },
     "tools/make_package.py": {
-      "sha256": "9c541598e1a8eaa25d5509d32a7f281c3f963fd18c475279249f5f2184a4be1d",
-      "bytes": 6207
+      "sha256": "bff002c49a7bae20083f5e91f2da478b46bbd23a0bf22e3104be572cbc490d78",
+      "bytes": 6679
     },
     "tools/operate.py": {
       "sha256": "2818a6cdc09df4fb1fb2594b416cad51e1aee14dddd699d2ae82819d1437e7d0",
@@ -530,6 +533,7 @@
     "The test-mod projection was regenerated in raw session order (tools/make_evidence_fixed.py); the pre-fix projection stays in the freeze snapshot.",
     "The task-time audit was PENDING and is preserved as verification/audit-task-time-pending.*; verification/audit.* is the post-review 5/5 PASS report.",
     "docs/evidence/rom20-coldstart/** is marked -text in .gitattributes so committed bytes match the working tree exactly (including CRLF failure excerpts).",
-    "No RCON password or environment credential is committed."
+    "No RCON password or environment credential is committed.",
+    "Packaging hardening (review #32 non-blocking notes): the tools now fail closed unless the run audit overall is PASS and the three required reviews are resolved before any accepted-run label is written (tools/make_manifest.py assert_audit_resolved, called by tools/make_package.py); derive_trajectory.py computes largest_session_result_chars from the imported records instead of hard-coding it. The three derived_products host-derived pins above are annotated as generation-time snapshots."
   ]
 }

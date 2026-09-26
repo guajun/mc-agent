@@ -3,7 +3,11 @@
 
 import hashlib
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from make_manifest import assert_audit_resolved  # noqa: E402
 
 ROOT = Path("F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z")
 DER = ROOT / "operator" / "post-task-derived"
@@ -24,6 +28,9 @@ def portable(path) -> str:
 
 def main() -> int:
     derived = json.loads((DER / "manifest.json").read_text(encoding="utf-8"))
+    # Fail closed before stamping any "accepted/PASS" label: the label must be
+    # derived from the real audit + review records, never hard-coded.
+    audit_assertion = assert_audit_resolved(DER / "run")
     run = json.loads((FRZ / "run-as-agent-left" / "run.json").read_text(encoding="utf-8"))
     freeze_manifest = json.loads((FRZ / "manifest.json").read_text(encoding="utf-8"))
     freeze_by_path = {item["path"]: item for item in freeze_manifest["files"]}
@@ -77,8 +84,11 @@ def main() -> int:
         "created_at": derived["created_at"],
         "status": (
             "externally reviewed: executed run independently proven successful "
-            "(PR #32 review 5325010883); run audit 5/5 PASS; awaiting final code review at the pushed head"
+            "(PR #32 review 5325010883); run audit "
+            f"{audit_assertion['flag_count']}/{audit_assertion['flag_count']} PASS; "
+            "awaiting final code review at the pushed head"
         ),
+        "audit_assertion": audit_assertion,
         "external_review": derived["external_review"],
         "execution": dict(
             derived["execution"],
