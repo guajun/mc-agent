@@ -127,29 +127,18 @@ def analyse(events: list[dict[str, Any]], correlation_window: int = CORRELATION_
         return earlier[-1] if earlier else None
 
     attack_request = next((linked_request(row) for row in attack_attempts if linked_request(row)), None)
-    # The use request is the one the state-changing processing actually
-    # consumed. The useItemOn attempt can still point at the attack's request
-    # (the use's own playNote has not happened yet), so prefer the processed
-    # event's requestSeq and then the useWithoutItem attempt's explicit link.
-    use_request = None
-    for row in processed:
-        request_seq = row.get("requestSeq")
-        if isinstance(request_seq, int) and request_seq in request_by_seq:
-            use_request = request_by_seq[request_seq]
-            break
-    if use_request is None:
-        use_request = next(
-            (
-                linked_request(row)
-                for row in use_attempts
-                if row.get("path") == "useWithoutItem"
-                and isinstance(row.get("requestSeq"), int)
-                and row.get("requestSeq") in request_by_seq
-            ),
-            None,
-        )
-    if use_request is None:
-        use_request = next((linked_request(row) for row in use_attempts if linked_request(row)), None)
+    # Select the use's own explicit request, never let a potentially stale
+    # processed record choose the request that will validate itself.
+    use_without_item = [row for row in use_attempts if row.get("path") == "useWithoutItem"]
+    use_request = next(
+        (request_by_seq[row["requestSeq"]] for row in use_without_item
+         if isinstance(row.get("requestSeq"), int) and row["requestSeq"] in request_by_seq),
+        None,
+    )
+    attack_request_seqs = {
+        int(request["seq"]) for attempt in attack_attempts
+        if (request := linked_request(attempt)) is not None
+    }
     attack_seqs = {int(row["seq"]) for row in attack_attempts}
     use_seqs = {int(row["seq"]) for row in use_attempts}
     attack_request_seq = int(attack_request["seq"]) if attack_request else None
@@ -162,7 +151,9 @@ def analyse(events: list[dict[str, Any]], correlation_window: int = CORRELATION_
                 rows.append(row)
         return rows
 
-    attack_processed = processed_for(attack_request_seq, attack_seqs)
+    attack_processed = [row for row in processed
+                        if row.get("attemptSeq") in attack_seqs
+                        or row.get("requestSeq") in attack_request_seqs]
     use_processed = processed_for(use_request_seq, use_seqs)
     request_gap_ticks = (
         int(use_request.get("tick") or 0) - int(attack_request.get("tick") or 0)
@@ -172,13 +163,19 @@ def analyse(events: list[dict[str, Any]], correlation_window: int = CORRELATION_
     within_window = (
         request_gap_ticks is not None and 0 <= request_gap_ticks <= correlation_window
     )
-    exactly_one_use = len(use_processed) == 1 and use_processed[0].get("path") == "playNote"
+    exactly_one_use = (
+        use_request is not None and len(use_processed) == 1
+        and use_processed[0].get("path") == "playNote"
+        and use_processed[0].get("requestSeq") == use_request_seq
+        and use_processed[0].get("attemptSeq") in {int(row["seq"]) for row in use_without_item}
+    )
     no_stale_attack = not attack_processed
     return {
         "correlationWindowTicks": correlation_window,
         "requestGapTicks": request_gap_ticks,
         "withinWindow": within_window,
         "attackRequestSeq": attack_request_seq,
+        "attackRequestSeqs": sorted(attack_request_seqs),
         "useRequestSeq": use_request_seq,
         "attackAttemptSeqs": sorted(attack_seqs),
         "useAttemptSeqs": sorted(use_seqs),

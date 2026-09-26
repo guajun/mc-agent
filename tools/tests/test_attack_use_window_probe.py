@@ -87,6 +87,23 @@ class AnalyseTests(unittest.TestCase):
         self.assertTrue(analysis["withinWindow"])
         self.assertTrue(analysis["ok"])
 
+    def test_second_attack_request_cannot_validate_itself_as_use(self) -> None:
+        events = base_events(gap_ticks=1)
+        events[2:2] = [
+            {"seq": 111, "tick": 100, "type": "input_request", "pos": {"x": 0, "y": -59, "z": 0}},
+            {"seq": 112, "tick": 100, "type": "input_attempt", "path": "attack", "requestSeq": 111},
+        ]
+        events[-1].update(requestSeq=111, attemptSeq=12)
+        result = PROBE.analyse(events)
+        self.assertFalse(result["noStaleAttackAttribution"])
+        self.assertFalse(result["exactlyOneUseProcessed"])
+        self.assertFalse(result["ok"])
+
+    def test_processed_requires_the_use_without_item_attempt(self) -> None:
+        events = base_events(gap_ticks=1)
+        events[-1]["attemptSeq"] = 12
+        self.assertFalse(PROBE.analyse(events)["ok"])
+
     def test_double_counted_use_fails_closed(self) -> None:
         analysis = PROBE.analyse(base_events(double_use=True), correlation_window=2)
         self.assertFalse(analysis["exactlyOneUseProcessed"])
