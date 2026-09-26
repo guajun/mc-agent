@@ -194,6 +194,21 @@ def main() -> int:
                         "run_id": args.run_id,
                         "phase": "experiment",
                         "raw_type": kind,
+                        # keep the raw phase transition fields: this is the only
+                        # synthetic event name in the projection
+                        "from": record.get("from"),
+                        "to": record.get("to"),
+                        "requested": record.get("requested"),
+                        "actor": record.get("actor"),
+                        "reason": record.get("reason"),
+                        "derived_from": {
+                            "type": kind,
+                            "seq": record.get("seq"),
+                            "from": record.get("from"),
+                            "to": record.get("to"),
+                            "requested": record.get("requested"),
+                            "actor": record.get("actor"),
+                        },
                     }
                 )
             )

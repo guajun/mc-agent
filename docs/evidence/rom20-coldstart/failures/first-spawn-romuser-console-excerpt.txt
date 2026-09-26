@@ -1,0 +1,12 @@
+[14:39:55] [Server thread/INFO]: Romuser[local] logged in with entity id 7 at (11.5, -53.0, -24.5)
+[14:39:55] [Server thread/INFO]: Romuser joined the game
+[14:39:57] [RCON Listener #1/INFO]: Thread RCON Client /127.0.0.1 started
+[14:39:57] [RCON Client /127.0.0.1 #11/INFO]: Thread RCON Client /127.0.0.1 shutting down
+[14:40:01] [Server thread/INFO]: Romuser fell out of the world
+[14:40:01] [Server thread/INFO]: Romuser lost connection: Romuser died
+[14:40:01] [Server thread/INFO]: Romuser left the game
+[14:40:01] [RCON Listener #1/INFO]: Thread RCON Client /127.0.0.1 started
+[14:40:01] [RCON Client /127.0.0.1 #12/INFO]: Thread RCON Client /127.0.0.1 shutting down
+[14:40:17] [RCON Listener #1/INFO]: Thread RCON Client /127.0.0.1 started
+[14:40:17] [Server thread/INFO]: Romuser[local] logged in with entity id 8 at (11.5, -53.0, -24.5)
+[14:40:17] [Server thread/INFO]: Romuser joined the game

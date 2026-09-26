@@ -34,7 +34,7 @@
       "path": "imports/agent-session.jsonl",
       "sha256": "46c2e824f46a72b2e68257d416107945e1c3818097b20ce83a1646b285a313b0",
       "records": 282,
-      "imported_at": "2026-09-26T06:51:17.101Z"
+      "imported_at": "2026-09-26T07:06:49.638Z"
     }
   ],
   "status": "open",
@@ -160,13 +160,13 @@
     "canonical": {
       "trajectory": "trajectory.jsonl",
       "trajectory_copy": "trajectory.canonical.jsonl",
-      "sha256": "11323afe580ec85f0a980d923083ed2b72dcedb527782335a5b70af5fb03b7d1"
+      "sha256": "11b5443132588abc7fae2b27ef8e8126bc1459691ef700d1c33777104dde46da"
     },
     "merge": {
       "strategy": "stable sort of all non-header records by their actual `at` timestamp; seq renumbered 1..N; no timestamp, argument, status or result text changed",
-      "original_records": 29,
+      "original_records": 32,
       "imported_records": 314,
-      "canonical_records": 344,
+      "canonical_records": 347,
       "fields_added": [
         "trajectory_origin",
         "raw_pi_call_ids"
@@ -174,7 +174,8 @@
       "labels": {
         "original-run-operator": "operator prep records from the original run trajectory",
         "original-run-agent-manual": "key calls/results the agent appended manually with run_trace.py during the task",
-        "pi-session-import": "raw harness tool calls/results imported from the frozen pi session"
+        "pi-session-import": "raw harness tool calls/results imported from the frozen pi session",
+        "external-review-resolution": "reviewer marks appended by run_trace.py review after the independent semantic review"
       }
     },
     "derivation_file": "trajectory-derivation.json",

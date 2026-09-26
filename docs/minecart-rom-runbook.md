@@ -46,7 +46,7 @@ extracts the reviewed #20 artifacts into a parameterized regression.
 | fixture #15 | merged (#27, `8dd75c6`) | `examples/minecart-rom/` |
 | audit mod #18 | merged (#26, `824c15d`) | `tests/mods/minecart-audit/` |
 | live stage-one gate | **PASS 8/8** (exit 0) on branch `codex/rom13-fullgate`, pending human review | [`docs/evidence/rom13-stage1/full-gate-summary.json`](evidence/rom13-stage1/full-gate-summary.json) |
-| stage #20 | packed for independent review, **not accepted** | one fresh model session (pi 0.87.1 / deepseek-flash) at `1deb735`; run + own logger + canonical trajectory in [`docs/evidence/rom20-coldstart/README.md`](evidence/rom20-coldstart/README.md); `run_audit` 2 PASS / 3 PENDING semantic reviews |
+| stage #20 | independently reviewed as a proven-successful cold start; package run audit 5/5 PASS after recording the review resolutions; awaiting final code review | one fresh model session (pi 0.87.1 / deepseek-flash) at `1deb735`; run + own logger + canonical trajectory in [`docs/evidence/rom20-coldstart/README.md`](evidence/rom20-coldstart/README.md); [review 5325010883](https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325010883) |
 | stage #21 | not prepared | - |
 | source save | unchanged through the full gate run | tree hash `8cd54c86...324a` (40 files, 11,556,310 bytes) |
 

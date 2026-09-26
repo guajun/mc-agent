@@ -75,10 +75,17 @@ def main() -> int:
         "format": "mc-agent/rom20-coldstart-manifest@1",
         "run_id": derived["run_id"],
         "created_at": derived["created_at"],
-        "status": "packed-for-independent-review; not accepted; 3 semantic reviews pending",
+        "status": (
+            "externally reviewed: executed run independently proven successful "
+            "(PR #32 review 5325010883); run audit 5/5 PASS; awaiting final code review at the pushed head"
+        ),
+        "external_review": derived["external_review"],
         "execution": dict(
             derived["execution"],
-            packaging_commit_note="commits after 1deb735 are packaging only and were not executed",
+            packaging_commit_note=(
+                "no commit after 1deb735 was part of the executed run; later commits are packaging "
+                "and preparation-recipe fixes/tests"
+            ),
         ),
         "attempts": derived["attempts"],
         "counts": derived["counts"],
@@ -90,6 +97,7 @@ def main() -> int:
         },
         "raw_sources": [dict(item, path=portable(item["path"])) for item in derived["raw_sources"]],
         "derived_products": [dict(item, path=portable(item["path"])) for item in derived["derived_products"]],
+        "host_local_sources": derived.get("host_local_sources", []),
         "run_artifacts": artifacts,
         "logger_build": {
             "jar_sha256": build["jar"]["sha256"],
@@ -103,8 +111,10 @@ def main() -> int:
         },
         "notes": [
             "Every raw source hash above was re-verified against the freeze manifest before packaging.",
-            "The canonical trajectory merges the frozen pi session with the original operator/manual records; see trajectory/trajectory-derivation.json.",
+            "The canonical trajectory merges the frozen pi session (full text, no truncation) with the original operator/manual records and the independent review marks; see trajectory/trajectory-derivation.json.",
             "The test-mod projection was regenerated in raw session order (tools/make_evidence_fixed.py); the pre-fix projection stays in the freeze snapshot.",
+            "The task-time audit was PENDING and is preserved as verification/audit-task-time-pending.*; verification/audit.* is the post-review 5/5 PASS report.",
+            "docs/evidence/rom20-coldstart/** is marked -text in .gitattributes so committed bytes match the working tree exactly (including CRLF failure excerpts).",
             "No RCON password or environment credential is committed.",
         ],
     }

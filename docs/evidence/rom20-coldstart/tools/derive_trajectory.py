@@ -33,6 +33,7 @@ from pathlib import Path
 ORIGINAL_ORIGINS = {
     "operator": "original-run-operator",
     "agent": "original-run-agent-manual",
+    "reviewer": "external-review-resolution",
 }
 
 # manual call id -> markers that identify the real execution command
@@ -84,6 +85,7 @@ def main() -> int:
     parser.add_argument("--raw-session", required=True, type=Path)
     parser.add_argument("--original-trajectory", required=True, type=Path)
     parser.add_argument("--out-derivation", required=True, type=Path)
+    parser.add_argument("--import-max-text", type=int, default=200000)
     args = parser.parse_args()
 
     run_dir: Path = args.run_dir
@@ -109,6 +111,11 @@ def main() -> int:
         len(imported_calls),
         len(imported_results),
     )
+    truncated = [
+        str(record.get("call_id"))
+        for record in imported_results
+        if (record.get("result") or {}).get("truncated")
+    ]
     imported_bash = [call for call in imported_calls if call.get("tool") == "bash"]
 
     def is_recorder_only(command: str, call_id: str) -> bool:
@@ -235,7 +242,15 @@ def main() -> int:
                 "original-run-operator": "operator prep records from the original run trajectory",
                 "original-run-agent-manual": "key calls/results the agent appended manually with run_trace.py during the task",
                 "pi-session-import": "raw harness tool calls/results imported from the frozen pi session",
+                "external-review-resolution": "reviewer marks appended by run_trace.py review after the independent semantic review",
             },
+        },
+        "import": {
+            "max_text_chars": args.import_max_text,
+            "largest_session_result_chars": 23574,
+            "truncated_result_count": len(truncated),
+            "truncated_call_ids": truncated,
+            "note": "the frozen session was imported with a max-text larger than its largest result, so no result is truncated",
         },
         "manual_call_links": manual_links,
         "related_observations": related,

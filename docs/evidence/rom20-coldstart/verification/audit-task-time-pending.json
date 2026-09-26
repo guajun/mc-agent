@@ -1,6 +1,6 @@
 {
   "schema": "mc-agent-coldstart-audit/1",
-  "at": "2026-09-26T07:09:23.610Z",
+  "at": "2026-09-26T06:51:20.569Z",
   "run_id": "rom20-20260926T063100Z",
   "harness": {
     "name": "pi",
@@ -8,18 +8,20 @@
     "model": "deepseek/deepseek-flash",
     "provider": "deepseek"
   },
-  "overall": "PASS",
+  "overall": "PENDING",
   "failure_class": null,
   "flags": [
     {
       "flag": "machine_operated",
-      "status": "PASS",
-      "summary": "5 actual processing event(s), 10 attempt(s); agent call 'call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547' precedes the first processing event",
+      "status": "PENDING",
+      "summary": "mechanically satisfied but awaiting explicit review: machine_operated.causality",
       "evidence": [
         "testmod:seq953",
         "trajectory:call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547"
       ],
-      "missing": [],
+      "missing": [
+        "machine_operated.causality"
+      ],
       "needs_review": [
         "10 input attempt(s) exist; attempts alone must not be accepted as operation"
       ],
@@ -29,34 +31,20 @@
           "question": "confirm the traced call is what the test mod processed, not a coincidental call in the same window"
         }
       ],
-      "review_resolutions": [
-        {
-          "id": "machine_operated.causality",
-          "status": "resolved",
-          "by": "independent pi reviewer (PR #32 review 5325010883)",
-          "at": "2026-09-26T07:03:53Z",
-          "note": "Independent review at head 666d740 (https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325010883) proved the run executed at 1deb735: five calibrated useItemOn/playNote processing events, each correlated to Romuser use; the traced operate.py execution call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547 issued the five player Romuser use once presses (support testmod:seq950..954, seq1010, logger:seq11).",
-          "evidence": [
-            "testmod:seq953",
-            "trajectory:call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547",
-            "testmod:seq950",
-            "testmod:seq954",
-            "testmod:seq1010",
-            "logger:seq11"
-          ]
-        }
-      ]
+      "review_resolutions": []
     },
     {
       "flag": "logger_armed_before_activation",
-      "status": "PASS",
-      "summary": "logger_armed is ordered before the first input_processed event (tick 0 < 2885)",
+      "status": "PENDING",
+      "summary": "mechanically satisfied but awaiting explicit review: logger_armed_before_activation.running",
       "evidence": [
         "logger:seq10",
         "testmod:seq953",
         "trajectory:call_01_WZij1nfMJFeTereaDDak0836"
       ],
-      "missing": [],
+      "missing": [
+        "logger_armed_before_activation.running"
+      ],
       "needs_review": [],
       "required_review": [
         {
@@ -64,21 +52,7 @@
           "question": "confirm from game-side load/restart evidence that the armed logger was actually running, not only written"
         }
       ],
-      "review_resolutions": [
-        {
-          "id": "logger_armed_before_activation.running",
-          "status": "resolved",
-          "by": "independent pi reviewer (PR #32 review 5325010883)",
-          "at": "2026-09-26T07:03:53Z",
-          "note": "Independent review confirmed the own logger was built, deployed, restarted and armed before any machine operation: the rebuild call_00_ET_A6387Us9qClvqubgFIqr5901 produced the deployed jar e445f461ab0d (provision reported replaced e445f461ab0d); logger_armed at server start precedes the first input_processed; the first left_stack_region capture holds the cart inventory.",
-          "evidence": [
-            "logger:seq10",
-            "logger:seq11",
-            "testmod:seq953",
-            "trajectory:call_00_ET_A6387Us9qClvqubgFIqr5901"
-          ]
-        }
-      ]
+      "review_resolutions": []
     },
     {
       "flag": "transient_outputs_captured",
@@ -118,8 +92,8 @@
     },
     {
       "flag": "answer_correct",
-      "status": "PASS",
-      "summary": "answer matches the verified oracle for 5 cart(s) and covers every oracle cart",
+      "status": "PENDING",
+      "summary": "mechanically satisfied but awaiting explicit review: answer_correct.oracle_independence",
       "evidence": [
         "oracle",
         "oracle:testmod:seq954",
@@ -129,7 +103,9 @@
         "oracle:testmod:seq994",
         "oracle:testmod:seq1010"
       ],
-      "missing": [],
+      "missing": [
+        "answer_correct.oracle_independence"
+      ],
       "needs_review": [],
       "required_review": [
         {
@@ -137,27 +113,7 @@
           "question": "confirm the oracle's evidence chain (fixture plus test mod) is independent of the agent answer"
         }
       ],
-      "review_resolutions": [
-        {
-          "id": "answer_correct.oracle_independence",
-          "status": "resolved",
-          "by": "independent pi reviewer (PR #32 review 5325010883)",
-          "at": "2026-09-26T07:03:53Z",
-          "note": "The oracle is extracted mechanically from the operator-deployed required test mod mc-minecart-audit-0.1.0 sha256 7a77e89d... before-destruction cart_remove inventories; it is independent of the agent answer and agent logger, and the independent reviewer matched it cart-by-cart to the answer and the agent logger captures.",
-          "evidence": [
-            "testmod:seq954",
-            "testmod:seq964",
-            "testmod:seq974",
-            "testmod:seq984",
-            "testmod:seq994",
-            "testmod:seq1010",
-            "testmod:seq1015",
-            "testmod:seq1019",
-            "testmod:seq1022",
-            "testmod:seq1024"
-          ]
-        }
-      ]
+      "review_resolutions": []
     }
   ],
   "infra_errors": [],
@@ -166,7 +122,7 @@
   "review_problems": [],
   "inputs": {
     "run": "run.json",
-    "trajectory": "347 records",
+    "trajectory": "344 records",
     "test_mod": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\testmod.experiment.jsonl",
     "agent_logger": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-freeze\\agent-logger-raw\\romlog.jsonl",
     "answer": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\answer.json",

@@ -10,18 +10,18 @@
   },
   "test_mod": {
     "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\testmod.experiment.jsonl",
-    "sha256": "c3f88ebce42f0b07f37c733f55550033c0907abbd66df78b03dd1e215dfd3c94",
+    "sha256": "283edf73d61bcfba855bb40e0551766da7f936341600352c0db77ee17d67c11c",
     "raw": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-freeze\\testmod\\audit-rom20-20260926T063100Z.jsonl",
     "raw_sha256": "bdc736ca9ae734f64cbe189c215483f905496892a95fd9be344cde7058d4ba32",
     "note": "fixed canonical projection (raw session order, input_request included); raw audit preserved in the freeze"
   },
   "answer": {
     "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\answer.json",
-    "sha256": "8e42af9479ad302779228d162a888210af5f78e7fd9a6beb81afaf1b94d61347"
+    "sha256": "bd1922968e7370abd54588a9ad2153a70622a2280eabb20818be2bee72d0fb80"
   },
   "oracle": {
     "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\oracle.json",
-    "sha256": "9b722a059bee804c200b1fb8bf66a053e18a2566f4125ae3251d6a48bd7ddd3c"
+    "sha256": "7af14cc241936af5d1887b198431f815fa51f69596556dad50e38ad28a559972"
   },
   "fixture": {
     "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\fixture\\ready-snapshot.json",
@@ -29,7 +29,7 @@
   },
   "restore": {
     "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\post-task-derived\\evidence\\restore-evidence.json",
-    "sha256": "16d9b3497b947b6973c1785e644b870e373ed51fb1e82efb083aa84924a0b6b5"
+    "sha256": "8032c3dc3b15653c2e9731f58da69fc39f36fe398364a98ab34fd200324fb109"
   },
   "preflight": {
     "path": "F:\\mc-agent-worktrees\\rom13\\coldstart\\labs\\rom20-20260926T063100Z\\operator\\preflight\\preflight.json",

@@ -66,17 +66,33 @@ def main() -> int:
         entry(FREEZE / "workspace-as-agent-left" / "evidence" / "restore-attempt-1-failed.json", "failed restore attempt record"),
     ]
     derived_products = [
-        entry(DERIVED / "run" / "trajectory.jsonl", "canonical chronological trajectory (344 records)"),
-        entry(DERIVED / "run" / "trajectory-derivation.json", "derivation manifest (raw hashes, mapping, validation)"),
+        entry(DERIVED / "run" / "trajectory.jsonl", f"canonical chronological trajectory ({derivation['merge']['canonical_records']} records)"),
+        entry(DERIVED / "run" / "trajectory-derivation.json", "derivation manifest (raw hashes, mapping, validation, import max-text)"),
+        entry(DERIVED / "run" / "reviews.jsonl", "independent review resolutions (3 required semantic reviews)"),
+        entry(DERIVED / "run" / "audit" / "audit.json", "cold-start run audit after review resolutions (5 PASS)"),
+        entry(DERIVED / "run" / "audit" / "audit.md", "cold-start run audit report after review resolutions"),
+        entry(DERIVED / "run" / "audit" / "audit-task-time-pending.json", "task-time audit report preserved (PENDING)"),
+        entry(DERIVED / "run" / "audit" / "audit-task-time-pending.md", "task-time audit report preserved (PENDING)"),
         entry(DERIVED / "evidence" / "answer.json", "answer (regenerated, identical hash to original)"),
         entry(DERIVED / "evidence" / "oracle.json", "independent oracle (regenerated, identical hash to original)"),
-        entry(DERIVED / "evidence" / "testmod.experiment.jsonl", "fixed canonical projection (raw session order)"),
+        entry(DERIVED / "evidence" / "testmod.experiment.jsonl", "fixed canonical projection (raw session order, phase provenance retained)"),
         entry(DERIVED / "evidence" / "romlog.experiment.norm.jsonl", "normalized agent logger view"),
         entry(DERIVED / "evidence" / "restore-evidence.json", "restore verification summary"),
         entry(DERIVED / "evidence" / "minecart-audit-check.json", "independent test-mod verifier result"),
-        entry(DERIVED / "run" / "audit" / "audit.json", "cold-start run audit (canonical trajectory)"),
-        entry(DERIVED / "run" / "audit" / "audit.md", "cold-start run audit report"),
         entry(DERIVED / "build-check" / "rom20-agent-logger.jar", "reproducible rebuild of the deployed logger"),
+        entry(DERIVED / "failures" / "restore-attempt-1-failed.session-result.txt", "byte-exact failed-restore tool result from the frozen session (line 169)"),
+        entry(DERIVED / "failures" / "first-spawn-romuser-console-excerpt.txt", "host-local console excerpt for the first-spawn failure (not frozen)"),
+        entry(DERIVED / "failures" / "failure-evidence.json", "failure evidence provenance and hashes"),
+    ]
+
+    failure_facts = json.loads((DERIVED / "failures" / "failure-evidence.json").read_text(encoding="utf-8"))
+    host_local_sources = [
+        {
+            "path": failure_facts["first_spawn_console_excerpt"]["host_local_source"],
+            "role": "host-local game console log (not part of the frozen archive)",
+            "bytes": failure_facts["first_spawn_console_excerpt"]["host_local_source_bytes"],
+            "sha256": failure_facts["first_spawn_console_excerpt"]["host_local_source_sha256"],
+        }
     ]
 
     manifest = {
@@ -91,7 +107,10 @@ def main() -> int:
             "thinking": "max",
             "task_sha256": (run.get("task") or {}).get("sha256"),
             "player_uuid": (run.get("task") or {}).get("player_uuid"),
-            "note": "packaging commits happen after this commit; they are not part of the executed run",
+            "note": (
+                "no commit after 1deb735 was part of the executed run; later commits are packaging "
+                "(this evidence package) and preparation-recipe fixes/tests (eb2bedf, 666d740, ...)"
+            ),
         },
         "attempts": {
             "operator_preparation_attempts": 6,
@@ -110,10 +129,26 @@ def main() -> int:
             "derived_trajectory_records": derivation["merge"]["canonical_records"],
             "manual_records": derivation["merge"]["original_records"],
             "imported_records": derivation["merge"]["imported_records"],
+            "truncated_imported_results": derivation["import"]["truncated_result_count"],
+        },
+        "external_review": {
+            "url": "https://github.com/guajun/mc-agent/pull/32#pullrequestreview-5325010883",
+            "review_id": 5325010883,
+            "reviewed_head": "666d74004d2b41869fafbc83e05392cad7a150d9",
+            "submitted_at": "2026-09-26T07:03:53Z",
+            "reviewer": "guajun (independent pi reviewer)",
+            "verdict": "executed run 1deb735 independently proven successful; three semantic reviews justified",
+            "resolved_reviews": [
+                "machine_operated.causality",
+                "logger_armed_before_activation.running",
+                "answer_correct.oracle_independence",
+            ],
+            "audit_after_resolution": "5/5 PASS",
         },
         "freeze_manifest_sha256": sha256(FREEZE / "manifest.json"),
         "raw_sources": raw_sources,
         "derived_products": derived_products,
+        "host_local_sources": host_local_sources,
     }
     (DERIVED / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps({

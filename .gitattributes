@@ -2,3 +2,6 @@
 *.jar binary
 *.png binary
 *.zip binary
+# ROM20 cold-start evidence is stored byte-exact (LF JSON/JSONL plus CRLF failure
+# excerpts) so manifest hashes verify without autocrlf conversion
+docs/evidence/rom20-coldstart/** -text
