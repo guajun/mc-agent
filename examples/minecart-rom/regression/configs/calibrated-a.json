@@ -1,0 +1,157 @@
+{
+  "format": "mc-agent/rom21-config@1",
+  "configId": "calibrated-a",
+  "description": "Five-cart sealed challenge (seed 2101): one to three inventory slots per cart over the default item pool.",
+  "challenge": {
+    "generator": "examples/minecart-rom/runner/minecart_rom.py challenge --seed 2101 --carts 5 --max-slots 3 --max-count 4",
+    "seed": 2101,
+    "carts": 5,
+    "maxSlots": 3,
+    "maxCount": 4,
+    "pool": "default"
+  },
+  "program": {
+    "carts": [
+      {
+        "index": 0,
+        "items": [
+          {
+            "slot": 11,
+            "id": "minecraft:gold_ingot",
+            "count": 1
+          },
+          {
+            "slot": 22,
+            "id": "minecraft:redstone",
+            "count": 2
+          },
+          {
+            "slot": 23,
+            "id": "minecraft:copper_ingot",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "items": [
+          {
+            "slot": 1,
+            "id": "minecraft:sand",
+            "count": 2
+          },
+          {
+            "slot": 5,
+            "id": "minecraft:dirt",
+            "count": 4
+          },
+          {
+            "slot": 17,
+            "id": "minecraft:gold_ingot",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "items": [
+          {
+            "slot": 12,
+            "id": "minecraft:copper_ingot",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "items": [
+          {
+            "slot": 9,
+            "id": "minecraft:gold_ingot",
+            "count": 4
+          },
+          {
+            "slot": 11,
+            "id": "minecraft:glass",
+            "count": 3
+          },
+          {
+            "slot": 18,
+            "id": "minecraft:redstone",
+            "count": 2
+          }
+        ]
+      },
+      {
+        "index": 4,
+        "items": [
+          {
+            "slot": 13,
+            "id": "minecraft:redstone",
+            "count": 3
+          }
+        ]
+      }
+    ]
+  },
+  "programSha256": "413289af29c02fae32566a3a7a213003e83633df2ce86f4b68b30a1baf04c42f",
+  "expectedCartCount": 5,
+  "scene": {
+    "dimension": "minecraft:overworld",
+    "playerName": "Romuser",
+    "inputRegion": {
+      "name": "note-block",
+      "from": [
+        11,
+        -54,
+        -23
+      ],
+      "to": [
+        11,
+        -54,
+        -23
+      ]
+    },
+    "stackRegion": {
+      "name": "stack",
+      "from": [
+        13,
+        -53,
+        -23
+      ],
+      "to": [
+        15,
+        -50,
+        -21
+      ]
+    },
+    "outputRegion": {
+      "name": "output",
+      "from": [
+        16,
+        -140,
+        -24
+      ],
+      "to": [
+        24,
+        -45,
+        -20
+      ]
+    },
+    "exitAxis": "x",
+    "exitGreaterThan": 15.0,
+    "cycleTicks": 4
+  },
+  "operations": {
+    "presses": 5,
+    "sprintTicks": 220,
+    "causalMaxTicks": 40,
+    "transientMaxDeltaTicks": 40,
+    "voidMaxDeltaTicks": 400,
+    "timeoutSeconds": 240
+  },
+  "logger": {
+    "buildVersion": "romlog-rom21-1",
+    "iterationVersion": "romlog-rom21-2"
+  }
+}

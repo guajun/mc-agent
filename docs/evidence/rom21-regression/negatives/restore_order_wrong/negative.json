@@ -1,0 +1,28 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "restore_order_wrong",
+  "kind": "live",
+  "injected": "two entities swapped in the guarded-restore snapshot before apply",
+  "expectedCheck": "restore_verified",
+  "verdict": "fail",
+  "failedChecks": [
+    "logger_session",
+    "audit_oracle",
+    "agent_operations",
+    "causal_joins",
+    "transient_captures",
+    "natural_void_captures",
+    "inventory_matches_program",
+    "restore_verified",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-neg-restore-order",
+  "evidence": {
+    "orderHashMatch": null,
+    "applyOk": false,
+    "guardRefusedOrderHash": true,
+    "applyError": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\negatives\\restore_order_wrong\\snapshot cannot be restored: 1 blocking issue(s). Nothing was sent to the game. [order_hash] meta.json: orderHash=93504bf35907122f but the file hashes to fb547f98c8bb0114",
+    "verifyError": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\negatives\\restore_order_wrong\\snapshot cannot be restored: 1 blocking issue(s). Nothing was sent to the game. [order_hash] meta.json: orderHash=93504bf35907122f but the file hashes to fb547f98c8bb0114"
+  }
+}

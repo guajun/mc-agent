@@ -1,0 +1,1 @@
+fixture error: the machine is not in its calibrated base state; the fixture copy is dirty: [{"pos": [11, -54, -22], "block": "minecraft:sticky_piston[extended=false,facing=up]", "ok": false}, {"pos": [11, -53, -22], "block": "minecraft:slime_block", "ok": false}]

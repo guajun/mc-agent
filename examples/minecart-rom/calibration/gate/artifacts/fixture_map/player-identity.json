@@ -1,0 +1,22 @@
+{
+  "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+  "name": "Romuser",
+  "dimension": "minecraft:overworld",
+  "pos": [
+    11.5,
+    -53.6,
+    -24.5
+  ],
+  "yaw": 0.0,
+  "pitch": 50.5055,
+  "source": "carpet",
+  "facing_target": true,
+  "facing_target_block": [
+    11,
+    -54,
+    -23
+  ],
+  "server_vantage_uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+  "player_game_type": "1",
+  "hover_seat": true
+}

@@ -1,0 +1,72 @@
+{
+  "format": "mc-agent/challenge@1",
+  "name": "challenge-20260926",
+  "seed": 20260926,
+  "carts": [
+    {
+      "index": 0,
+      "items": [
+        {
+          "slot": 1,
+          "id": "minecraft:stone",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "items": [
+        {
+          "slot": 5,
+          "id": "minecraft:stone",
+          "count": 1
+        },
+        {
+          "slot": 20,
+          "id": "minecraft:coal",
+          "count": 4
+        },
+        {
+          "slot": 26,
+          "id": "minecraft:iron_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "items": [
+        {
+          "slot": 22,
+          "id": "minecraft:oak_planks",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "items": [
+        {
+          "slot": 9,
+          "id": "minecraft:copper_ingot",
+          "count": 2
+        },
+        {
+          "slot": 17,
+          "id": "minecraft:copper_ingot",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "id": "minecraft:gold_ingot",
+          "count": 2
+        }
+      ]
+    }
+  ],
+  "program_sha256": "9f97d515ae386fb0154137283453cbfef154872d03eb485590b3bbbeaa9449da",
+  "notes": [
+    "sealed evaluator-side input; do not commit and do not hand to the Agent",
+    "the pop order is observed live and sealed separately; it is not generated here"
+  ]
+}

@@ -1,82 +1,105 @@
-# mc-agent
+---
+hide:
+  - toc
+---
 
-让 AI 智能体**观测**、**驱动**并**分叉**一个 Minecraft 世界，同时让智能体的运行时和游戏彻底解耦。
+# 让你的智能体走进 Minecraft 世界
 
-这个项目不关心你在研究什么：没有大炮代码、没有 TNT 逻辑、没有分析。框架只做两件事——把游戏里的事实搬出来、把意图送进去；怎么解释由智能体决定。
+**读取世界、执行命令、开展可重复的实验。**
 
+Minecraft Agent Toolkit 通过本机工具连接 AI 智能体与 Minecraft。
+沿用你熟悉的智能体应用，也可以先在终端体验，不必先配置模型。
+
+<div class="landing-actions" markdown>
+
+[安装并开始体验](getting-started.md){ .md-button .md-button--primary }
+[查看工具能力](tools.md){ .md-button }
+
+</div>
+
+## 可以做什么？
+
+<div class="grid cards" markdown>
+
+- **了解世界**
+
+    读取服务端的权威世界状态，查找在线玩家，检查附近实体。
+
+    试着说：“概括当前世界状态和在线玩家。”
+
+- **通过工具执行操作**
+
+    从智能体或终端执行 Minecraft 命令，并读取命令结果。
+
+    试着说：“列出当前在线玩家。”
+
+- **重复和校验实验**
+
+    采集实体顺序快照，分叉世界，检查恢复结果。
+
+    [了解世界分叉 →](protocol-snapshot.md)
+
+- **沿用你的智能体应用**
+
+    接入 Codex、Claude Code、Hermes 等 MCP 客户端；有终端权限的智能体也能使用 CLI。
+    模型与对话由你的应用提供。
+
+    [接入智能体 →](getting-started.md#4-connect-your-agent)
+
+</div>
+
+**已通过实机验收：** [Minecart ROM](minecart-rom-runbook.md) 已于 2026-09-26
+完成工具链门禁、智能体自主冷启动和全新实例回归。
+[查看结果与复现入口 →](advanced.md#verified-example)
+
+## 四步完成连接
+
+**开始前准备：** Minecraft 26.2、Fabric Loader 0.19+、Fabric API、JDK 25、
+Python 3.11+ 和 Git。Minecraft、Toolkit 和智能体运行在同一台机器。
+可以从一个单机世界开始，也可以使用已有的独立 Fabric 服务端。
+
+1. **安装 Fabric mod。** 从源码构建，将 jar 放入 `mods/`，进入世界。
+2. **安装 Toolkit。** 克隆 `mc-agent-bridge`，安装到 Python 虚拟环境。
+3. **检查连接。** 一个终端运行常驻进程，另一个终端依次检查 `status`、`capabilities` 和 `state`。
+4. **接入智能体。** 注册 MCP 适配器，让智能体描述你的世界。
+
+[逐步安装指南](getting-started.md)提供 Windows 与 macOS/Linux 命令、路径示例、
+MCP 配置和成功标志。首次连接检查不需要 AI 模型。
+目前安装仍包含 mod 源码构建，指南尚未提供全自动安装器。
+
+<div class="landing-actions" markdown>
+
+[开始安装](getting-started.md){ .md-button .md-button--primary }
+[已经装好？检查连接](getting-started.md#3-check-the-connection){ .md-button }
+
+</div>
+
+## 架构方案
+
+```text
+你 → 智能体应用 → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft 世界
+     (Harness)       MCP / CLI + 常驻进程       服务端视角
 ```
-Hermes（或任意运行时）  <->  bridge  <->  接口 mod  <->  Minecraft
-     判断力                 接缝          进程内的事实       世界
-```
 
-## 有什么
+| 组件 | 负责什么 |
+| --- | --- |
+| 智能体应用（Harness） | 运行模型和对话，决定调用哪些工具。 |
+| Toolkit（`mc-agent-bridge`） | 提供 `mc-bridge` 命令和 MCP 工具，保持与 Minecraft 的连接。 |
+| Fabric mod | 读取服务端世界状态并执行请求；单机世界也适用。 |
 
-| 模块 | 是什么 | 仓库 |
-| --- | --- | --- |
-| **接口 mod** | 一个 Fabric 客户端 **且** 服务端 mod，通过本地 socket 暴露状态、实体、命令、聊天、录制、快照和事件 | [mc-agent-interface-mod](https://github.com/guajun/mc-agent-interface-mod) |
-| **bridge** | 唯一与游戏通信的进程：守护进程 + JSON-lines API + MCP 前端 + 在其上组合出来的工具 | [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge) |
-| **agent loop** | 主动的一侧：监听聊天、唤醒后端、把答案送回游戏；也可以按需跑单次 | [mc-agent-loop](https://github.com/guajun/mc-agent-loop) |
-| **本仓库** | 文档、驱动整套东西的工具、以及 RFC | 你在这里 |
+使用期间保持 Toolkit 常驻进程运行，智能体的 MCP 适配器会连接它。
+游戏控制连接仅限本机；实际可用工具从连接的 mod 查询。
 
-## 三种运行方式
+[查看完整架构与部署说明 →](concepts.md)
 
-同一个 mod、同一个 bridge 通吃三种；不同的只是**智能体附着在哪一个实例上**。
+## 接下来去哪里？
 
-| 轨道 | 智能体是 | 适合 |
-| --- | --- | --- |
-| **活客户端** | 你自己游戏里的一个 mod | "看看我正在看的东西"、和人类一起玩 |
-| **活服务端** | 你所在服务器里的一个 mod——或者单机世界里的集成服务端 | 权威数据、驱动假人、对真实发生的事作出反应 |
-| **隔离实验室** | 智能体自己拉起来的无头服务器 | 可复现的物理实验：冻结、步进、分叉世界、跑一百次 |
+| 我想…… | 打开 |
+| --- | --- |
+| 安装、升级或更换游戏路径 | [安装参考](install.md) |
+| 解决连接问题 | [首次运行帮助](getting-started.md#something-didnt-work) · [疑难排查](troubleshooting.md) |
+| 教智能体正确使用 Toolkit | [可选的 Toolkit Skill](toolkit-skill.md) |
+| 配置事件触发、无人值守或实验 | [进阶指南](advanced.md) |
 
-轨道三是让实验变"诚实"的那个，也是这个项目存在的原因：存档记录了方块和实体 NBT，但**不记录实体的 tick 顺序**——而这个顺序会改变任何"逐个实体计算"的结果。mod 能读到它，快照协议把它记下来，[`fork_verify.py`](fork-verify.md) 来证明还原是否复现了它。
-
-## 快速开始
-
-```bash
-git clone https://github.com/guajun/mc-agent && cd mc-agent
-
-# 1. 编译 mod，丢进实例的 mods/ 目录
-git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py --minecraft-dir <实例> \
-    --version 26.2-Fabric --jdk <jdk25>
-
-# 2. bridge 持有游戏连接
-python -m venv .venv && .venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
-.venv/Scripts/mc-bridge run
-
-# 3. 和它说话
-.venv/Scripts/mc-bridge call state
-.venv/Scripts/mc-agent-loop run --backend hermes --trigger @codex
-```
-
-然后在游戏聊天里打 `@codex 你能看到什么？`；想自己看接口，就在聊天框里敲 `/mcagent state`。
-
-[快速开始 :material-arrow-right:](getting-started.md){ .md-button .md-button--primary }
-[安装说明 :material-arrow-right:](install.md){ .md-button }
-[整体结构 :material-arrow-right:](concepts.md){ .md-button }
-
-## 手边没有游戏？
-
-整套链路都可以在没有 Minecraft 的情况下验证：
-
-```bash
-python tools/smoke_offline.py                     # 假 mod + 守护进程 + loop
-python tools/smoke_offline.py --backend hermes    # 真模型驱动真工具
-```
-
-## 文档
-
-* [快速开始](getting-started.md) —— 安装、运行、第一次对话、第一个实验
-* [安装说明](install.md) —— 版本要求、升级、卸载，以及各种文件落在哪
-* [整体结构](concepts.md) —— 心智模型，以及"新能力该放进哪一层"
-* [智能体在游戏里是谁](player-identity.md) —— 第二个客户端、Carpet 假人，或服务端 mod
-* [分叉一个活的世界](protocol-snapshot.md) —— 快照协议与还原配方
-* [用 Hermes 运行智能体](hermes-setup.md) —— 本项目对着开发的运行时
-* [无头实验室服务器](lab-server.md) —— 供给、启停与控制
-* [工具](tools.md) —— 全部 CLI 与 MCP 工具
-* [疑难排查](troubleshooting.md) —— 那些坑，大多是真机上撞出来的
-* [RFC 提案](rfc/0001-agent-interface.md) —— 已经定了什么、什么还开放
-
-!!! note "部分页面暂时只有英文"
-    站点使用按语言的目录结构，未翻译的页面会**回退到英文原版**（比如 `hermes-setup`、`lab-server`、
-    `fork-verify` 和两篇 RFC）。如果你需要，我可以继续翻。
+Hermes 无人值守属于进阶集成，目前仍有签名投递问题待解决。
+其[配置与状态](hermes-unattended.md)独立于上面的交互式使用流程。

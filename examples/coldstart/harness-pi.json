@@ -1,0 +1,47 @@
+{
+  "schema": "mc-agent-harness-config/1",
+  "name": "pi",
+  "command": "pi",
+  "version_args": ["--version"],
+  "model": "deepseek-flash",
+  "provider": "deepseek",
+  "session_env": "PI_SESSION_FILE",
+  "shell": ["bash", "--version"],
+  "fetch_urls": [
+    "https://meta.fabricmc.net/v2/versions/loader",
+    "https://api.modrinth.com/v2/project/carpet"
+  ],
+  "build": {
+    "java": "",
+    "min_java": 25,
+    "pip_packages": []
+  },
+  "bridge": {
+    "command": "",
+    "siblings_root": "",
+    "smoke": true
+  },
+  "ports": {
+    "api": 27190,
+    "mod": 27191,
+    "range": [27190, 27199]
+  },
+  "lab": {
+    "enabled": true,
+    "name": "meta19-preflight",
+    "provision": true,
+    "start": true,
+    "ports": {
+      "game": 27192,
+      "rcon": 27193
+    },
+    "wait": 300
+  },
+  "timeouts": {
+    "fetch": 20,
+    "provision": 600,
+    "lab_start": 900,
+    "smoke": 60,
+    "smoke_total": 300
+  }
+}

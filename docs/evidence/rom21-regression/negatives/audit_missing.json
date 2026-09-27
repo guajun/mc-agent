@@ -1,0 +1,16 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "audit_missing",
+  "kind": "offline",
+  "injected": "the independent audit log removed from a copy of the run",
+  "expectedCheck": "audit_oracle",
+  "verdict": "fail",
+  "failedChecks": [
+    "audit_oracle",
+    "agent_operations",
+    "causal_joins",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-20260926T083500Z-a1"
+}

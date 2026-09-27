@@ -1,0 +1,59 @@
+{
+  "carts": [
+    {
+      "index": 0,
+      "items": [
+        {
+          "slot": 16,
+          "id": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "id": "minecraft:copper_ingot",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "items": [
+        {
+          "slot": 2,
+          "id": "minecraft:glass",
+          "count": 1
+        },
+        {
+          "slot": 13,
+          "id": "minecraft:coal",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "items": [
+        {
+          "slot": 0,
+          "id": "minecraft:glass",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "items": [
+        {
+          "slot": 1,
+          "id": "minecraft:copper_ingot",
+          "count": 6
+        },
+        {
+          "slot": 2,
+          "id": "minecraft:redstone",
+          "count": 4
+        }
+      ]
+    }
+  ]
+}

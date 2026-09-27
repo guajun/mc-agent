@@ -1,0 +1,10 @@
+{"at": "2026-09-26T08:14:43Z", "epoch": 1790410483.895, "step": "provenance", "head": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02", "clean": true}
+{"at": "2026-09-26T08:16:15Z", "epoch": 1790410575.805, "step": "fixture", "carts": 5, "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d"}
+{"at": "2026-09-26T08:16:17Z", "epoch": 1790410577.785, "step": "jars", "v1": "3c1dae36590b82a26d0fad8cc5daa08d017ae7d27847c99004170a1c55da71ae", "v1Size": 21530, "v2": null, "v2Size": null}
+{"at": "2026-09-26T08:16:18Z", "epoch": 1790410578.466, "step": "fork", "orderHash": "93504bf35907122f", "entities": 6}
+{"at": "2026-09-26T08:17:14Z", "epoch": 1790410634.291, "step": "operation", "generation": "gen1", "press": 1, "stack_before": 5, "stack_after": 4, "transient_captures": 1, "void_captures": 1, "elapsed_s": 2.105}
+{"at": "2026-09-26T08:17:17Z", "epoch": 1790410637.133, "step": "operation", "generation": "gen1", "press": 2, "stack_before": 4, "stack_after": 3, "transient_captures": 2, "void_captures": 2, "elapsed_s": 2.127}
+{"at": "2026-09-26T08:17:19Z", "epoch": 1790410639.981, "step": "operation", "generation": "gen1", "press": 3, "stack_before": 3, "stack_after": 2, "transient_captures": 3, "void_captures": 3, "elapsed_s": 2.127}
+{"at": "2026-09-26T08:17:22Z", "epoch": 1790410642.808, "step": "operation", "generation": "gen1", "press": 4, "stack_before": 2, "stack_after": 1, "transient_captures": 4, "void_captures": 4, "elapsed_s": 2.128}
+{"at": "2026-09-26T08:17:25Z", "epoch": 1790410645.688, "step": "operation", "generation": "gen1", "press": 5, "stack_before": 1, "stack_after": -1, "transient_captures": 5, "void_captures": 5, "elapsed_s": 2.177}
+{"at": "2026-09-26T08:17:32Z", "epoch": 1790410652.995, "step": "evidence", "copied": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\run-rom21-20260926T083500Z-a1\\logger.jsonl"}

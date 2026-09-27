@@ -1,0 +1,132 @@
+{
+  "format": "mc-agent/rom21-config@1",
+  "configId": "calibrated-b",
+  "description": "Four-cart sealed challenge (seed 2102): one to two inventory slots per cart from a different item pool, so the answer cannot be assumed from the calibration default.",
+  "challenge": {
+    "generator": "examples/minecart-rom/runner/minecart_rom.py challenge --seed 2102 --carts 4 --max-slots 2 --max-count 6 --pool stone,glass,copper_ingot,redstone,sand,coal",
+    "seed": 2102,
+    "carts": 4,
+    "maxSlots": 2,
+    "maxCount": 6,
+    "pool": "minecraft:stone,minecraft:glass,minecraft:copper_ingot,minecraft:redstone,minecraft:sand,minecraft:coal"
+  },
+  "program": {
+    "carts": [
+      {
+        "index": 0,
+        "items": [
+          {
+            "slot": 16,
+            "id": "minecraft:stone",
+            "count": 4
+          },
+          {
+            "slot": 22,
+            "id": "minecraft:copper_ingot",
+            "count": 5
+          }
+        ]
+      },
+      {
+        "index": 1,
+        "items": [
+          {
+            "slot": 2,
+            "id": "minecraft:glass",
+            "count": 1
+          },
+          {
+            "slot": 13,
+            "id": "minecraft:coal",
+            "count": 5
+          }
+        ]
+      },
+      {
+        "index": 2,
+        "items": [
+          {
+            "slot": 0,
+            "id": "minecraft:glass",
+            "count": 4
+          }
+        ]
+      },
+      {
+        "index": 3,
+        "items": [
+          {
+            "slot": 1,
+            "id": "minecraft:copper_ingot",
+            "count": 6
+          },
+          {
+            "slot": 2,
+            "id": "minecraft:redstone",
+            "count": 4
+          }
+        ]
+      }
+    ]
+  },
+  "programSha256": "f0d97d2ab0746ce9ea5d0f6fc76df6f5ba1668df5813d1402863ea39919c5f15",
+  "expectedCartCount": 4,
+  "scene": {
+    "dimension": "minecraft:overworld",
+    "playerName": "Romuser",
+    "inputRegion": {
+      "name": "note-block",
+      "from": [
+        11,
+        -54,
+        -23
+      ],
+      "to": [
+        11,
+        -54,
+        -23
+      ]
+    },
+    "stackRegion": {
+      "name": "stack",
+      "from": [
+        13,
+        -53,
+        -23
+      ],
+      "to": [
+        15,
+        -50,
+        -21
+      ]
+    },
+    "outputRegion": {
+      "name": "output",
+      "from": [
+        16,
+        -140,
+        -24
+      ],
+      "to": [
+        24,
+        -45,
+        -20
+      ]
+    },
+    "exitAxis": "x",
+    "exitGreaterThan": 15.0,
+    "cycleTicks": 4
+  },
+  "operations": {
+    "presses": 4,
+    "sprintTicks": 220,
+    "causalMaxTicks": 40,
+    "transientMaxDeltaTicks": 40,
+    "voidMaxDeltaTicks": 400,
+    "timeoutSeconds": 240
+  },
+  "logger": {
+    "buildVersion": "romlog-rom21-1",
+    "iterationVersion": "romlog-rom21-2"
+  }
+}

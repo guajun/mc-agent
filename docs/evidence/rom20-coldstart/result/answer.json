@@ -1,0 +1,116 @@
+{
+  "format": "mc-agent/minecart-rom-answer@1",
+  "run_id": "rom20-20260926T063100Z",
+  "instance": "experiment",
+  "dimension": "minecraft:overworld",
+  "method": "Carpet fake player Romuser right-clicked the note block at 11,-54,-23 five times (Carpet 'use once'); each pop was captured by the agent's own server-side logger before the cart was destroyed.",
+  "pop_order": [
+    "5304524c-6dbf-472e-ad88-bedf9456d95c",
+    "4431ae3d-f0f4-4f51-9d14-b9a915ec1531",
+    "d494cb2c-bdb9-43fc-9e14-314c3a561008",
+    "5f2f69ba-c4ff-4cfe-98b1-9f709c241119",
+    "1c23aa8e-81a4-404c-8942-a706fc777d93"
+  ],
+  "carts": [
+    {
+      "order": 1,
+      "uuid": "5304524c-6dbf-472e-ad88-bedf9456d95c",
+      "tick": 2893,
+      "items": [
+        {
+          "slot": 7,
+          "id": "minecraft:iron_ingot",
+          "count": 5
+        },
+        {
+          "slot": 15,
+          "id": "minecraft:sand",
+          "count": 1
+        },
+        {
+          "slot": 23,
+          "id": "minecraft:gold_ingot",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "order": 2,
+      "uuid": "4431ae3d-f0f4-4f51-9d14-b9a915ec1531",
+      "tick": 2910,
+      "items": [
+        {
+          "slot": 0,
+          "id": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 7,
+          "id": "minecraft:glass",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "id": "minecraft:sand",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "id": "minecraft:glass",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "order": 3,
+      "uuid": "d494cb2c-bdb9-43fc-9e14-314c3a561008",
+      "tick": 2926,
+      "items": [
+        {
+          "slot": 7,
+          "id": "minecraft:iron_ingot",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "order": 4,
+      "uuid": "5f2f69ba-c4ff-4cfe-98b1-9f709c241119",
+      "tick": 2943,
+      "items": [
+        {
+          "slot": 0,
+          "id": "minecraft:coal",
+          "count": 3
+        },
+        {
+          "slot": 13,
+          "id": "minecraft:redstone",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "id": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 26,
+          "id": "minecraft:gold_ingot",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "order": 5,
+      "uuid": "1c23aa8e-81a4-404c-8942-a706fc777d93",
+      "tick": 2959,
+      "items": [
+        {
+          "slot": 26,
+          "id": "minecraft:coal",
+          "count": 2
+        }
+      ]
+    }
+  ]
+}

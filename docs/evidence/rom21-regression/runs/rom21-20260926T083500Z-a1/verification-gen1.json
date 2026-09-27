@@ -1,0 +1,345 @@
+{
+  "format": "mc-agent/rom21-verification@1",
+  "runId": "rom21-20260926T083500Z-a1",
+  "configId": "calibrated-a",
+  "instance": "rom21-om21-20260926t083500z-a1-exp",
+  "expectedCartCount": 5,
+  "verdict": "pass",
+  "failures": [],
+  "problems": [],
+  "checks": {
+    "run_manifest": {
+      "pass": true,
+      "detail": "run manifest consistent"
+    },
+    "logger_session": {
+      "pass": true,
+      "detail": "logger session 1 scoped and identified"
+    },
+    "audit_oracle": {
+      "pass": true,
+      "detail": "independent oracle present and PASS"
+    },
+    "agent_operations": {
+      "pass": true,
+      "detail": "5 calibrated note-block operation(s)"
+    },
+    "causal_joins": {
+      "pass": true,
+      "detail": "5 pop(s) joined to exact presses in tick order"
+    },
+    "transient_captures": {
+      "pass": true,
+      "detail": "5 transient live-inventory capture(s)"
+    },
+    "natural_void_captures": {
+      "pass": true,
+      "detail": "5 natural void capture(s) at removal"
+    },
+    "capture_timing": {
+      "pass": true,
+      "detail": "capture and removal ticks inside the calibrated windows"
+    },
+    "output_order": {
+      "pass": true,
+      "detail": "observed pop order is consistent across logger and audit"
+    },
+    "inventory_matches": {
+      "pass": true,
+      "detail": "live inventory equal across logger, audit exit and audit removal"
+    },
+    "inventory_matches_program": {
+      "pass": true,
+      "detail": "all 5 observed inventories match the sealed program exactly"
+    },
+    "restore_verified": {
+      "pass": true,
+      "detail": "guarded restore verified (order, UUID order, counts, dimension)"
+    },
+    "jar_provenance": {
+      "pass": true,
+      "detail": "logger jar(s) pinned by SHA-256 (and size+source for iteration)"
+    },
+    "source_world": {
+      "pass": true,
+      "detail": "source world (and map artifact) unchanged"
+    },
+    "answer_matches_oracle": {
+      "pass": true,
+      "detail": "5 cart(s) match the independent oracle exactly"
+    }
+  },
+  "answer": [
+    {
+      "uuid": "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+      "tick": 590,
+      "seq": 2,
+      "via": "left_stack_region",
+      "items": [
+        [
+          11,
+          "minecraft:gold_ingot",
+          1
+        ],
+        [
+          22,
+          "minecraft:redstone",
+          2
+        ],
+        [
+          23,
+          "minecraft:copper_ingot",
+          2
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 11,
+          "id": "minecraft:gold_ingot",
+          "count": 1
+        },
+        {
+          "slot": 22,
+          "id": "minecraft:redstone",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "id": "minecraft:copper_ingot",
+          "count": 2
+        }
+      ],
+      "digest": "62544b22c0b85251"
+    },
+    {
+      "uuid": "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+      "tick": 862,
+      "seq": 4,
+      "via": "left_stack_region",
+      "items": [
+        [
+          1,
+          "minecraft:sand",
+          2
+        ],
+        [
+          5,
+          "minecraft:dirt",
+          4
+        ],
+        [
+          17,
+          "minecraft:gold_ingot",
+          2
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 1,
+          "id": "minecraft:sand",
+          "count": 2
+        },
+        {
+          "slot": 5,
+          "id": "minecraft:dirt",
+          "count": 4
+        },
+        {
+          "slot": 17,
+          "id": "minecraft:gold_ingot",
+          "count": 2
+        }
+      ],
+      "digest": "9df54b53909a611c"
+    },
+    {
+      "uuid": "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+      "tick": 1137,
+      "seq": 6,
+      "via": "left_stack_region",
+      "items": [
+        [
+          12,
+          "minecraft:copper_ingot",
+          2
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 12,
+          "id": "minecraft:copper_ingot",
+          "count": 2
+        }
+      ],
+      "digest": "1163df03fed91f12"
+    },
+    {
+      "uuid": "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+      "tick": 1412,
+      "seq": 8,
+      "via": "left_stack_region",
+      "items": [
+        [
+          9,
+          "minecraft:gold_ingot",
+          4
+        ],
+        [
+          11,
+          "minecraft:glass",
+          3
+        ],
+        [
+          18,
+          "minecraft:redstone",
+          2
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 9,
+          "id": "minecraft:gold_ingot",
+          "count": 4
+        },
+        {
+          "slot": 11,
+          "id": "minecraft:glass",
+          "count": 3
+        },
+        {
+          "slot": 18,
+          "id": "minecraft:redstone",
+          "count": 2
+        }
+      ],
+      "digest": "33e094cdc812e33e"
+    },
+    {
+      "uuid": "d09386ce-522a-4e38-9b38-a10b395927ce",
+      "tick": 1687,
+      "seq": 10,
+      "via": "left_stack_region",
+      "items": [
+        [
+          13,
+          "minecraft:redstone",
+          3
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 13,
+          "id": "minecraft:redstone",
+          "count": 3
+        }
+      ],
+      "digest": "84384cc0e7a82e8e"
+    }
+  ],
+  "oracle": [
+    {
+      "uuid": "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+      "tick": 727,
+      "seq": 131,
+      "items": [
+        [
+          11,
+          "minecraft:gold_ingot",
+          1
+        ],
+        [
+          22,
+          "minecraft:redstone",
+          2
+        ],
+        [
+          23,
+          "minecraft:copper_ingot",
+          2
+        ]
+      ],
+      "digest": "64aa72f9a8d86d8e"
+    },
+    {
+      "uuid": "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+      "tick": 999,
+      "seq": 189,
+      "items": [
+        [
+          1,
+          "minecraft:sand",
+          2
+        ],
+        [
+          5,
+          "minecraft:dirt",
+          4
+        ],
+        [
+          17,
+          "minecraft:gold_ingot",
+          2
+        ]
+      ],
+      "digest": "beceee493fe75737"
+    },
+    {
+      "uuid": "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+      "tick": 1274,
+      "seq": 237,
+      "items": [
+        [
+          12,
+          "minecraft:copper_ingot",
+          2
+        ]
+      ],
+      "digest": "d6ae526eeaf1b701"
+    },
+    {
+      "uuid": "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+      "tick": 1549,
+      "seq": 271,
+      "items": [
+        [
+          9,
+          "minecraft:gold_ingot",
+          4
+        ],
+        [
+          11,
+          "minecraft:glass",
+          3
+        ],
+        [
+          18,
+          "minecraft:redstone",
+          2
+        ]
+      ],
+      "digest": "19124cc5a3dc94c1"
+    },
+    {
+      "uuid": "d09386ce-522a-4e38-9b38-a10b395927ce",
+      "tick": 1824,
+      "seq": 291,
+      "items": [
+        [
+          13,
+          "minecraft:redstone",
+          3
+        ]
+      ],
+      "digest": "d07c80cc1192218e"
+    }
+  ],
+  "observedPopOrder": [
+    "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+    "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+    "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+    "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+    "d09386ce-522a-4e38-9b38-a10b395927ce"
+  ],
+  "popOrderSource": "observed live (logger transient captures joined to audit cart_exit/cart_remove); spawn order never assumed",
+  "pressedOperations": 5
+}

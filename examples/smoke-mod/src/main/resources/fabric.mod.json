@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "id": "mc-agent-lab-smoke",
+  "version": "${version}",
+  "name": "MC Agent Lab Smoke Mod",
+  "description": "Generic observation smoke mod for lab deployment verification. No ROM or use-case logic.",
+  "authors": [
+    "mc-agent"
+  ],
+  "license": "MIT",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "dev.mcagent.smoke.SmokeMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.19.0",
+    "minecraft": "*",
+    "fabric-api": "*",
+    "java": ">=25"
+  }
+}

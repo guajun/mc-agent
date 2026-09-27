@@ -1,186 +1,213 @@
-# Getting started
+# Install and first run
 
-This page takes you from nothing to an agent that can answer a question about
-your world, and then to a lab instance you can experiment on. Every command here
-has been run against Minecraft 26.2 on Windows; the same steps work on other
-platforms with the paths changed.
+Read your Minecraft world's state from a terminal, then connect the same tools
+to your agent. The terminal check needs no model account. A single-player world
+is a good starting point if you do not already run a server.
 
-## What you need
+## Before you start
 
-| | |
+| You need | Check |
 | --- | --- |
-| **Minecraft** | 26.2 with **Fabric Loader 0.19+** and **Fabric API** |
-| **Java** | 25 (the version the game itself ships with is fine) |
-| **Python** | 3.11+ for the bridge, the loop and the tools |
-| **An agent runtime** | [Hermes](hermes-setup.md) is what this was built against; anything that can call MCP or HTTP works too |
+| Minecraft 26.2, Fabric Loader 0.19+ and Fabric API | Launch that profile once and confirm it opens. |
+| JDK 25, including its compiler | `java -version` and `javac -version` report 25, or supply the JDK path below. |
+| Python 3.11+ and Git | `python --version` (`python3` on macOS/Linux) and `git --version`. |
+| An agent application, for the final step | MCP support or permission to run CLI commands. |
 
-## 1. Install the pieces
+Use one machine for the game endpoint, Toolkit and agent application. Create a
+working folder, for example `C:/Minecraft/toolkit-workspace`, and open a terminal
+there. Run all commands below from that folder. No virtual environment activation
+is needed. Replace the example paths with your own.
 
-Everything is installed once, from
-[Installation](install.md) - the mod jar into `<instance>/mods/`, the bridge
-and the loop into one virtual environment. The short version:
+## 1. Install the game mod { #1-install-the-game-mod }
 
-The mod compiles against the game's own (unobfuscated) jar - no Gradle, no
-decompiler:
+The documented installation builds the mod from source. Locate these paths first:
 
-```bash
-git clone https://github.com/guajun/mc-agent-interface-mod
-python mc-agent-interface-mod/build.py \
-    --minecraft-dir "C:/Users/me/AppData/Roaming/.minecraft" \
-    --version 26.2-Fabric \
-    --jdk "C:/Program Files/Java/jdk-25"
-```
+| Setting | Which folder? |
+| --- | --- |
+| `MinecraftDir` / `MINECRAFT_DIR` | Resource root containing `versions/` and `libraries/`. The builder needs `versions/<version>/<version>.json` and `<version>.jar`. |
+| `Version` / `MC_VERSION` | Actual folder name inside `versions/`, such as `26.2-Fabric`. |
+| `GameDir` / `GAME_DIR` | Running instance directory containing `mods/` and `saves/`, or the dedicated server directory containing `mods/`. |
+| `JdkDir` / `JDK_DIR` | JDK 25 installation containing `bin/javac` or `javac.exe`. |
 
-Copy `dist/mc-agent-interface-<version>.jar` into `<instance>/mods/` next to
-Fabric API, then start the game. In the log you should see:
+Launcher instance isolation can make the resource root and game directory
+different. The builder looks for Fabric API in the resource root's `mods/` or
+`versions/<version>/.fabric/processedMods/`. If neither contains it, also place
+a matching Fabric API jar in the resource root's `mods/` for compilation.
 
-```
-[mc-agent-interface] initialized, dir=<instance>/mc-agent basePort=25580
-[mc-agent-interface] listening on 127.0.0.1:25580
-```
+A dedicated-server-only folder does not provide this script's client build
+resources. Build against an installed client profile, then copy the jar to the
+server. [Lab mod builds](mod-building.md) are a separate advanced workflow.
 
-The mod writes the port it actually got into `<instance>/mc-agent/port.txt`. If
-something else holds 25580 it moves to the next free port, and the bridge finds
-it through that file.
+Close the game/server before copying the mod. Edit the four values, then run:
 
-!!! tip "In game, right now"
-    The mod adds client-side commands, so you can check the interface without any
-    of the rest:
+=== "Windows · PowerShell"
 
+    ```powershell
+    git clone https://github.com/guajun/mc-agent-interface-mod
+    $MinecraftDir = "C:/Minecraft"
+    $GameDir = "C:/Minecraft/instances/my-world"
+    $Version = "26.2-Fabric"
+    $JdkDir = "C:/Program Files/Java/jdk-25"
+    python mc-agent-interface-mod/build.py --minecraft-dir "$MinecraftDir" --version "$Version" --jdk "$JdkDir"
+    New-Item -ItemType Directory -Force -Path "$GameDir/mods" | Out-Null
+    Copy-Item mc-agent-interface-mod/dist/mc-agent-interface-*.jar "$GameDir/mods/"
     ```
-    /mcagent status      mod version, port, connected bridges, tick
-    /mcagent state       position, velocity, health, dimension
-    /mcagent entities 32 entity list within 32 blocks
-    /mcagent record start 200 32    sample 200 ticks into samples.jsonl
+
+=== "macOS / Linux"
+
+    ```bash
+    git clone https://github.com/guajun/mc-agent-interface-mod
+    MINECRAFT_DIR="/path/to/minecraft"
+    GAME_DIR="/path/to/minecraft/instances/my-world"
+    MC_VERSION="26.2-Fabric"
+    JDK_DIR="/path/to/jdk-25"
+    python3 mc-agent-interface-mod/build.py --minecraft-dir "$MINECRAFT_DIR" --version "$MC_VERSION" --jdk "$JDK_DIR"
+    mkdir -p "$GAME_DIR/mods"
+    cp mc-agent-interface-mod/dist/mc-agent-interface-*.jar "$GAME_DIR/mods/"
     ```
 
-## 2. Install the bridge and the loop
+The build ends with `built: ...jar`. Keep **one version** of the interface mod
+in the target `mods/`, alongside a matching **Fabric API** jar. Start the Fabric
+server, or launch the client and **enter a single-player world**. The title
+screen alone does not start the integrated server.
 
-```bash
-git clone https://github.com/guajun/mc-agent-bridge
-git clone https://github.com/guajun/mc-agent-loop
-python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
+**Success:** `<GameDir>/mc-agent-server/port.txt` appears with a port number.
+This same `GameDir` is the `--server-dir` in step 3, including in single-player.
+If you joined someone else's multiplayer server, that server also needs the mod
+for this server-view setup.
+
+## 2. Install the Toolkit { #2-install-the-toolkit }
+
+In the same working folder:
+
+=== "Windows · PowerShell"
+
+    ```powershell
+    git clone https://github.com/guajun/mc-agent-bridge
+    python -m venv .venv
+    .venv/Scripts/python -m pip install -e "mc-agent-bridge[mcp]"
+    .venv/Scripts/mc-bridge --help
+    ```
+
+=== "macOS / Linux"
+
+    ```bash
+    git clone https://github.com/guajun/mc-agent-bridge
+    python3 -m venv .venv
+    .venv/bin/python -m pip install -e "mc-agent-bridge[mcp]"
+    .venv/bin/mc-bridge --help
+    ```
+
+**Success:** the last command displays CLI help. The `[mcp]` extra installs the
+adapter used by agent applications. This setup requires no `mc-agent-loop`.
+
+## 3. Check the connection { #3-check-the-connection }
+
+**Terminal A — start the daemon and leave it running.** Set `--server-dir` to
+the game directory from step 1, the parent of `mc-agent-server/`:
+
+=== "Windows · PowerShell"
+
+    ```powershell
+    .venv/Scripts/mc-bridge run --server-dir "C:/Minecraft/instances/my-world"
+    ```
+
+=== "macOS / Linux"
+
+    ```bash
+    .venv/bin/mc-bridge run --server-dir "/path/to/minecraft/instances/my-world"
+    ```
+
+This process will not return to the prompt while serving connections. Keep the
+world open too.
+
+**Terminal B — open another terminal in the same working folder**, then run:
+
+=== "Windows · PowerShell"
+
+    ```powershell
+    .venv/Scripts/mc-bridge call status
+    .venv/Scripts/mc-bridge call capabilities
+    .venv/Scripts/mc-bridge call state
+    ```
+
+=== "macOS / Linux"
+
+    ```bash
+    .venv/bin/mc-bridge call status
+    .venv/bin/mc-bridge call capabilities
+    .venv/bin/mc-bridge call state
+    ```
+
+| Check | Success looks like |
+| --- | --- |
+| `status` | `connected: true` and `vantage: server` in the JSON result. |
+| `capabilities` | Supported operations from the connected mod; this list determines which tools you can use. |
+| `state` | World data returned by the server, rather than a connection error. |
+
+**You are connected.** These checks only inspect the connection and world.
+Keep using the CLI, or continue to connect your agent.
+
+## 4. Connect your agent { #4-connect-your-agent }
+
+In your agent application's **MCP server settings**, add a local **stdio** server:
+
+| Field | Value |
+| --- | --- |
+| Name | `minecraft` (or another recognizable label) |
+| Command · Windows | Absolute path to `.venv/Scripts/mc-bridge.exe` in your working folder |
+| Command · macOS/Linux | Absolute path to `.venv/bin/mc-bridge` in your working folder |
+| Arguments | `mcp` |
+
+For clients accepting an `mcpServers` JSON configuration, replace the command
+path in this example. Other clients use their own settings format; the command
+and argument stay the same.
+
+```json
+{
+  "mcpServers": {
+    "minecraft": {
+      "command": "C:/Minecraft/toolkit-workspace/.venv/Scripts/mc-bridge.exe",
+      "args": ["mcp"]
+    }
+  }
+}
 ```
 
-`[mcp]` is optional: without it you still get the daemon, the CLI and the
-loopback API.
+On macOS/Linux, use `/path/to/toolkit-workspace/.venv/bin/mc-bridge` instead.
+Use an **absolute** path because the agent may start in a different directory.
+Keep Terminal A running: the MCP adapter connects to the daemon; it does not start it.
 
-## 3. Run the bridge
+Reload the client's MCP servers or start a new agent session. Then send:
 
-!!! tip "Single player already has both vantages"
-    The same jar gives you the client vantage (25580) *and* the server vantage
-    (25581) while you play single player, because the world runs on an integrated
-    server inside the same process. Everything below - authoritative state,
-    snapshots, forking - works there without any server to set up.
+> Check the Minecraft connection with mc_status and discover tools with
+> mc_capabilities. Read mc_state and summarize the current world and online
+> players. Do not change the world.
 
-```bash
-.venv/Scripts/mc-bridge run
-```
+**Success:** the agent calls the tools and summarizes actual world data.
+An agent without MCP can run the same CLI commands from step 3.
+Optionally [install the Toolkit Skill](toolkit-skill.md) to teach your agent the
+discovery and player-context workflow.
 
-```
-[mc-agent-bridge] local API on 127.0.0.1:8765
-[mc-agent-bridge] connected to interface mod on port 25580
-```
+## Something didn't work? { #something-didnt-work }
 
-It keeps trying while the game is closed, so start it whenever; the game can come
-and go without disturbing it. In another shell:
+| Symptom | Try this first |
+| --- | --- |
+| Build says `missing version json` or `missing client jar` | Check the resource root and actual profile folder name from step 1; both files are required. |
+| Build cannot find Fabric API or `javac` | Check the Fabric API locations and JDK path from step 1. |
+| No `mc-agent-server/port.txt` | Check that the mod and Fabric API loaded; enter a world or start the dedicated server. |
+| `status` says `connected: false` | Check Terminal A's error and `--server-dir`; use the running instance, not the Toolkit checkout or `saves/`. |
+| Connection refused when calling `status` | Start the daemon in Terminal A and keep it running. |
+| CLI works but the agent has no `mc_*` tools | Check the absolute MCP executable path, `mcp` argument and `[mcp]` install; reload MCP settings. |
+| The agent does not reply to game chat | This setup starts requests from your agent application. See the separate [unattended setup](hermes-unattended.md), which has a pending delivery integration issue. |
 
-```bash
-.venv/Scripts/mc-bridge call state
-.venv/Scripts/mc-bridge call entities '{"radius": 32}'
-.venv/Scripts/mc-bridge call chat '{"message": "hello from outside"}'
-.venv/Scripts/mc-bridge watch --events chat,game      # live event stream
-```
+[More troubleshooting](troubleshooting.md) · [Installation reference](install.md)
 
-## 4. Give it a mind
+## Next steps
 
-The loop turns chat into backend turns. The quickest way to see it work needs no
-model at all:
+- [Tool reference](tools.md) — more CLI calls and MCP operations.
+- [Architecture](concepts.md) — deployment choices and component responsibilities.
+- [Advanced guides](advanced.md) — events, unattended agents, world forks and experiments.
 
-```bash
-.venv/Scripts/mc-agent-loop run --backend echo --trigger @codex
-```
-
-Type `@codex hello` in game chat and the game will answer itself with an echo.
-That proves the plumbing: chat in, backend out, reply back into chat.
-
-For a real model, start Hermes and point the loop at it - see
-[Running the agent on Hermes](hermes-setup.md):
-
-```bash
-.venv/Scripts/mc-agent-loop run --backend hermes --trigger @codex --env-file .env
-```
-
-The loop ignores its own messages (otherwise it would answer itself forever), so
-in a single-player world the trigger has to come from somebody else - another
-player, or the agent's own player as described in
-[Who is the agent in game](player-identity.md). For the single-client case there
-is one-shot mode:
-
-```bash
-.venv/Scripts/mc-agent-loop once "look around and tell me what is within 64 blocks" \
-    --sender operator --backend hermes --env-file .env
-```
-
-## 5. Check it without a game
-
-The repository ships a fake mod so the seams can be tested on their own:
-
-```bash
-python tools/smoke_offline.py                     # echo backend, no model
-python tools/smoke_offline.py --backend hermes    # real model, real tools
-```
-
-The second one drives the actual stack - daemon, loop, MCP, model - against a
-stand-in for the game, and is the fastest way to tell whether a problem is in
-your setup or in the game.
-
-## 6. Give the agent a lab
-
-For research you want an instance the agent owns: no humans, no rendering,
-deterministic stepping. That is one command plus a server start:
-
-```bash
-python tools/lab_server.py provision --name my-lab --void --fabric-api --carpet \
-    --mod-jar mc-agent-interface-mod/dist/mc-agent-interface-0.5.2.jar \
-    --java <java25>
-python tools/lab_server.py start --name my-lab --wait 300
-python tools/lab_server.py exec --name my-lab "tick freeze"
-```
-
-The lab listens with the mod's **server vantage** on the port in
-`labs/my-lab/mc-agent-server/port.txt` (25581 by default, or the next free one).
-Attach a bridge to it and it speaks the same tools:
-
-```bash
-.venv/Scripts/mc-bridge run --api-port 8766 \
-    --port-file labs/my-lab/mc-agent-server/port.txt
-.venv/Scripts/mc-bridge --api-port 8766 call state
-```
-
-## 7. Fork a live world into it
-
-The point of the lab is that you can take a *running* world with you, including
-the entity tick order:
-
-```bash
-# against the live instance's server vantage
-.venv/Scripts/mc-bridge --api-port 8767 call fork '{"name": "before", "radius": 64}'
-
-# restore it into the lab and prove the order survived
-python tools/fork_verify.py inspect "<fork directory>"
-python tools/fork_verify.py restore "<fork directory>" --apply --api-port 8766
-python tools/fork_verify.py check   "<fork directory>" --api-port 8766 --radius 0
-```
-
-`check` re-snapshots the lab and compares the order hash with the recording:
-`MATCH` means the isolated instance ticks its entities in the same order as the
-world you forked. The full recipe, including the parts that are easy to get
-wrong, is in [Forking a live world](protocol-snapshot.md).
-
-## Where to next
-
-* [How it fits together](concepts.md) - so you put new code in the right layer
-* [Tools](tools.md) - the rest of the toolbelt
-* [Troubleshooting](troubleshooting.md) - the traps, collected
+To finish, stop the daemon with **Ctrl+C in Terminal A**. Next time, open your
+world and repeat step 3; installation and MCP registration are one-time setup.

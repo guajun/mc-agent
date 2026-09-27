@@ -1,0 +1,31 @@
+bot [11.5, -53.6, -24.5] rotation Rom_Bot has the following entity data: [0.0f, 50.5055f]
+stacking 2 carts
+ready carts: [('1401229667', [14.5, -51.9375, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])]
+ready machine: {'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [20]}
+press: use
+  tick 1: carts=[('1401229667', [14.5, -51.49, -21.5]), ('-142490065', [14.5, -51.49, -21.5])] machine={'up_ext': True, 'east_ext': False, 'rail52': False, 'rail51': False, 'sand50': False, 'note': [21]}
+  tick 2: carts=[('1401229667', [14.5, -49.658000011444095, -21.5]), ('-142490065', [14.5, -51.26999998807907, -21.5])] machine={'up_ext': True, 'east_ext': False, 'rail52': False, 'rail51': True, 'sand50': True, 'note': [21]}
+  tick 3: carts=[('1401229667', [15.500000009536743, -48.160620062313086, -21.5]), ('-142490065', [14.5, -51.5, -21.5])] machine={'up_ext': False, 'east_ext': True, 'rail52': False, 'rail51': False, 'sand50': False, 'note': [21]}
+  tick 4: carts=[('1401229667', [16.28000000476837, -46.96523469118398, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': False, 'note': [21]}
+  tick 5: carts=[('1401229667', [16.9839499827981, -46.04239941986148, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': False, 'note': [21]}
+  tick 6: carts=[('1401229667', [17.61926482202563, -45.365540607441254, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': False, 'note': [21]}
+  tick 7: carts=[('1401229667', [18.192636450038744, -44.91067554360902, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 8: carts=[('1401229667', [18.71010433133385, -44.65615983284934, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 9: carts=[('1401229667', [19.17711908248215, -44.582459408699776, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 10: carts=[('1401229667', [19.59859988481572, -44.67194477662042, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 11: carts=[('1401229667', [19.978986299375325, -44.908705318188304, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 12: carts=[('1401229667', [20.322285029899707, -45.27838170063708, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 13: carts=[('1401229667', [20.632112126422324, -45.76801462647033, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+  tick 14: carts=[('1401229667', [20.91173107401648, -46.3659083299911, -21.5]), ('-142490065', [14.5, -51.9375, -21.5])] machine={'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+last machine: {'up_ext': False, 'east_ext': False, 'rail52': True, 'rail51': False, 'sand50': True, 'note': [21]}
+unfreeze; poll popped cart until removal
+  t+ 0.40s carts=[('1401229667', [21.39, -47.85, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 1.08s carts=[('1401229667', [22.42, -54.57, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 1.75s carts=[('1401229667', [22.97, -63.78, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 2.41s carts=[('1401229667', [23.23, -73.26, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 3.08s carts=[('1401229667', [23.36, -83.19, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 3.75s carts=[('1401229667', [23.43, -94.13, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 4.41s carts=[('1401229667', [23.47, -104.41, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 5.07s carts=[('1401229667', [23.48, -114.75, -21.5]), ('-142490065', [14.5, -51.94, -21.5])]
+  t+ 5.75s carts=[('-142490065', [23.49, -125.92, -21.5])]
+  popped cart removed at t+5.75s

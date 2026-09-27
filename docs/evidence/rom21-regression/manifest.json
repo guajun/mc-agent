@@ -1,0 +1,437 @@
+{
+  "format": "mc-agent/rom21-evidence@1",
+  "suite": {
+    "stamp": "20260926T083500Z",
+    "startedAt": "2026-09-26T08:14:43Z",
+    "finishedAt": "2026-09-26T08:24:32Z"
+  },
+  "runs": [
+    {
+      "runId": "rom21-20260926T083500Z-a1",
+      "dir": "runs/rom21-20260926T083500Z-a1",
+      "config": "calibrated-a.json",
+      "cold": false,
+      "jarIteration": false,
+      "verifyInputs": {
+        "gen1": "runs/rom21-20260926T083500Z-a1/verify-gen1"
+      }
+    },
+    {
+      "runId": "rom21-20260926T083500Z-b1",
+      "dir": "runs/rom21-20260926T083500Z-b1",
+      "config": "calibrated-b.json",
+      "cold": false,
+      "jarIteration": true,
+      "verifyInputs": {
+        "gen1": "runs/rom21-20260926T083500Z-b1/verify-gen1",
+        "gen2": "runs/rom21-20260926T083500Z-b1/verify-gen2"
+      }
+    },
+    {
+      "runId": "rom21-20260926T083500Z-a2",
+      "dir": "runs/rom21-20260926T083500Z-a2",
+      "config": "calibrated-a.json",
+      "cold": true,
+      "jarIteration": false,
+      "verifyInputs": {
+        "gen1": "runs/rom21-20260926T083500Z-a2/verify-gen1"
+      }
+    }
+  ],
+  "notes": [
+    "These are regression results: real game instances, no model called. The original autonomous cold-start capability evidence is docs/evidence/rom20-coldstart.",
+    "Copied raw records (logger/audit/restore/fork/init) are byte-faithful and therefore keep the host-local absolute paths the server wrote; package-generated fields use repo-relative paths.",
+    "audit-<label>.projected.jsonl removes only the periodic cart_sample stream; the full raw audit hashes are pinned per generation in runs/<run-id>/run.json.",
+    "verify-<label>/ is a complete verifier input; packaging re-ran tools/rom21_verify.py against it and required PASS before recording this manifest.",
+    "revalidation/ records the post-review offline re-check: all four committed generation inputs pass and all declared negatives fail closed under verifier head 8f28aea; the game execution remains c5fa37b."
+  ],
+  "committed": {
+    "negatives/audit_missing.json": {
+      "bytes": 401,
+      "sha256": "3b510eabeac9ccb7978cca052d917bed58f6a9094cdec5dde75430098c714b2f"
+    },
+    "negatives/inventory_wrong.json": {
+      "bytes": 565,
+      "sha256": "0ec4b744cb103783d63754da60a18e4780bbb9c2b5e3f47eb91e1a21abc90ff7"
+    },
+    "negatives/logger_late_capture.json": {
+      "bytes": 617,
+      "sha256": "36b7af3a90b151973eaa5bd13014ae659564bf65b0a6f2946f140d040b0ae1da"
+    },
+    "negatives/logger_missed_capture.json": {
+      "bytes": 620,
+      "sha256": "d9b4cdee5d2be2bc4037e3bcf26e8d3ecacfa4b2fe4579346ab2c4239647fbd4"
+    },
+    "negatives/neg-inventory_wrong/audit-check.json": {
+      "bytes": 5445,
+      "sha256": "76887da04a47c770579798933624949609e17fc745ee3e7c58a9719c104b071e"
+    },
+    "negatives/neg-inventory_wrong/verification.json": {
+      "bytes": 7473,
+      "sha256": "3e71f00d03de0308a4b20c93c96d080749ac00b17935d6c792c4bacbe20017d6"
+    },
+    "negatives/neg-logger_late_capture/audit-check.json": {
+      "bytes": 5451,
+      "sha256": "4729bf4fc949a7bd7fb605574f2c153af678d53e99c22f3aca04dc2bbc575054"
+    },
+    "negatives/neg-logger_late_capture/verification.json": {
+      "bytes": 4475,
+      "sha256": "145506ee694bf6b9e590f5a1f8b9dba03639b1596103af0bdfff7fb97cf15083"
+    },
+    "negatives/neg-logger_missed_capture/audit-check.json": {
+      "bytes": 5455,
+      "sha256": "4d286a09f7017458a8d89a1177d018d5b8c3d3cc54a82e84d6064d53a909d497"
+    },
+    "negatives/neg-logger_missed_capture/verification.json": {
+      "bytes": 4477,
+      "sha256": "7687252ad325e6683a1c5c1eb7b129411423630d8e4f9a96018658e87ec73fe5"
+    },
+    "negatives/neg-no_machine_operation/audit-check.json": {
+      "bytes": 2896,
+      "sha256": "fb5eb467f4cbd96b7076735282691007178211bc7adc64dbaaed1968839d0a56"
+    },
+    "negatives/neg-no_machine_operation/verification.json": {
+      "bytes": 3189,
+      "sha256": "1a36dd3c5e5b3f935d200b10f5392ae1812676232acbd9b47f2714783d07e28c"
+    },
+    "negatives/no_machine_operation.json": {
+      "bytes": 702,
+      "sha256": "f629e6e6172f0555f4dca819ef7285894d9ce9f3b7e0460f8c94d55c3ac40799"
+    },
+    "negatives/output_order_wrong.json": {
+      "bytes": 411,
+      "sha256": "e8f7ff9d547e25d40e3b4103fdf746d0d5d41b8ff81cfe125020b7fe58d27fb6"
+    },
+    "negatives/restore_order_wrong/negative.json": {
+      "bytes": 1237,
+      "sha256": "692bea6dae21d9fe224be2511a844659d8353f31cbc7f43fe200105d808dbc00"
+    },
+    "negatives/restore_order_wrong/restore-apply.json": {
+      "bytes": 738,
+      "sha256": "852d646c994d46143ff114f53e7063163791d76132d60485894fa76154aa081b"
+    },
+    "negatives/restore_order_wrong/restore-verify.json": {
+      "bytes": 571,
+      "sha256": "a2a93ea0b4b002fe3a49bb7116befbf2c170edec182a941b7d3dce9deb311f1d"
+    },
+    "negatives/summary.json": {
+      "bytes": 5659,
+      "sha256": "e9c7bebf82413d9a338ae7c49ced04633fdab76989947a4f48b55df43f5847e7"
+    },
+    "negatives/wrong_instance.json": {
+      "bytes": 331,
+      "sha256": "c01febec25c30945980038a0d4f1e25a028c4d3c626ff06eda8e28e42cad6981"
+    },
+    "README.md": {
+      "bytes": 11676,
+      "sha256": "5262a758b56e20321dca1672c98e497f9cfa4561d846c0974f04e963e520807d"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-a1-verify-gen1.json": {
+      "bytes": 1583,
+      "sha256": "bfbfb64ccdab128d3e3256bdf86e50d68d334cdc5d56fa2077c9ce33c701fad1"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-a2-verify-gen1.json": {
+      "bytes": 1583,
+      "sha256": "10ab68ca009dcfe520cbb36119b7ce7d42573bb6f2cf31818257a98208ea1fe3"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-b1-verify-gen1.json": {
+      "bytes": 1583,
+      "sha256": "8d720fb1e12171cb24d65219a3ae930721b8caaa01b07b1074bba801a7d2f2e2"
+    },
+    "revalidation/generation-rom21-20260926T083500Z-b1-verify-gen2.json": {
+      "bytes": 1583,
+      "sha256": "89d9d59ba2a2f9721c6f2311eb6aec1a8f7f13207afeea5363ce0ad2b4b31004"
+    },
+    "revalidation/negative-inventory_wrong.json": {
+      "bytes": 5364,
+      "sha256": "d1051f12206152d0a5b81abff2117714558979b5b615bdcc426b6af086fbf6ef"
+    },
+    "revalidation/negative-logger_late_capture.json": {
+      "bytes": 5536,
+      "sha256": "c76668ae09adfb0851a63e84bb69f6d37a73d51e41b7efbdb3ca537ba9232924"
+    },
+    "revalidation/negative-logger_missed_capture.json": {
+      "bytes": 5546,
+      "sha256": "d97f9cadd005ee3e6ea2d0d22a42b3edfc9ede6efcd8da9438b11db825eeb418"
+    },
+    "revalidation/negative-no_machine_operation.json": {
+      "bytes": 5922,
+      "sha256": "3398fa9ff811af7fb594945b96babf9c5e5009f3bfa91095d438ee53169a0ac8"
+    },
+    "revalidation/negative-restore_order_wrong.json": {
+      "bytes": 781,
+      "sha256": "87c33ac6356bcf3b57f414263c751e6f48ba94cfeb6e7cffd913a8703be69966"
+    },
+    "revalidation/offline-audit_missing.json": {
+      "bytes": 660,
+      "sha256": "06f7ea9407f72d389611ecf1309484766c9d63abe1d506b06d0780f5d0604764"
+    },
+    "revalidation/offline-output_order_wrong.json": {
+      "bytes": 647,
+      "sha256": "bdf2e46f7fc4df2941dd489f2adab362299fb445411af47d44bbe7f7eac32cb6"
+    },
+    "revalidation/offline-wrong_instance.json": {
+      "bytes": 564,
+      "sha256": "65048d3c2c66c7a70b9948c4c6bc05c69d771f737cfb683bc8d2e32ad2210a67"
+    },
+    "revalidation/summary.json": {
+      "bytes": 3711,
+      "sha256": "5a3799e97faa2bb5a16f4b2f2ee3ae745df9e9afd2d08766e57af167e2d23965"
+    },
+    "runs/rom21-20260926T083500Z-a1/audit-check-gen1.json": {
+      "bytes": 5423,
+      "sha256": "0cd215a8023a50551b2da858bcf223fa65e3e3a640a398bde4db923e787559df"
+    },
+    "runs/rom21-20260926T083500Z-a1/audit-gen1.projected.jsonl": {
+      "bytes": 26375,
+      "sha256": "8daa1b2a9261e68aa4d826d702fd8dd3a6e61f07567b0d31297f86327bd61a75"
+    },
+    "runs/rom21-20260926T083500Z-a1/fork.json": {
+      "bytes": 1008,
+      "sha256": "776c01a1c0038cead8cd93bd5c1dfde5e740fcfd3d8831c6beadbaead0f6ac77"
+    },
+    "runs/rom21-20260926T083500Z-a1/init-summary.json": {
+      "bytes": 4826,
+      "sha256": "e72a878fe79ac3d1e1c723bdcbd4d997128badd0d8266ea8c7e0de6f528f93d5"
+    },
+    "runs/rom21-20260926T083500Z-a1/logger-gen1.jsonl": {
+      "bytes": 7141,
+      "sha256": "acba3edf66531f31f97ad86376e032c54a16c78ddef8e83eb34638162fc5286f"
+    },
+    "runs/rom21-20260926T083500Z-a1/logger.jsonl": {
+      "bytes": 7458,
+      "sha256": "f4799314384f869cbd0f67f2c6f252a8ece01b9af191f0a7db64156f2d2a5304"
+    },
+    "runs/rom21-20260926T083500Z-a1/program.json": {
+      "bytes": 1417,
+      "sha256": "2b1369fa6062fda262db00a3bea77d7c3c6e901dcd66fcf5fb48e226ec64e2c8"
+    },
+    "runs/rom21-20260926T083500Z-a1/restore-verify-gen1.json": {
+      "bytes": 2471,
+      "sha256": "99af2fe75991ecce73f6816b7fb14d0decbcdcdeccb3a2fd5dcdb0df6e7b4c56"
+    },
+    "runs/rom21-20260926T083500Z-a1/run.json": {
+      "bytes": 17847,
+      "sha256": "3d94def4e1bffa21504970d4991da5af678a1cc421827215ef490872a6ae93fc"
+    },
+    "runs/rom21-20260926T083500Z-a1/steps.jsonl": {
+      "bytes": 1857,
+      "sha256": "ef8af8e907f2425d7de29cb8e693a99f90328f5acc1c0a4bb1908583fa12e66b"
+    },
+    "runs/rom21-20260926T083500Z-a1/verification-gen1.json": {
+      "bytes": 7292,
+      "sha256": "1ee093ff91fe8115119d8337ae9c98a153d9aa633a0159e84dae9361d635764b"
+    },
+    "runs/rom21-20260926T083500Z-a1/verify-gen1/audit-check.json": {
+      "bytes": 5423,
+      "sha256": "0cd215a8023a50551b2da858bcf223fa65e3e3a640a398bde4db923e787559df"
+    },
+    "runs/rom21-20260926T083500Z-a1/verify-gen1/audit.jsonl": {
+      "bytes": 26375,
+      "sha256": "8daa1b2a9261e68aa4d826d702fd8dd3a6e61f07567b0d31297f86327bd61a75"
+    },
+    "runs/rom21-20260926T083500Z-a1/verify-gen1/logger.jsonl": {
+      "bytes": 7141,
+      "sha256": "acba3edf66531f31f97ad86376e032c54a16c78ddef8e83eb34638162fc5286f"
+    },
+    "runs/rom21-20260926T083500Z-a1/verify-gen1/restore-verify.json": {
+      "bytes": 2471,
+      "sha256": "99af2fe75991ecce73f6816b7fb14d0decbcdcdeccb3a2fd5dcdb0df6e7b4c56"
+    },
+    "runs/rom21-20260926T083500Z-a1/verify-gen1/run.json": {
+      "bytes": 5865,
+      "sha256": "46102a5500fa9de502eb3746eb75756feac5efb38e309eb13bc18f678cac9f27"
+    },
+    "runs/rom21-20260926T083500Z-a2/audit-check-gen1.json": {
+      "bytes": 5423,
+      "sha256": "d8e8794bae6e9de4ae1bc8367e4c7a621fae00fe7902c43e0115f2047d2fabf4"
+    },
+    "runs/rom21-20260926T083500Z-a2/audit-gen1.projected.jsonl": {
+      "bytes": 26390,
+      "sha256": "14173c5afed3e5577481e510b8ef150cd6b8c84678d306e50f919336e43b6f0d"
+    },
+    "runs/rom21-20260926T083500Z-a2/fetch.json": {
+      "bytes": 3390,
+      "sha256": "dbd335d758d701afc5e88ba8ff24e8fa6725490624b98951489dc10847fec2bd"
+    },
+    "runs/rom21-20260926T083500Z-a2/fork.json": {
+      "bytes": 1008,
+      "sha256": "d07a1333d178288ff2f471493ff9a672e757e0e8c184cc051fb12767133c9571"
+    },
+    "runs/rom21-20260926T083500Z-a2/init-summary.json": {
+      "bytes": 4826,
+      "sha256": "defea02aec08d0416d8c04679d2472d20313ee14e34785e8931e3838ea215894"
+    },
+    "runs/rom21-20260926T083500Z-a2/logger-gen1.jsonl": {
+      "bytes": 7142,
+      "sha256": "29f2847cc78effafd7b039b25cb0d86d610259c9d8ed764b6c0dd5ddc89c8d32"
+    },
+    "runs/rom21-20260926T083500Z-a2/logger.jsonl": {
+      "bytes": 7459,
+      "sha256": "053c25e44b3bf3d60d9fd5942268340352728e0068a4a9d2c4a406a626428354"
+    },
+    "runs/rom21-20260926T083500Z-a2/program.json": {
+      "bytes": 1417,
+      "sha256": "2b1369fa6062fda262db00a3bea77d7c3c6e901dcd66fcf5fb48e226ec64e2c8"
+    },
+    "runs/rom21-20260926T083500Z-a2/restore-verify-gen1.json": {
+      "bytes": 2471,
+      "sha256": "fe6e00c129d3380e4a2778a09a2aa177fa2da408d7a70969b883f11b4e42cd5e"
+    },
+    "runs/rom21-20260926T083500Z-a2/run.json": {
+      "bytes": 18400,
+      "sha256": "669660c05e113e91534f032cfd52ceaa86aa9a808c1e8c904100412175bd569b"
+    },
+    "runs/rom21-20260926T083500Z-a2/steps.jsonl": {
+      "bytes": 1854,
+      "sha256": "cb6618066e2ff9c9be0e79a43974c6afde3bc2f93e59e97de14977b86e4e2323"
+    },
+    "runs/rom21-20260926T083500Z-a2/verification-gen1.json": {
+      "bytes": 7293,
+      "sha256": "6ba58bec0b132b0dc4af6dcbb39efc45b172ff626311159512d686ddd13064f6"
+    },
+    "runs/rom21-20260926T083500Z-a2/verify-gen1/audit-check.json": {
+      "bytes": 5423,
+      "sha256": "d8e8794bae6e9de4ae1bc8367e4c7a621fae00fe7902c43e0115f2047d2fabf4"
+    },
+    "runs/rom21-20260926T083500Z-a2/verify-gen1/audit.jsonl": {
+      "bytes": 26390,
+      "sha256": "14173c5afed3e5577481e510b8ef150cd6b8c84678d306e50f919336e43b6f0d"
+    },
+    "runs/rom21-20260926T083500Z-a2/verify-gen1/logger.jsonl": {
+      "bytes": 7142,
+      "sha256": "29f2847cc78effafd7b039b25cb0d86d610259c9d8ed764b6c0dd5ddc89c8d32"
+    },
+    "runs/rom21-20260926T083500Z-a2/verify-gen1/restore-verify.json": {
+      "bytes": 2471,
+      "sha256": "fe6e00c129d3380e4a2778a09a2aa177fa2da408d7a70969b883f11b4e42cd5e"
+    },
+    "runs/rom21-20260926T083500Z-a2/verify-gen1/run.json": {
+      "bytes": 5865,
+      "sha256": "dfeec2112f75381900498f3e0a36b3cdef311e81e92756634b3becfd5b639505"
+    },
+    "runs/rom21-20260926T083500Z-b1/audit-check-gen1.json": {
+      "bytes": 4482,
+      "sha256": "bd5064524d3e3ab059818b2cd0fbdad4fd9c385e56cc059c803bcb7b357cbbe2"
+    },
+    "runs/rom21-20260926T083500Z-b1/audit-check-gen2.json": {
+      "bytes": 4667,
+      "sha256": "4e87463cf429a84615fa8b97362d60b2c240e96c8297de0f4025e8c7304adae2"
+    },
+    "runs/rom21-20260926T083500Z-b1/audit-gen1.projected.jsonl": {
+      "bytes": 21749,
+      "sha256": "03c088cdac05e625e52ce672efd5f566e41486c3a702de1eb732e5e08accc8ed"
+    },
+    "runs/rom21-20260926T083500Z-b1/audit-gen2.projected.jsonl": {
+      "bytes": 43504,
+      "sha256": "b0e2d9514bc78fdee7713137adcc7bb890e78653e0ff57da6e29320973097cea"
+    },
+    "runs/rom21-20260926T083500Z-b1/fork-2.json": {
+      "bytes": 1014,
+      "sha256": "f06d425402552b50d91477934096b6c462ea8fa9e0e168deab26a396c977530b"
+    },
+    "runs/rom21-20260926T083500Z-b1/fork.json": {
+      "bytes": 1008,
+      "sha256": "f81f4c67bec9b65ee714da6a4129223fb1ef8fb4ff50b1a848637e122e6c86f2"
+    },
+    "runs/rom21-20260926T083500Z-b1/init-summary.json": {
+      "bytes": 4694,
+      "sha256": "73dfeae742c7e52838aa22ff898e3527be97949b79d39b3feaf544ebcf036b91"
+    },
+    "runs/rom21-20260926T083500Z-b1/jar-swap-refusal.json": {
+      "bytes": 2272,
+      "sha256": "33ed58ef1ba19048ce2f7d0908f2305537f0eb52fa979384bd36ab9e7dd36b5b"
+    },
+    "runs/rom21-20260926T083500Z-b1/logger-gen1.jsonl": {
+      "bytes": 5620,
+      "sha256": "4873cc336e393bc5efbbed650b2a71c1e78462bc8d83c4a5287e8698603a226b"
+    },
+    "runs/rom21-20260926T083500Z-b1/logger-gen2.jsonl": {
+      "bytes": 11566,
+      "sha256": "c41dc8f05b2e04523b2eb0433c1ba2f818f2f90c9b5ed696a2411adbae38bdf9"
+    },
+    "runs/rom21-20260926T083500Z-b1/logger.jsonl": {
+      "bytes": 11883,
+      "sha256": "3b12f94da142f3f9887df8ebb44858c6ff3bb7911513016f7417a150a2866180"
+    },
+    "runs/rom21-20260926T083500Z-b1/program.json": {
+      "bytes": 945,
+      "sha256": "5d1344785016ce6714a07c64785dec2ca3445b34f02e1af6c7d32c6ab306d898"
+    },
+    "runs/rom21-20260926T083500Z-b1/restore-verify-gen1.json": {
+      "bytes": 2471,
+      "sha256": "3697f54cc8d3181d7fa6898201019ec27887d2e80fe402f0af8de2486deca08d"
+    },
+    "runs/rom21-20260926T083500Z-b1/restore-verify-gen2.json": {
+      "bytes": 2473,
+      "sha256": "1e7c6d4f99a49c20a13729d797b9ea4204e31ff7bcd405be89302d235d8e028c"
+    },
+    "runs/rom21-20260926T083500Z-b1/run.json": {
+      "bytes": 25116,
+      "sha256": "2a1c20afc11e8986368255af8273cc35a719c004bbad8bfeb7ce8c0b4799453a"
+    },
+    "runs/rom21-20260926T083500Z-b1/steps.jsonl": {
+      "bytes": 2668,
+      "sha256": "19c71f0e084b74d36d621ab939601ec832c3abf93edb4ae3b982e1bb1a8c3f15"
+    },
+    "runs/rom21-20260926T083500Z-b1/verification-gen1.json": {
+      "bytes": 5790,
+      "sha256": "5291da510a5afd5fc16b0b51cbbb6798bd9ebbab4817a090c770c59400e2afab"
+    },
+    "runs/rom21-20260926T083500Z-b1/verification-gen2.json": {
+      "bytes": 5794,
+      "sha256": "4d591e9819d522d00be8acf78b10f427866ef58b8d7b463c2e493aebe710ee3b"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen1/audit-check.json": {
+      "bytes": 4482,
+      "sha256": "bd5064524d3e3ab059818b2cd0fbdad4fd9c385e56cc059c803bcb7b357cbbe2"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen1/audit.jsonl": {
+      "bytes": 21749,
+      "sha256": "03c088cdac05e625e52ce672efd5f566e41486c3a702de1eb732e5e08accc8ed"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen1/logger.jsonl": {
+      "bytes": 5620,
+      "sha256": "4873cc336e393bc5efbbed650b2a71c1e78462bc8d83c4a5287e8698603a226b"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen1/restore-verify.json": {
+      "bytes": 2471,
+      "sha256": "3697f54cc8d3181d7fa6898201019ec27887d2e80fe402f0af8de2486deca08d"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen1/run.json": {
+      "bytes": 5343,
+      "sha256": "a0ef53dd3437afbc4af10a9dd3680c3d263cda175fc465b8402d116a2e5fa67c"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen2/audit-check.json": {
+      "bytes": 4667,
+      "sha256": "4e87463cf429a84615fa8b97362d60b2c240e96c8297de0f4025e8c7304adae2"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen2/audit.jsonl": {
+      "bytes": 43504,
+      "sha256": "b0e2d9514bc78fdee7713137adcc7bb890e78653e0ff57da6e29320973097cea"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen2/logger.jsonl": {
+      "bytes": 11566,
+      "sha256": "c41dc8f05b2e04523b2eb0433c1ba2f818f2f90c9b5ed696a2411adbae38bdf9"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen2/restore-verify.json": {
+      "bytes": 2473,
+      "sha256": "1e7c6d4f99a49c20a13729d797b9ea4204e31ff7bcd405be89302d235d8e028c"
+    },
+    "runs/rom21-20260926T083500Z-b1/verify-gen2/run.json": {
+      "bytes": 5343,
+      "sha256": "fbe51a67b3259cbbd37371958a3650d467fa90ef740ab6a2e2547c0de6349a00"
+    }
+  },
+  "revalidation": {
+    "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+    "verifierHeads": [
+      "b3c09272550b745fe91120ea129479ea77a109be",
+      "8f28aea06ba3644fd06485f4338bfeda999da6bf"
+    ],
+    "verifierHead": "8f28aea06ba3644fd06485f4338bfeda999da6bf",
+    "verifierSha256": "18bbe6da3511d19c30a936b6b64a5031facd573711b3551cfc18c44f5b4389a4",
+    "summary": "revalidation/summary.json",
+    "note": "offline re-check of the retained raw evidence under the hardened verifier; no game rerun and no raw/older-report rewrite"
+  }
+}

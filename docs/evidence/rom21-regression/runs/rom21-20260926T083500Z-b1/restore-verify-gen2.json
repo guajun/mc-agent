@@ -1,0 +1,109 @@
+{
+  "directory": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-om21-20260926t083500z-b1-src\\mc-agent-server\\snapshots\\rom21-20260926T083500Z-b1-ready-2",
+  "target": "rom21-om21-20260926t083500z-b1-exp",
+  "targetIsLabel": true,
+  "snapshotDir": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-om21-20260926t083500z-b1-exp\\mc-agent-server\\snapshots\\restore-check-rom21-om21-20260926t083500z-b1-exp",
+  "expected": {
+    "orderHash": "1e902c3c104260f6",
+    "count": 5,
+    "dimension": "minecraft:overworld"
+  },
+  "actual": {
+    "orderHash": "1e902c3c104260f6",
+    "count": 5,
+    "dimension": "minecraft:overworld"
+  },
+  "warnings": [],
+  "actualIssues": [],
+  "verification": {
+    "ok": true,
+    "strict": true,
+    "dimension": {
+      "expected": "minecraft:overworld",
+      "actual": "minecraft:overworld",
+      "match": true
+    },
+    "actualMalformed": {
+      "count": 0,
+      "sample": []
+    },
+    "actualDuplicateUuids": {
+      "count": 0,
+      "sample": []
+    },
+    "orderHash": {
+      "expected": "1e902c3c104260f6",
+      "actual": "1e902c3c104260f6",
+      "match": true
+    },
+    "uuidOrder": {
+      "match": true,
+      "commonPrefix": 5,
+      "expectedCount": 5,
+      "actualCount": 5,
+      "divergence": null
+    },
+    "counts": {
+      "match": true,
+      "byType": [
+        {
+          "type": "minecraft:chest_minecart",
+          "expected": 4,
+          "actual": 4,
+          "delta": 0
+        },
+        {
+          "type": "minecraft:armor_stand",
+          "expected": 1,
+          "actual": 1,
+          "delta": 0
+        }
+      ]
+    },
+    "missing": {
+      "count": 0,
+      "sample": []
+    },
+    "unexpected": {
+      "count": 0,
+      "sample": []
+    },
+    "typeMismatches": {
+      "count": 0,
+      "sample": []
+    },
+    "positionDeltas": {
+      "count": 0,
+      "tolerance": 0.01,
+      "sample": []
+    },
+    "velocityDeltas": {
+      "count": 0,
+      "tolerance": 0.01,
+      "sample": []
+    },
+    "nbtMismatches": {
+      "count": 0,
+      "sample": []
+    },
+    "matched": 5,
+    "failures": {
+      "order": false,
+      "counts": false,
+      "missing": false,
+      "unexpected": false,
+      "types": false,
+      "positions": false,
+      "velocities": false,
+      "nbt": false,
+      "subsequence": false,
+      "dimension": false,
+      "actualMalformed": false
+    },
+    "playersExcluded": {
+      "expected": 1,
+      "actual": 0
+    }
+  },
+  "ok": true
+}

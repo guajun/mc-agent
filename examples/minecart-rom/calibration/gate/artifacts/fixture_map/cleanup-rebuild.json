@@ -1,0 +1,36 @@
+{
+  "steps": [
+    "python examples/minecart-rom/runner/minecart_rom.py fetch --cold",
+    "python examples/minecart-rom/runner/minecart_rom.py import --lab rom15d --reset --rcon-port <rcon> --server-port <game> --java <jdk25>",
+    "python examples/minecart-rom/runner/minecart_rom.py start --lab rom15d",
+    "python examples/minecart-rom/runner/minecart_rom.py init --lab rom15d --records <records>",
+    "python examples/minecart-rom/runner/minecart_rom.py validate --lab rom15d --ready <records>/ready-snapshot.json",
+    "python examples/minecart-rom/runner/minecart_rom.py stop --lab rom15d",
+    "rm -rf labs/rom15d/world   # discard the copy; the source save is never the world directory"
+  ],
+  "source_world_untouched": true,
+  "rebuild_reproducible": true,
+  "rebuild_check": {
+    "first_sha256": "71e11e8a2b234a865f4c89610823490ee98b877fd029b60d75471acbe15caa47",
+    "second_sha256": "71e11e8a2b234a865f4c89610823490ee98b877fd029b60d75471acbe15caa47",
+    "identical": true,
+    "world_sha256": "642d91fae8569e5467c74ed2c355908cafb3464c506c0a1d4bf99d9234934d61",
+    "exported_at": "2026-01-01T00:00:00Z"
+  },
+  "source_world": {
+    "provided": true,
+    "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
+    "tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "files": 40,
+    "bytes": 11556310,
+    "baseline": {
+      "source": "docs/stage1-gate.md independent read-only baseline",
+      "tree_sha256": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+      "files": 40,
+      "bytes": 11556310
+    },
+    "matches_baseline": true
+  },
+  "records": "examples/minecart-rom/calibration/records",
+  "commands": "README.md#quick-start"
+}

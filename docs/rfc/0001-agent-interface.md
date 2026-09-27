@@ -1,5 +1,13 @@
 # RFC 0001: agent interface and bridge architecture
 
+!!! warning "Historical architecture"
+    This RFC records the client-first Phase 1 design. The current deployment
+    model is the server-vantage Minecraft Agent Toolkit in
+    [Architecture and terminology](../concepts.md), adopted by
+    [plan #8](https://github.com/guajun/mc-agent/issues/8). The agent loop is
+    now optional compatibility infrastructure, and Codex and Claude Code are
+    user-driven Harnesses rather than project-maintained backends.
+
 * Status: implemented - Phase 1 shipped, and the discussion is closed. What is
   still open moved to issues [#4](https://github.com/guajun/mc-agent/issues/4)
   (backpressure), [#5](https://github.com/guajun/mc-agent/issues/5) (richer
@@ -52,7 +60,7 @@ restarted whenever anyone touches the game.
 | interface mod | expose state/actions/events over a local socket | interpret them |
 | bridge daemon | own the mod connection, buffer events, re-serve over loopback + MCP | think |
 | agent loop | decide when the backend should think, deliver replies | know game internals |
-| backend | reason (Hermes, Codex, a script) | touch sockets |
+| Harness | run the Agent and own its session (for example Hermes or Codex) | touch the mod wire protocol |
 
 ## Layer boundaries
 

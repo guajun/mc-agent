@@ -1,0 +1,19 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "logger_late_capture",
+  "kind": "live",
+  "injected": "logger capture delay larger than the pop-to-removal window",
+  "expectedCheck": "transient_captures",
+  "verdict": "fail",
+  "failedChecks": [
+    "transient_captures",
+    "inventory_matches_program",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-neg-logger_late_capture-1790411204",
+  "evidence": {
+    "loggerSha256": "adecdc0ccb90908bb9cb2d68f19cde4e39e3635dbc1624c2390cb36206779c88",
+    "auditSha256": "d241882bb20c4a9f4106b8c7356c852490ae1c182f32d5838f5686a4f4f064dc"
+  }
+}

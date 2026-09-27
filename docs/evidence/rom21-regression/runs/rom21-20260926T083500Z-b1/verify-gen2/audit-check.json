@@ -1,0 +1,215 @@
+{
+  "verdict": "pass",
+  "require_machine": true,
+  "reasons": [],
+  "sessions": [
+    {
+      "id": "s1790410763959",
+      "events": 211,
+      "firstSeq": 1,
+      "lastSeq": 211,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    },
+    {
+      "id": "s1790410847816",
+      "events": 209,
+      "firstSeq": 212,
+      "lastSeq": 420,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    }
+  ],
+  "machine_operated": true,
+  "agentOperations": [
+    {
+      "seq": 284,
+      "tick": 581,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 282,
+      "attemptSeq": 283
+    },
+    {
+      "seq": 339,
+      "tick": 856,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 337,
+      "attemptSeq": 338
+    },
+    {
+      "seq": 380,
+      "tick": 1131,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 378,
+      "attemptSeq": 379
+    },
+    {
+      "seq": 407,
+      "tick": 1410,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 405,
+      "attemptSeq": 406
+    }
+  ],
+  "outputs": [
+    {
+      "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+      "epoch": 1,
+      "exitSeq": 285,
+      "exitTick": 585,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 314,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 16,
+          "item": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "item": "minecraft:copper_ingot",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+      "epoch": 1,
+      "exitSeq": 340,
+      "exitTick": 860,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 362,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 2,
+          "item": "minecraft:glass",
+          "count": 1
+        },
+        {
+          "slot": 13,
+          "item": "minecraft:coal",
+          "count": 5
+        }
+      ]
+    },
+    {
+      "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+      "epoch": 1,
+      "exitSeq": 381,
+      "exitTick": 1135,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 396,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 0,
+          "item": "minecraft:glass",
+          "count": 4
+        }
+      ]
+    },
+    {
+      "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+      "epoch": 1,
+      "exitSeq": 408,
+      "exitTick": 1414,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 416,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 1,
+          "item": "minecraft:copper_ingot",
+          "count": 6
+        },
+        {
+          "slot": 2,
+          "item": "minecraft:redstone",
+          "count": 4
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "stream": {
+      "pass": true,
+      "detail": ""
+    },
+    "run_identity": {
+      "pass": true,
+      "detail": "run=['rom21-20260926T083500Z-b1'] inst=['rom21-om21-20260926t083500z-b1-exp']"
+    },
+    "sessions": {
+      "pass": true,
+      "detail": "2 session(s); ended=2; open=0; evaluated=s1790410847816"
+    },
+    "completeness": {
+      "pass": true,
+      "detail": "end=complete incomplete=[] truncated=False open=0"
+    },
+    "status_agrees": {
+      "pass": true,
+      "detail": "no status file given"
+    },
+    "lifecycle": {
+      "pass": true,
+      "detail": "phases valid; experiment windows=1"
+    },
+    "input_chain": {
+      "pass": true,
+      "detail": "4 target processing event(s), all correlated"
+    },
+    "phase_isolation": {
+      "pass": true,
+      "detail": "agent operations confined to the experiment phase"
+    },
+    "machine_operated": {
+      "pass": true,
+      "detail": "4 calibrated agent operation(s); 0 uncalibrated player trigger(s); 0 environment trigger(s)"
+    },
+    "transient_outputs": {
+      "pass": true,
+      "detail": "4 tracked cart(s) checked"
+    },
+    "ordering": {
+      "pass": true,
+      "detail": "4 exit(s) in actual occurrence order"
+    }
+  },
+  "events": 420,
+  "run": "rom21-20260926T083500Z-b1",
+  "instance": "rom21-om21-20260926t083500z-b1-exp",
+  "_exitCode": 0
+}

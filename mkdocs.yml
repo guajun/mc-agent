@@ -1,5 +1,5 @@
-site_name: mc-agent
-site_description: Let an agent observe, drive and fork a Minecraft world.
+site_name: Minecraft Agent Toolkit
+site_description: Connect your AI agent to Minecraft. Install, inspect your world, and run tools.
 site_url: https://guajun.github.io/mc-agent/
 repo_url: https://github.com/guajun/mc-agent
 repo_name: guajun/mc-agent
@@ -7,12 +7,16 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 strict: true
 
+extra_css:
+  - stylesheets/extra.css
+
 theme:
   name: material
   features:
-    - navigation.sections
+    - navigation.indexes
     - navigation.top
     - content.code.copy
+    - content.tabs.link
     - search.suggest
     - search.highlight
     - toc.follow
@@ -30,22 +34,33 @@ theme:
 
 nav:
   - Home: index.md
-  - Installation: install.md
-  - Getting started: getting-started.md
-  - Concepts:
-      - How it fits together: concepts.md
+  - Install and first run: getting-started.md
+  - Architecture: concepts.md
+  - Tools: tools.md
+  - Advanced guides:
+      - advanced.md
+      - Installing the Toolkit Skill: toolkit-skill.md
+      - "Unattended Hermes: webhook + Skill": hermes-unattended.md
+      - Running the agent on Hermes: hermes-setup.md
       - Who is the agent in game: player-identity.md
       - Forking a live world: protocol-snapshot.md
-  - Guides:
-      - Running the agent on Hermes: hermes-setup.md
       - Headless lab servers: lab-server.md
+      - Building a mod for a lab: mod-building.md
       - Checking a fork: fork-verify.md
+      - Experiments and validation:
+          - Auditable cold-start runs: coldstart-protocol.md
+          - "Audit test mod (read-only evidence)": minecart-audit.md
+          - Stage-one integration gate: stage1-gate.md
+          - Stage-one integration run: stage1-integration.md
+          - Minecart ROM acceptance runbook: minecart-rom-runbook.md
+          - "Minecart ROM regression (issue #21)": rom21-regression.md
+      - Design history:
+          - "0001: agent interface and bridge": rfc/0001-agent-interface.md
+          - "0002: programmable tool calls": rfc/0002-programmable-tool-calls.md
   - Reference:
-      - Tools: tools.md
+      - Installation reference: install.md
       - Troubleshooting: troubleshooting.md
-  - RFCs:
-      - "0001: agent interface and bridge": rfc/0001-agent-interface.md
-      - "0002: programmable tool calls": rfc/0002-programmable-tool-calls.md
+      - Documentation development: contributing-docs.md
 
 plugins:
   - search
@@ -60,21 +75,37 @@ plugins:
           name: English
         - locale: zh
           name: 中文
-          site_description: 让智能体观测、驱动并分叉一个 Minecraft 世界。
+          site_description: 让 AI 智能体连接 Minecraft：安装、读取世界、调用工具。
           theme:
             language: zh
           nav_translations:
             Home: 首页
+            Install and first run: 安装与首次运行
+            Architecture: 架构方案
+            Advanced guides: 进阶指南
+            Experiments and validation: 实验与验收
+            Design history: 设计历史
+            Installation reference: 安装参考
+            Documentation development: 文档开发
             Installation: 安装
             Getting started: 快速开始
             Concepts: 概念
-            How it fits together: 整体结构
+            Architecture and terminology: 架构与术语
             Who is the agent in game: 智能体在游戏里是谁
             Forking a live world: 分叉一个活的世界
+            Auditable cold-start runs: 可审计的冷启动运行
             Guides: 指南
             Running the agent on Hermes: 用 Hermes 运行智能体
+            Installing the Toolkit Skill: 安装 Toolkit Skill
+            "Unattended Hermes: webhook + Skill": "Hermes 无人值守：webhook + Skill"
             Headless lab servers: 无头实验室服务器
+            Building a mod for a lab: 为实验室构建 mod
+            "Audit test mod (read-only evidence)": "审计测试 mod（只读证据）"
             Checking a fork: 校验一次分叉
+            Stage-one integration gate: 阶段一集成门禁
+            Stage-one integration run: 阶段一集成运行
+            Minecart ROM acceptance runbook: Minecart ROM 验收 runbook
+            "Minecart ROM regression (issue #21)": Minecart ROM 回归（issue #21）
             Reference: 参考
             Tools: 工具
             Troubleshooting: 疑难排查
@@ -83,6 +114,7 @@ plugins:
 markdown_extensions:
   - admonition
   - attr_list
+  - md_in_html
   - tables
   - toc:
       permalink: true

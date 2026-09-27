@@ -1,0 +1,4 @@
+$ player Romuser use
+
+$ tick sprint 1
+The game is sprinting

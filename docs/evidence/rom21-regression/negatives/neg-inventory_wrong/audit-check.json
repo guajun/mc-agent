@@ -1,0 +1,251 @@
+{
+  "verdict": "pass",
+  "require_machine": true,
+  "reasons": [],
+  "sessions": [
+    {
+      "id": "s1790411097049",
+      "events": 299,
+      "firstSeq": 1,
+      "lastSeq": 299,
+      "ready": true,
+      "ended": true,
+      "endStatus": "complete"
+    }
+  ],
+  "machine_operated": true,
+  "agentOperations": [
+    {
+      "seq": 95,
+      "tick": 374,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 93,
+      "attemptSeq": 94
+    },
+    {
+      "seq": 164,
+      "tick": 645,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 162,
+      "attemptSeq": 163
+    },
+    {
+      "seq": 219,
+      "tick": 922,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 217,
+      "attemptSeq": 218
+    },
+    {
+      "seq": 260,
+      "tick": 1198,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 258,
+      "attemptSeq": 259
+    },
+    {
+      "seq": 286,
+      "tick": 1474,
+      "operator": {
+        "uuid": "3ec122d5-fc27-4816-be47-bf8be8d7e56d",
+        "name": "Romuser"
+      },
+      "requestSeq": 284,
+      "attemptSeq": 285
+    }
+  ],
+  "outputs": [
+    {
+      "uuid": "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+      "epoch": 1,
+      "exitSeq": 101,
+      "exitTick": 378,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 132,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 11,
+          "item": "minecraft:gold_ingot",
+          "count": 64
+        },
+        {
+          "slot": 22,
+          "item": "minecraft:redstone",
+          "count": 2
+        },
+        {
+          "slot": 23,
+          "item": "minecraft:copper_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "uuid": "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+      "epoch": 1,
+      "exitSeq": 165,
+      "exitTick": 649,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 194,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 1,
+          "item": "minecraft:sand",
+          "count": 2
+        },
+        {
+          "slot": 5,
+          "item": "minecraft:dirt",
+          "count": 4
+        },
+        {
+          "slot": 17,
+          "item": "minecraft:gold_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "uuid": "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+      "epoch": 1,
+      "exitSeq": 220,
+      "exitTick": 926,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 242,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 12,
+          "item": "minecraft:copper_ingot",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "uuid": "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+      "epoch": 1,
+      "exitSeq": 261,
+      "exitTick": 1202,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 276,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 9,
+          "item": "minecraft:gold_ingot",
+          "count": 4
+        },
+        {
+          "slot": 11,
+          "item": "minecraft:glass",
+          "count": 3
+        },
+        {
+          "slot": 18,
+          "item": "minecraft:redstone",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "uuid": "d09386ce-522a-4e38-9b38-a10b395927ce",
+      "epoch": 1,
+      "exitSeq": 288,
+      "exitTick": 1478,
+      "exitPos": {
+        "x": 15.0,
+        "y": -48.87,
+        "z": -21.5
+      },
+      "removeSeq": 295,
+      "removeReason": "DISCARDED",
+      "inventory": [
+        {
+          "slot": 13,
+          "item": "minecraft:redstone",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "checks": {
+    "stream": {
+      "pass": true,
+      "detail": ""
+    },
+    "run_identity": {
+      "pass": true,
+      "detail": "run=['rom21-neg-inventory_wrong-1790411074'] inst=['rom21-t083500z-inventory-wrong-exp']"
+    },
+    "sessions": {
+      "pass": true,
+      "detail": "1 session(s); ended=1; open=0; evaluated=s1790411097049"
+    },
+    "completeness": {
+      "pass": true,
+      "detail": "end=complete incomplete=[] truncated=False open=0"
+    },
+    "status_agrees": {
+      "pass": true,
+      "detail": "no status file given"
+    },
+    "lifecycle": {
+      "pass": true,
+      "detail": "phases valid; experiment windows=1"
+    },
+    "input_chain": {
+      "pass": true,
+      "detail": "5 target processing event(s), all correlated"
+    },
+    "phase_isolation": {
+      "pass": true,
+      "detail": "agent operations confined to the experiment phase"
+    },
+    "machine_operated": {
+      "pass": true,
+      "detail": "5 calibrated agent operation(s); 0 uncalibrated player trigger(s); 0 environment trigger(s)"
+    },
+    "transient_outputs": {
+      "pass": true,
+      "detail": "5 tracked cart(s) checked"
+    },
+    "ordering": {
+      "pass": true,
+      "detail": "5 exit(s) in actual occurrence order"
+    }
+  },
+  "events": 299,
+  "run": "rom21-neg-inventory_wrong-1790411074",
+  "instance": "rom21-t083500z-inventory-wrong-exp",
+  "_exitCode": 0
+}

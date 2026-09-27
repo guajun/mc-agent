@@ -1,5 +1,12 @@
 # RFC 0001：智能体接口与 bridge 架构
 
+!!! warning "历史架构"
+    本 RFC 记录客户端优先的 Phase 1 设计。当前部署模型是
+    [架构与术语](../concepts.md)中描述的服务端视角 Minecraft Agent Toolkit，
+    由[方案 #8](https://github.com/guajun/mc-agent/issues/8)确立。agent loop
+    现在只是可选兼容基础设施；Codex 与 Claude Code 是用户主动型 Harness，
+    不是项目维护的 backend。
+
 * 状态：已实现——Phase 1 已发出，讨论关闭。仍未定论的问题已拆成 issue：[#4](https://github.com/guajun/mc-agent/issues/4)（背压）、[#5](https://github.com/guajun/mc-agent/issues/5)（更丰富的游戏事件）、[#6](https://github.com/guajun/mc-agent/issues/6)（多个客户端）、[#7](https://github.com/guajun/mc-agent/issues/7)（游戏向智能体推送）
 * 范围：Minecraft 客户端与智能体运行时之间的通用管道
 * 不在范围：任何与某个具体实验或用例相关的东西
@@ -39,7 +46,7 @@
 | 接口 mod | 通过本地 socket 暴露状态/动作/事件 | 解释它们 |
 | bridge 守护进程 | 持有 mod 连接、缓冲事件、再通过 loopback + MCP 重新提供服务 | 思考 |
 | agent loop | 决定什么时候该让后端思考、把回复送回去 | 了解游戏内部 |
-| 后端 | 推理（Hermes、Codex、一个脚本） | 碰 socket |
+| Harness | 运行 Agent 并持有会话（例如 Hermes 或 Codex） | 接触 mod 线协议 |
 
 ## 层边界
 

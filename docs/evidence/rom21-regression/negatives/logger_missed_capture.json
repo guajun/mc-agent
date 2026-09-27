@@ -1,0 +1,19 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "logger_missed_capture",
+  "kind": "live",
+  "injected": "logger exit plane set far away (no cart is ever captured)",
+  "expectedCheck": "transient_captures",
+  "verdict": "fail",
+  "failedChecks": [
+    "transient_captures",
+    "inventory_matches_program",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-neg-logger_missed_capture-1790411139",
+  "evidence": {
+    "loggerSha256": "e5859995d796d82ffb2ab5992d2c6b83c22ef157976ea243647c6f762f08c0f9",
+    "auditSha256": "7c2038e1e9f68d2494e5208e09f8edbfbaaa426f55e4310343fe00eaaf266ea7"
+  }
+}

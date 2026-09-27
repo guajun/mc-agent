@@ -1,0 +1,25 @@
+{
+  "snapshotDir": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-om21-20260926t083500z-a2-src\\mc-agent-server\\snapshots\\rom21-20260926T083500Z-a2-ready",
+  "forkDir": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-om21-20260926t083500z-a2-src\\mc-agent-server\\snapshots\\rom21-20260926T083500Z-a2-ready\\world",
+  "worldDir": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-om21-20260926t083500z-a2-src\\.\\world\\.",
+  "manifest": {
+    "files": 32,
+    "bytes": 11533536,
+    "skipped": [
+      "players",
+      "session.lock"
+    ],
+    "stripped": [
+      "dimensions/minecraft/overworld/entities/r.-1.-1.mca",
+      "dimensions/minecraft/overworld/entities/r.-1.0.mca",
+      "dimensions/minecraft/overworld/entities/r.0.-1.mca",
+      "dimensions/minecraft/overworld/entities/r.0.0.mca"
+    ]
+  },
+  "orderHash": "138e48fcdedfc057",
+  "entities": 6,
+  "tick": 1359,
+  "dimension": "minecraft:overworld",
+  "name": "rom21-20260926T083500Z-a2-ready",
+  "replaced": false
+}

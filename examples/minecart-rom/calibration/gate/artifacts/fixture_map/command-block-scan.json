@@ -1,0 +1,11 @@
+{
+  "method": "chunk block_states palette scan of every region file (export_world.find_command_blocks)",
+  "world_dirs": [
+    "labs/_cache/maps/unpacked/minecart-rom-base-1.0.0/world",
+    "labs/rom15d/world"
+  ],
+  "command_blocks": 0,
+  "blocks": [],
+  "scanned": true,
+  "placed_by_init": false
+}

@@ -1,0 +1,109 @@
+{
+  "kind": "mc-agent/attack-use-window-probe-evidence@1",
+  "issue": "guajun/mc-agent#14 (stage-2 prerequisite check)",
+  "date": "2026-09-26T05:43:23Z",
+  "driver": {
+    "path": "tools/attack_use_window_probe.py",
+    "head": "5f135267947e91910ab70a8740f07c36a481a8a8",
+    "actual_sha256": "ee07872e5265e64c02afd9a5bf9321bb5add583c1173f3c4225ec037f2365430",
+    "git_blob_sha256": "0a579e5bd8d6620fd2a7592888edd27917a0c690a75763fe19d71fd114ce11a9",
+    "normalized_matches_git_blob": true
+  },
+  "auditJar": {
+    "path": "F:\\mc-agent-worktrees\\rom13\\fullgate\\tests\\mods\\minecart-audit\\dist\\mc-minecart-audit-0.1.0.jar",
+    "sha256": "7a77e89d72969f23ce7b7c2543bfe992c2a3674171f3eb190a8e7faa8f2ec4ac",
+    "bytes": 47608
+  },
+  "lab": "rom13-win",
+  "correlationWindowTicks": 2,
+  "result": {
+    "ok": true,
+    "requestGapTicks": 1,
+    "withinWindow": true,
+    "exactlyOneUseProcessed": true,
+    "noStaleAttackAttribution": true,
+    "processedCount": 1
+  },
+  "rawLog": {
+    "path": "F:\\mc-agent-worktrees\\rom13\\fullgate\\labs\\rom13-win\\mc-audit\\audit-rom13-win-window-20260926T054329Z.jsonl",
+    "sha256": "9269bce814185fbcf301e6972539dd39895ce0f8c4fa2ab19e636761ef41f5a5",
+    "copy": "labs\\attack-window-probe\\audit-window.jsonl"
+  },
+  "rawRows": {
+    "requests": [
+      {
+        "seq": 5,
+        "tick": 1059,
+        "trigger": "player"
+      },
+      {
+        "seq": 7,
+        "tick": 1059,
+        "trigger": "player"
+      },
+      {
+        "seq": 10,
+        "tick": 1060,
+        "trigger": "player"
+      }
+    ],
+    "attempts": [
+      {
+        "seq": 6,
+        "tick": 1059,
+        "path": "attack",
+        "requestSeq": 5
+      },
+      {
+        "seq": 8,
+        "tick": 1059,
+        "path": "attack",
+        "requestSeq": 7
+      },
+      {
+        "seq": 9,
+        "tick": 1060,
+        "path": "useItemOn",
+        "requestSeq": 7
+      },
+      {
+        "seq": 11,
+        "tick": 1060,
+        "path": "useWithoutItem",
+        "requestSeq": 10
+      }
+    ],
+    "processed": [
+      {
+        "seq": 12,
+        "tick": 1060,
+        "path": "playNote",
+        "requestSeq": 10,
+        "attemptSeq": 11,
+        "targetInput": true,
+        "agentOp": true,
+        "note": 1
+      }
+    ]
+  },
+  "assertions": [
+    "two live commands over one persistent RCON connection, ~122 ms apart (same/adjacent tick)",
+    "attack request tick 1059, use request tick 1060 -> gap 1 tick <= correlationWindowTicks 2",
+    "exactly one input_processed (path playNote) and it consumes the useWithoutItem attempt",
+    "no processed event is attributed to an attack request/attempt"
+  ],
+  "notes": "run on the already-reviewed unchanged audit jar on a fresh disposable void lab; the frozen full-gate run and its provenance are untouched",
+  "offlineRevalidation": {
+    "sourceCommit": "f750a2f9e5123bca58b903a816ca6eb292916725",
+    "rawSha256": "9269bce814185fbcf301e6972539dd39895ce0f8c4fa2ab19e636761ef41f5a5",
+    "attackRequestSeqs": [
+      5,
+      7
+    ],
+    "useRequestSeq": 10,
+    "requestGapTicks": 1,
+    "processedCount": 1,
+    "ok": true,
+    "note": "Revalidated preserved live events with all attack requests checked; no runtime mod or full-gate evidence changed."
+  }
+}

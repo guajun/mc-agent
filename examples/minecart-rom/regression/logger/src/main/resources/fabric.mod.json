@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "rom21-regression-logger",
+  "version": "${version}",
+  "name": "ROM21 regression logger",
+  "description": "Agent-owned observation logger for the Minecart ROM regression (issue #21); derived from the frozen issue-#20 logger.",
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "dev.mcagent.rom21.RomLogMod"
+    ]
+  },
+  "mixins": [
+    "rom21log.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.19.5",
+    "fabric-api": "*",
+    "minecraft": "~26.2",
+    "java": ">=25"
+  }
+}

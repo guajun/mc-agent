@@ -1,0 +1,181 @@
+{
+  "format": "mc-agent/rom21-verification@1",
+  "runId": "rom21-neg-logger_missed_capture-1790411139",
+  "configId": "calibrated-a",
+  "instance": "rom21-0z-logger-missed-capture-exp",
+  "expectedCartCount": 5,
+  "verdict": "fail",
+  "failures": [
+    "transient_captures",
+    "inventory_matches_program",
+    "answer_matches_oracle"
+  ],
+  "problems": [
+    "transient_captures: 0 transient capture(s) for 5 expected cart(s)",
+    "inventory_matches_program: observed inventories do not match the sealed program (missing=5 unexpected=0)",
+    "answer_matches_oracle: answer cart order differs from the independent oracle; answer inventories differ from the independent oracle"
+  ],
+  "checks": {
+    "run_manifest": {
+      "pass": true,
+      "detail": "run manifest consistent"
+    },
+    "logger_session": {
+      "pass": true,
+      "detail": "logger session 1 scoped and identified"
+    },
+    "audit_oracle": {
+      "pass": true,
+      "detail": "independent oracle present and PASS"
+    },
+    "agent_operations": {
+      "pass": true,
+      "detail": "5 calibrated note-block operation(s)"
+    },
+    "causal_joins": {
+      "pass": true,
+      "detail": "5 pop(s) joined to exact presses in tick order"
+    },
+    "transient_captures": {
+      "pass": false,
+      "detail": "0 transient capture(s) for 5 expected cart(s)"
+    },
+    "natural_void_captures": {
+      "pass": true,
+      "detail": "5 natural void capture(s) at removal"
+    },
+    "capture_timing": {
+      "pass": true,
+      "detail": "capture and removal ticks inside the calibrated windows"
+    },
+    "output_order": {
+      "pass": true,
+      "detail": "observed pop order is consistent across logger and audit"
+    },
+    "inventory_matches": {
+      "pass": true,
+      "detail": "live inventory equal across logger, audit exit and audit removal"
+    },
+    "inventory_matches_program": {
+      "pass": false,
+      "detail": "observed inventories do not match the sealed program (missing=5 unexpected=0)"
+    },
+    "restore_verified": {
+      "pass": true,
+      "detail": "guarded restore verified (order, UUID order, counts, dimension)"
+    },
+    "jar_provenance": {
+      "pass": true,
+      "detail": "logger jar(s) pinned by SHA-256 (and size+source for iteration)"
+    },
+    "source_world": {
+      "pass": true,
+      "detail": "source world (and map artifact) unchanged"
+    },
+    "answer_matches_oracle": {
+      "pass": false,
+      "detail": "answer cart order differs from the independent oracle; answer inventories differ from the independent oracle"
+    }
+  },
+  "answer": [],
+  "oracle": [
+    {
+      "uuid": "e235d9bf-781c-4fb0-b6e3-763bbdeb6224",
+      "tick": 508,
+      "seq": 131,
+      "items": [
+        [
+          11,
+          "minecraft:gold_ingot",
+          1
+        ],
+        [
+          22,
+          "minecraft:redstone",
+          2
+        ],
+        [
+          23,
+          "minecraft:copper_ingot",
+          2
+        ]
+      ],
+      "digest": "64aa72f9a8d86d8e"
+    },
+    {
+      "uuid": "bc3dad5c-f4d4-4191-9a19-0f82ca19b109",
+      "tick": 784,
+      "seq": 193,
+      "items": [
+        [
+          1,
+          "minecraft:sand",
+          2
+        ],
+        [
+          5,
+          "minecraft:dirt",
+          4
+        ],
+        [
+          17,
+          "minecraft:gold_ingot",
+          2
+        ]
+      ],
+      "digest": "beceee493fe75737"
+    },
+    {
+      "uuid": "b4ee4b9b-206b-426a-b8ee-f4174bb9893f",
+      "tick": 1061,
+      "seq": 241,
+      "items": [
+        [
+          12,
+          "minecraft:copper_ingot",
+          2
+        ]
+      ],
+      "digest": "d6ae526eeaf1b701"
+    },
+    {
+      "uuid": "e121ddf2-da1e-4d4c-85ac-301ed37b85a7",
+      "tick": 1337,
+      "seq": 273,
+      "items": [
+        [
+          9,
+          "minecraft:gold_ingot",
+          4
+        ],
+        [
+          11,
+          "minecraft:glass",
+          3
+        ],
+        [
+          18,
+          "minecraft:redstone",
+          2
+        ]
+      ],
+      "digest": "19124cc5a3dc94c1"
+    },
+    {
+      "uuid": "d09386ce-522a-4e38-9b38-a10b395927ce",
+      "tick": 1613,
+      "seq": 293,
+      "items": [
+        [
+          13,
+          "minecraft:redstone",
+          3
+        ]
+      ],
+      "digest": "d07c80cc1192218e"
+    }
+  ],
+  "observedPopOrder": [],
+  "popOrderSource": "observed live (logger transient captures joined to audit cart_exit/cart_remove); spawn order never assumed",
+  "pressedOperations": 5
+}

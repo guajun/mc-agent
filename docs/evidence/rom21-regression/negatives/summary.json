@@ -1,0 +1,159 @@
+{
+  "format": "mc-agent/rom21-negatives@1",
+  "at": "2026-09-26T08:28:56Z",
+  "baseRunId": "rom21-20260926T083500Z-a1",
+  "cases": [
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "inventory_wrong",
+      "kind": "live",
+      "injected": "a restored cart's Items[0].count modified before the operation",
+      "expectedCheck": "inventory_matches_program",
+      "verdict": "fail",
+      "failedChecks": [
+        "inventory_matches_program"
+      ],
+      "failClosed": true,
+      "runId": "rom21-neg-inventory_wrong-1790411074",
+      "evidence": {
+        "loggerSha256": "330f0432a14ad18e0c5bd2a0996f1d95d42dc4a313f88cc34b82800c0802b659",
+        "auditSha256": "dbc5bd6f62d250417d3a4ae2dd707d1a457d2f0f88d26f4b2885f0d7ac63ad45"
+      }
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "logger_missed_capture",
+      "kind": "live",
+      "injected": "logger exit plane set far away (no cart is ever captured)",
+      "expectedCheck": "transient_captures",
+      "verdict": "fail",
+      "failedChecks": [
+        "transient_captures",
+        "inventory_matches_program",
+        "answer_matches_oracle"
+      ],
+      "failClosed": true,
+      "runId": "rom21-neg-logger_missed_capture-1790411139",
+      "evidence": {
+        "loggerSha256": "e5859995d796d82ffb2ab5992d2c6b83c22ef157976ea243647c6f762f08c0f9",
+        "auditSha256": "7c2038e1e9f68d2494e5208e09f8edbfbaaa426f55e4310343fe00eaaf266ea7"
+      }
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "logger_late_capture",
+      "kind": "live",
+      "injected": "logger capture delay larger than the pop-to-removal window",
+      "expectedCheck": "transient_captures",
+      "verdict": "fail",
+      "failedChecks": [
+        "transient_captures",
+        "inventory_matches_program",
+        "answer_matches_oracle"
+      ],
+      "failClosed": true,
+      "runId": "rom21-neg-logger_late_capture-1790411204",
+      "evidence": {
+        "loggerSha256": "adecdc0ccb90908bb9cb2d68f19cde4e39e3635dbc1624c2390cb36206779c88",
+        "auditSha256": "d241882bb20c4a9f4106b8c7356c852490ae1c182f32d5838f5686a4f4f064dc"
+      }
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "no_machine_operation",
+      "kind": "live",
+      "injected": "restored ready machine, no note-block press at all",
+      "expectedCheck": "agent_operations",
+      "verdict": "fail",
+      "failedChecks": [
+        "audit_oracle",
+        "agent_operations",
+        "causal_joins",
+        "transient_captures",
+        "natural_void_captures",
+        "inventory_matches_program",
+        "answer_matches_oracle"
+      ],
+      "failClosed": true,
+      "runId": "rom21-neg-no_machine_operation-1790411267",
+      "evidence": {
+        "loggerSha256": "5765a0daeb272fea30473e7b506c1a85573e67cd7d5ac0e94cfd8f6249b1f6ae",
+        "auditSha256": "083e75f46c74061d797108ea275496d0906d6e442afe21bc7a944355fc3b6604"
+      }
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "restore_order_wrong",
+      "kind": "live",
+      "injected": "two entities swapped in the guarded-restore snapshot before apply",
+      "expectedCheck": "restore_verified",
+      "verdict": "fail",
+      "failedChecks": [
+        "logger_session",
+        "audit_oracle",
+        "agent_operations",
+        "causal_joins",
+        "transient_captures",
+        "natural_void_captures",
+        "inventory_matches_program",
+        "restore_verified",
+        "answer_matches_oracle"
+      ],
+      "failClosed": true,
+      "runId": "rom21-neg-restore-order",
+      "evidence": {
+        "orderHashMatch": null,
+        "applyOk": false,
+        "guardRefusedOrderHash": true,
+        "applyError": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\negatives\\restore_order_wrong\\snapshot cannot be restored: 1 blocking issue(s). Nothing was sent to the game. [order_hash] meta.json: orderHash=93504bf35907122f but the file hashes to fb547f98c8bb0114",
+        "verifyError": "F:\\mc-agent-worktrees\\rom13\\regression\\labs\\rom21-regression\\negatives\\restore_order_wrong\\snapshot cannot be restored: 1 blocking issue(s). Nothing was sent to the game. [order_hash] meta.json: orderHash=93504bf35907122f but the file hashes to fb547f98c8bb0114"
+      }
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "output_order_wrong",
+      "kind": "offline",
+      "injected": "cart_observed records reversed in a copy of the raw logger",
+      "expectedCheck": "output_order",
+      "verdict": "fail",
+      "failedChecks": [
+        "capture_timing",
+        "output_order",
+        "inventory_matches",
+        "answer_matches_oracle"
+      ],
+      "failClosed": true,
+      "runId": "rom21-20260926T083500Z-a1"
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "audit_missing",
+      "kind": "offline",
+      "injected": "the independent audit log removed from a copy of the run",
+      "expectedCheck": "audit_oracle",
+      "verdict": "fail",
+      "failedChecks": [
+        "audit_oracle",
+        "agent_operations",
+        "causal_joins",
+        "answer_matches_oracle"
+      ],
+      "failClosed": true,
+      "runId": "rom21-20260926T083500Z-a1"
+    },
+    {
+      "format": "mc-agent/rom21-negative@1",
+      "case": "wrong_instance",
+      "kind": "offline",
+      "injected": "logger instance/run id changed to a different instance",
+      "expectedCheck": "logger_session",
+      "verdict": "fail",
+      "failedChecks": [
+        "logger_session"
+      ],
+      "failClosed": true,
+      "runId": "rom21-20260926T083500Z-a1"
+    }
+  ],
+  "allFailClosed": true
+}

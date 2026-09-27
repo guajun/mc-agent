@@ -1,0 +1,202 @@
+{
+  "format": "mc-agent/rom20-trajectory-derivation@1",
+  "generated_at": "2026-09-26T07:07:03.263Z",
+  "run_id": "rom20-20260926T063100Z",
+  "created_at_original": "2026-09-26T06:27:17.978Z",
+  "sources": {
+    "raw_session": {
+      "path": "post-task-freeze\\agent-session.jsonl",
+      "sha256": "46c2e824f46a72b2e68257d416107945e1c3818097b20ce83a1646b285a313b0",
+      "records": 282,
+      "tool_calls": 157
+    },
+    "original_trajectory": {
+      "path": "post-task-freeze\\run-as-agent-left\\trajectory.jsonl",
+      "sha256": "a068b4280c67c5c7be4656db6d6aaf0783b2577bb9181b6fc38e42b25082f284",
+      "records": 30
+    },
+    "pre_merge_trajectory": {
+      "path": "post-task-derived\\run\\trajectory.jsonl",
+      "sha256": "786aabfb6bcb724a5a7d7ac0b2053c2c5d56132aebf81aa9ad96fbf71232686c",
+      "note": "original run trajectory after import-pi appended the raw session"
+    }
+  },
+  "merge": {
+    "strategy": "stable sort of all non-header records by their actual `at` timestamp; seq renumbered 1..N; no timestamp, argument, status or result text changed",
+    "original_records": 32,
+    "imported_records": 314,
+    "canonical_records": 347,
+    "fields_added": [
+      "trajectory_origin",
+      "raw_pi_call_ids"
+    ],
+    "labels": {
+      "original-run-operator": "operator prep records from the original run trajectory",
+      "original-run-agent-manual": "key calls/results the agent appended manually with run_trace.py during the task",
+      "pi-session-import": "raw harness tool calls/results imported from the frozen pi session",
+      "external-review-resolution": "reviewer marks appended by run_trace.py review after the independent semantic review"
+    }
+  },
+  "import": {
+    "max_text_chars": 200000,
+    "largest_session_result_chars": 23574,
+    "truncated_result_count": 0,
+    "truncated_call_ids": [],
+    "note": "the frozen session was imported with a max-text larger than its largest result, so no result is truncated"
+  },
+  "manual_call_links": {
+    "c-build-logger-1": {
+      "selected_pi_call_id": "call_00_ii05J6vv0yJQ0NGiaeJf8030",
+      "basis": "imported bash command contains 'build_mod.py', 'rom20-agent-logger.jar', '--out'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_ii05J6vv0yJQ0NGiaeJf8030",
+          "at": "2026-09-26T06:35:57.484Z",
+          "command": "cd F:/mc-agent-worktrees/rom13/coldstart && \"F:/mc-agent/.venv/Scripts/python.exe\" tools/build_mod.py --source \"labs/rom20-20260926T063100Z/workspace/agent-logger\" --lab rom20-exp --out \"labs/rom20-20260926T063100Z/workspace/artifacts/rom20-agent-logger.jar\" --version 0.1.0 2>&1 | tail -20",
+          "delta_seconds": -8.422
+        },
+        {
+          "pi_call_id": "call_00_ET_A6387Us9qClvqubgFIqr5901",
+          "at": "2026-09-26T06:37:26.366Z",
+          "command": "cd F:/mc-agent-worktrees/rom13/coldstart && PY=\"F:/mc-agent/.venv/Scripts/python.exe\" && \"$PY\" tools/build_mod.py --source \"labs/rom20-20260926T063100Z/workspace/agent-logger\" --lab rom20-exp --out \"labs/rom20-20260926T063100Z/workspace/artifacts/rom20-agent-logger.jar\" --version 0.1.0 2>&1 | tail -6",
+          "delta_seconds": 80.46
+        }
+      ]
+    },
+    "c-fork-src-1": {
+      "selected_pi_call_id": "call_01_sUq9769NpI8sqjUb5V635349",
+      "basis": "imported bash command contains 'call fork', 'rom20-acquire'",
+      "candidates": [
+        {
+          "pi_call_id": "call_01_sUq9769NpI8sqjUb5V635349",
+          "at": "2026-09-26T06:36:05.689Z",
+          "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27190 --timeout 120 call fork '{\"name\":\"rom20-acquire\",\"freeze\":false}' 2>&1 | tee evidence/fork-src.json",
+          "delta_seconds": -4.41
+        }
+      ]
+    },
+    "c-restore-dry-1": {
+      "selected_pi_call_id": "call_00_pNJ7yf2Qf8aunt0AjutO3580",
+      "basis": "imported bash command contains 'call restore', '\"dry_run\":true'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_pNJ7yf2Qf8aunt0AjutO3580",
+          "at": "2026-09-26T06:37:55.072Z",
+          "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27194 --timeout 120 call restore '{\"directory\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-src/mc-agent-server/snapshots/rom20-acquire\",\"dry_run\":true,\"expect_instance\":\"server\",\"expect_world_dir\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/world\",\"expect_level\":\"Minecart ROM base\",\"expect_dimension\":\"minecraft:overworld\"}' 2>&1 | tee evidence/restore-dryrun.json | head -100",
+          "delta_seconds": -5.138
+        },
+        {
+          "pi_call_id": "call_00_KbpyRMGEiBtqRPABgyCu9066",
+          "at": "2026-09-26T06:37:51.245Z",
+          "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27194 --timeout 120 call restore '{\"directory\":\"F:\\\\mc-agent-worktrees\\\\rom13\\\\coldstart\\\\labs\\\\rom20-src\\\\mc-agent-server\\\\snapshots\\\\rom20-acquire\",\"dry_run\":true,\"expect_instance\":\"server\",\"expect_world_dir\":\"F:\\\\mc-agent-worktrees\\\\rom13\\\\coldstart\\\\labs\\\\rom20-exp\\\\world\",\"expect_level\":\"Minecart ROM base\",\"expect_dimension\":\"minecraft:overworld\"}' 2>&1 | tee evidence/restore-dryrun.json | head -80",
+          "delta_seconds": -8.965
+        }
+      ]
+    },
+    "c-restore-apply-1": {
+      "selected_pi_call_id": "call_00_Lhk5153p15narL1hGUbU6449",
+      "basis": "imported bash command contains 'call restore', '\"dry_run\":false'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_Lhk5153p15narL1hGUbU6449",
+          "at": "2026-09-26T06:39:35.373Z",
+          "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27194 --timeout 600 call restore '{\"directory\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-src/mc-agent-server/snapshots/rom20-acquire\",\"dry_run\":false,\"expect_instance\":\"server\",\"expect_world_dir\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/world\",\"expect_level\":\"Minecart ROM base\",\"expect_dimension\":\"minecraft:overworld\"}' 2>&1 | tee evidence/restore-apply.json | python -c \"\nimport sys,json\ndata=json.load(sys.stdin)\nprint('ok:', data.get('ok'), 'verdict:', data.get('verdict'))\nprint('count:', data.get('count'), 'issued:', data.get('issued'), 'failed:', len(data.get('failed') or []))\ncomp = data.get('verification') or {}\nprint('verification ok:', comp.get('ok'), 'strict:', comp.get('strict'))\nprint('orderHash:', json.dumps(comp.get('orderHash')))\nprint('counts match:', comp.get('counts',{}).get('match'))\nprint('uuidOrder match:', comp.get('uuidOrder',{}).get('match'))\nprint('positionDeltas:', comp.get('positionDeltas',{}).get('count'))\nprint('velocityDeltas:', comp.get('velocityDeltas',{}).get('count'))\nprint('nbtMismatches:', json.dumps(comp.get('nbtMismatches') or comp.get('nbt'))[:200])\n\"",
+          "delta_seconds": -5.803
+        },
+        {
+          "pi_call_id": "call_01_rGUkIuhGmx1ATn82IQTg3707",
+          "at": "2026-09-26T06:37:59.962Z",
+          "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27194 --timeout 600 call restore '{\"directory\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-src/mc-agent-server/snapshots/rom20-acquire\",\"dry_run\":false,\"expect_instance\":\"server\",\"expect_world_dir\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/world\",\"expect_level\":\"Minecart ROM base\",\"expect_dimension\":\"minecraft:overworld\"}' 2>&1 | tee evidence/restore-apply.json | python -c \"\nimport sys,json\ntry:\n    data=json.load(sys.stdin)\nexcept Exception as e:\n    print('not json:', e); sys.exit()\nprint('ok:', data.get('ok'), 'verdict:', data.get('verdict'))\nprint('count:', data.get('count'), 'restored:', data.get('restored'), 'skipped:', data.get('skipped'))\nprint('endpoint:', json.dumps(data.get('checks',{}).get('endpoint',{}))[:300])\nprint('dimension:', json.dumps(data.get('checks',{}).get('dimension'))[:300])\nprint('existing:', json.dumps(data.get('checks',{}).get('existing'))[:300])\ncomp = data.get('comparison') or {}\nprint('comparison keys:', list(comp)[:10])\nprint('orderHash:', json.dumps(comp.get('orderHash'))[:200])\nprint('counts:', json.dumps(comp.get('counts'))[:300])\nprint('summary:', data.get('summary'))\n\"",
+          "delta_seconds": -101.214
+        }
+      ]
+    },
+    "c-place-user-1": {
+      "selected_pi_call_id": "call_00_ET_NxGCWuH8SBrxHzNZ0Shq5173",
+      "basis": "imported bash command contains 'scripts/place_user.py'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_ET_NxGCWuH8SBrxHzNZ0Shq5173",
+          "at": "2026-09-26T06:40:16.858Z",
+          "command": "cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"F:/mc-agent/.venv/Scripts/python.exe\" scripts/place_user.py 2>&1 | tee evidence/place-user.json",
+          "delta_seconds": -69.98
+        }
+      ]
+    },
+    "c-check-acquired-1": {
+      "selected_pi_call_id": "call_00_ET_hV7G9DsFdrkVp18ihGUk6677",
+      "basis": "imported bash command contains 'scripts/check_acquired.py'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_ET_hV7G9DsFdrkVp18ihGUk6677",
+          "at": "2026-09-26T06:40:54.579Z",
+          "command": "cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"F:/mc-agent/.venv/Scripts/python.exe\" scripts/check_acquired.py 2>&1 | tail -40",
+          "delta_seconds": -32.563
+        }
+      ]
+    },
+    "c-operate-1": {
+      "selected_pi_call_id": "call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547",
+      "basis": "imported bash command contains 'scripts/operate.py'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_ET_Z8Jf2dzy92rgwL9OifKQ1547",
+          "at": "2026-09-26T06:41:43.315Z",
+          "command": "cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"F:/mc-agent/.venv/Scripts/python.exe\" scripts/operate.py 2>&1 | tee evidence/operation.json",
+          "delta_seconds": 1.496
+        }
+      ]
+    },
+    "c-read-romlog-1": {
+      "selected_pi_call_id": "call_00_ET_jBVnWPls1Aj90rbfN2EY2368",
+      "basis": "imported bash command contains 'scripts/read_romlog.py', '--file'",
+      "candidates": [
+        {
+          "pi_call_id": "call_00_ET_jBVnWPls1Aj90rbfN2EY2368",
+          "at": "2026-09-26T06:42:37.675Z",
+          "command": "cd F:/mc-agent-worktrees/rom13/coldstart && RUN=\"labs/rom20-20260926T063100Z/run\" && PY=\"F:/mc-agent/.venv/Scripts/python.exe\" && \"$PY\" tools/run_trace.py call --run-dir \"$RUN\" --call-id c-read-romlog-1 --tool bash --phase agent --actor agent --arguments '{\"command\":\"python workspace/scripts/read_romlog.py --file F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/audit/romlogger/romlog.jsonl\"}' 2>&1; echo \"=== output ===\"; cd labs/rom20-20260926T063100Z/workspace && \"$PY\" scripts/read_romlog.py --file \"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/audit/romlogger/romlog.jsonl\" 2>&1 | tee evidence/read-romlog.txt",
+          "delta_seconds": -0.223
+        }
+      ]
+    }
+  },
+  "related_observations": {
+    "first_dry_run_attempt_failed_escape": [
+      {
+        "pi_call_id": "call_00_KbpyRMGEiBtqRPABgyCu9066",
+        "at": "2026-09-26T06:37:51.245Z",
+        "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27194 --timeout 120 call restore '{\"directory\":\"F:\\\\mc-agent-worktrees\\\\rom13\\\\coldstart\\\\labs\\\\rom20-src\\\\mc-agent-server\\\\snapshots\\\\rom20-acquire\",\"dry_run\":true,\"expect_instance\":\"server\",\"expect_world_dir\":\"F:\\\\mc-agent-worktrees\\\\rom13\\\\coldstart\\\\labs\\\\rom20-exp\\\\world\",\"expect_level\":\"Minecart ROM base\",\"expect_dimension\":\"minecraft:overworld\"}' 2>&1 | tee evidence/restore-dryrun.json | head -80"
+      }
+    ],
+    "first_apply_attempt_failed_chunks": [
+      {
+        "pi_call_id": "call_01_rGUkIuhGmx1ATn82IQTg3707",
+        "at": "2026-09-26T06:37:59.962Z",
+        "command": "export PYTHONPATH=\"F:/mc-agent-worktrees/rom13/bridge6/src\"; PY=\"F:/mc-agent/.venv/Scripts/python.exe\"; cd F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-20260926T063100Z/workspace && \"$PY\" -m mc_agent_bridge.cli --api-port 27194 --timeout 600 call restore '{\"directory\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-src/mc-agent-server/snapshots/rom20-acquire\",\"dry_run\":false,\"expect_instance\":\"server\",\"expect_world_dir\":\"F:/mc-agent-worktrees/rom13/coldstart/labs/rom20-exp/world\",\"expect_level\":\"Minecart ROM base\",\"expect_dimension\":\"minecraft:overworld\"}' 2>&1 | tee evidence/restore-apply.json | python -c \"\nimport sys,json\ntry:\n    data=json.load(sys.stdin)\nexcept Exception as e:\n    print('not json:', e); sys.exit()\nprint('ok:', data.get('ok'), 'verdict:', data.get('verdict'))\nprint('count:', data.get('count'), 'restored:', data.get('restored'), 'skipped:', data.get('skipped'))\nprint('endpoint:', json.dumps(data.get('checks',{}).get('endpoint',{}))[:300])\nprint('dimension:', json.dumps(data.get('checks',{}).get('dimension'))[:300])\nprint('existing:', json.dumps(data.get('checks',{}).get('existing'))[:300])\ncomp = data.get('comparison') or {}\nprint('comparison keys:', list(comp)[:10])\nprint('orderHash:', json.dumps(comp.get('orderHash'))[:200])\nprint('counts:', json.dumps(comp.get('counts'))[:300])\nprint('summary:', data.get('summary'))\n\""
+      }
+    ],
+    "deployed_jar_rebuild": [
+      {
+        "pi_call_id": "call_00_ii05J6vv0yJQ0NGiaeJf8030",
+        "at": "2026-09-26T06:35:57.484Z",
+        "command": "cd F:/mc-agent-worktrees/rom13/coldstart && \"F:/mc-agent/.venv/Scripts/python.exe\" tools/build_mod.py --source \"labs/rom20-20260926T063100Z/workspace/agent-logger\" --lab rom20-exp --out \"labs/rom20-20260926T063100Z/workspace/artifacts/rom20-agent-logger.jar\" --version 0.1.0 2>&1 | tail -20"
+      },
+      {
+        "pi_call_id": "call_00_ET_A6387Us9qClvqubgFIqr5901",
+        "at": "2026-09-26T06:37:26.366Z",
+        "command": "cd F:/mc-agent-worktrees/rom13/coldstart && PY=\"F:/mc-agent/.venv/Scripts/python.exe\" && \"$PY\" tools/build_mod.py --source \"labs/rom20-20260926T063100Z/workspace/agent-logger\" --lab rom20-exp --out \"labs/rom20-20260926T063100Z/workspace/artifacts/rom20-agent-logger.jar\" --version 0.1.0 2>&1 | tail -6"
+      }
+    ]
+  },
+  "validation": {
+    "call_result_pairs": true,
+    "timestamps_monotonic": true,
+    "seq_monotonic": true,
+    "run_id_consistent": true
+  },
+  "outputs": {
+    "trajectory": "trajectory.jsonl",
+    "trajectory_copy": "trajectory.canonical.jsonl",
+    "sha256": "11b5443132588abc7fae2b27ef8e8126bc1459691ef700d1c33777104dde46da"
+  }
+}

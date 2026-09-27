@@ -1,0 +1,93 @@
+{
+  "format": "mc-agent/rom21-verification@1",
+  "runId": "rom21-neg-no_machine_operation-1790411267",
+  "configId": "calibrated-a",
+  "instance": "rom21-00z-no-machine-operation-exp",
+  "expectedCartCount": 5,
+  "verdict": "fail",
+  "failures": [
+    "audit_oracle",
+    "agent_operations",
+    "causal_joins",
+    "transient_captures",
+    "natural_void_captures",
+    "inventory_matches_program",
+    "answer_matches_oracle"
+  ],
+  "problems": [
+    "audit_oracle: no experiment input_processed/cart_exit in the audit log; minecart-audit verdict is 'fail', not pass",
+    "agent_operations: 0 processed input(s) for 5 expected pops",
+    "causal_joins: counts differ: processed=0 exits=0 removes=0 expected=5",
+    "transient_captures: 0 transient capture(s) for 5 expected cart(s)",
+    "natural_void_captures: 0 natural void capture(s) for 5 expected cart(s)",
+    "inventory_matches_program: observed inventories do not match the sealed program (missing=5 unexpected=0)",
+    "answer_matches_oracle: 0 cart(s) match the independent oracle exactly"
+  ],
+  "checks": {
+    "run_manifest": {
+      "pass": true,
+      "detail": "run manifest consistent"
+    },
+    "logger_session": {
+      "pass": true,
+      "detail": "logger session 1 scoped and identified"
+    },
+    "audit_oracle": {
+      "pass": false,
+      "detail": "no experiment input_processed/cart_exit in the audit log; minecart-audit verdict is 'fail', not pass"
+    },
+    "agent_operations": {
+      "pass": false,
+      "detail": "0 processed input(s) for 5 expected pops"
+    },
+    "causal_joins": {
+      "pass": false,
+      "detail": "counts differ: processed=0 exits=0 removes=0 expected=5"
+    },
+    "transient_captures": {
+      "pass": false,
+      "detail": "0 transient capture(s) for 5 expected cart(s)"
+    },
+    "natural_void_captures": {
+      "pass": false,
+      "detail": "0 natural void capture(s) for 5 expected cart(s)"
+    },
+    "capture_timing": {
+      "pass": true,
+      "detail": "capture and removal ticks inside the calibrated windows"
+    },
+    "output_order": {
+      "pass": true,
+      "detail": "observed pop order is consistent across logger and audit"
+    },
+    "inventory_matches": {
+      "pass": true,
+      "detail": "live inventory equal across logger, audit exit and audit removal"
+    },
+    "inventory_matches_program": {
+      "pass": false,
+      "detail": "observed inventories do not match the sealed program (missing=5 unexpected=0)"
+    },
+    "restore_verified": {
+      "pass": true,
+      "detail": "guarded restore verified (order, UUID order, counts, dimension)"
+    },
+    "jar_provenance": {
+      "pass": true,
+      "detail": "logger jar(s) pinned by SHA-256 (and size+source for iteration)"
+    },
+    "source_world": {
+      "pass": true,
+      "detail": "source world (and map artifact) unchanged"
+    },
+    "answer_matches_oracle": {
+      "pass": false,
+      "detail": "0 cart(s) match the independent oracle exactly"
+    }
+  },
+  "answer": [],
+  "oracle": [],
+  "observedPopOrder": [],
+  "popOrderSource": "observed live (logger transient captures joined to audit cart_exit/cart_remove); spawn order never assumed",
+  "pressedOperations": 0
+}

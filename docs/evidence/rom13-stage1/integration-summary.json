@@ -1,0 +1,338 @@
+{
+  "kind": "stage1-integration-summary",
+  "evidenceVersion": 3,
+  "issue": "guajun/mc-agent#14",
+  "date": "2026-09-25T18:03:14Z",
+  "gateRepoHeadAtRun": "32aa245",
+  "runId": "rom13-integration-run-20260925T174503Z",
+  "runDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-20260925T174503Z",
+  "finalization": {
+    "trajectoryPath": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\run-20260925T174503Z\\trajectory.final.jsonl",
+    "sha256": "76ab7da8fe641104fca61c74b290f6106a1fe7493748fc929c760bacecb0b049",
+    "calls": 71,
+    "results": 71,
+    "uniqueCallIds": 71,
+    "finalizedAt": "2026-09-25T17:48:30Z",
+    "mappingSourceSha256Matches": true
+  },
+  "validationScope": {
+    "fullLiveRerun": false,
+    "reason": "scoping/validation and summary reporting changed; the immutable frozen inputs still validate and no live fact changed",
+    "reusedFrozenInputs": true,
+    "frozenSha256Checked": true,
+    "mappingGaps": [],
+    "infraErrors": [],
+    "gateExpectedBlocked": true,
+    "artifactDelta": [
+      "input_attempt.request_seq is now promoted from the raw requestSeq (seq 183 -> 182)",
+      "evidence-index.json re-hashes that audit-events artifact"
+    ]
+  },
+  "normalizeStatus": {
+    "commands": [
+      {
+        "name": "map-identity",
+        "returncode": 0,
+        "seconds": 0.264,
+        "gaps": 0,
+        "ok": true
+      },
+      {
+        "name": "map-audit",
+        "returncode": 0,
+        "seconds": 0.294,
+        "gaps": 0,
+        "ok": true
+      },
+      {
+        "name": "map-trace",
+        "returncode": 0,
+        "seconds": 0.273,
+        "gaps": 0,
+        "ok": true
+      },
+      {
+        "name": "assemble",
+        "returncode": 3,
+        "seconds": 0.352,
+        "gateOverall": "blocked",
+        "expectedBlocked": true
+      }
+    ],
+    "mappingGaps": [],
+    "infraErrors": [],
+    "gateOverall": "blocked",
+    "gateExitCode": 3
+  },
+  "java": {
+    "path": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\java.exe",
+    "jdk": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon"
+  },
+  "interfaceModJar": {
+    "interface_jar": "F:\\mc-agent-worktrees\\rom13\\meta16\\labs\\_build\\mods\\mc-agent-interface-0.6.0.jar",
+    "interface_jar_sha256": "45f12e16b3979be6a699ac3c744b2a68dfcf8dd2379f5987bf9b9319adf4404f",
+    "interface_commit": "3b93ceb137f8e05624d9d443356c0db78c4b4751",
+    "note": "read-only peer-built jar, hash-pinned to the #16 evidence"
+  },
+  "smokeMod": {
+    "v1": {
+      "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
+      "sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+      "build": {
+        "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
+        "sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+        "size": 15177,
+        "version": "0.1.0",
+        "compression": "store",
+        "lab": "rom13-src",
+        "minecraft": "26.2",
+        "jdk": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon",
+        "javac": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\javac.exe",
+        "javacVersion": "javac 25.0.1",
+        "release": 25,
+        "serverJar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\versions\\26.2\\server-26.2.jar",
+        "serverJarSha256": "183c0499c5f855570ee487dd38e141a53f0121f83a0b07a3bac2d8b6698823e8",
+        "classpathEntries": 88,
+        "classpathSha256": "ad5e3d9c256abe1b5cd228bc08e97b9f99211b1397739796aa4e88a3fad2fd88",
+        "sources": [
+          {
+            "path": "src/main/java/dev/mcagent/smoke/SmokeMod.java",
+            "sha256": "86bfdbb4394490c77c97fcaa6f0ff288f8241bfdc31fed9b8c3e00147045f2bb"
+          },
+          {
+            "path": "src/main/resources/fabric.mod.json",
+            "sha256": "9a3e101b8716d91d45077d0f06968181559d2d1e7d2c77b8a8959b8dd0ef6f72"
+          }
+        ],
+        "builtAt": 1790358346.939759
+      }
+    },
+    "v2": {
+      "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
+      "sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+      "build": {
+        "jar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-integration\\build\\smoke-mod.jar",
+        "sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+        "size": 15177,
+        "version": "0.1.0",
+        "compression": "store",
+        "lab": "rom13-src",
+        "minecraft": "26.2",
+        "jdk": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon",
+        "javac": "C:\\Users\\MSI-NB\\AppData\\Roaming\\.hmcl\\java\\windows-x86_64\\mojang-java-runtime-epsilon\\bin\\javac.exe",
+        "javacVersion": "javac 25.0.1",
+        "release": 25,
+        "serverJar": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\versions\\26.2\\server-26.2.jar",
+        "serverJarSha256": "183c0499c5f855570ee487dd38e141a53f0121f83a0b07a3bac2d8b6698823e8",
+        "classpathEntries": 89,
+        "classpathSha256": "fd53d7f1f0827f0df7a400b783a8bcbef048ab06fc02b9afa89d8af5af1041ab",
+        "sources": [
+          {
+            "path": "src/main/java/dev/mcagent/smoke/SmokeMod.java",
+            "sha256": "d996cda1cf36657641263db1493f15d7e44101cd7646a762fdc426892edcc610"
+          },
+          {
+            "path": "src/main/resources/fabric.mod.json",
+            "sha256": "9a3e101b8716d91d45077d0f06968181559d2d1e7d2c77b8a8959b8dd0ef6f72"
+          }
+        ],
+        "builtAt": 1790358421.2721164
+      }
+    }
+  },
+  "jarUpdate": {
+    "old_sha256": "227d7a9146c1d56491f115d0c671d99c03de9a09948fcc4e2e73ac41cc42f518",
+    "new_sha256": "2f042c139d62ca29f10f97af81ceb268a3dd3ef83923456cd49a29c148d4c643",
+    "old_bytes": 15177,
+    "new_bytes": 15177,
+    "same_size": true,
+    "status_output": "[mc-agent-smoke] build=smoke-de2 version=0.1.0 lab=rom13-exp instance=8cf7f17ce42f4f29a97d95fa872fa950 tick=19 audit=F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\audit\n",
+    "runtime_evidence": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\logs\\console.log",
+    "loaded_new_marker": true
+  },
+  "probes": {
+    "build_errors_detected": true,
+    "load_failure_detected": true,
+    "missing_dependency_detected": true
+  },
+  "restarts": {
+    "src": {
+      "worldDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\world",
+      "sameWorldDir": true
+    },
+    "exp": {
+      "worldDir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\world",
+      "sameWorldDir": true
+    }
+  },
+  "instances": [
+    {
+      "instance_id": "rom13-src",
+      "role": "source_audit",
+      "dimension": "minecraft:overworld",
+      "world_dir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-src\\world",
+      "rcon_port": 27241,
+      "bridge_port": 27243
+    },
+    {
+      "instance_id": "rom13-exp",
+      "role": "experiment",
+      "dimension": "minecraft:overworld",
+      "world_dir": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\world",
+      "rcon_port": 27245,
+      "bridge_port": 27247
+    }
+  ],
+  "traceAttribution": {
+    "rows": 71,
+    "byInstance": {
+      "rom13-src": 18,
+      "rom13-exp": 53
+    },
+    "defaultedInstances": 0,
+    "rawCalls": 71,
+    "verifiedJoins": 0,
+    "joinCandidates": 135,
+    "traceJoinWithheld": true
+  },
+  "audit18": {
+    "path": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-20260925T174503Z.jsonl",
+    "sha256": "f9d2bf766cf3f0e272c5680131ab03b5099fbd39efdc19b92894922049a1df99",
+    "rawEvents": 299,
+    "mappedEvents": 296,
+    "mapping": {
+      "tool": "#18 audit JSONL -> gate audit-events",
+      "source": "F:\\mc-agent-worktrees\\rom13\\integration\\labs\\rom13-exp\\mc-audit\\audit-rom13-integration-run-20260925T174503Z.jsonl",
+      "source_sha256": "f9d2bf766cf3f0e272c5680131ab03b5099fbd39efdc19b92894922049a1df99",
+      "mapped": [
+        "artifacts\\independent_test_mod\\audit-events.jsonl"
+      ],
+      "counts": {
+        "phase": 4,
+        "cart_tracked": 1,
+        "cart_sample": 285,
+        "input_attempt": 2,
+        "input_request": 1,
+        "input_processed": 1,
+        "cart_emitted": 1,
+        "cart_removed": 1
+      },
+      "excluded": {
+        "session_start": 1,
+        "audit_ready": 1,
+        "audit_end": 1
+      },
+      "lifecycle": {
+        "sessions": [
+          {
+            "session": "s1790358481908",
+            "started": true,
+            "ready": true,
+            "ended": true,
+            "status": "complete"
+          }
+        ],
+        "open_sessions": [],
+        "incomplete": [],
+        "truncated": false,
+        "end_statuses": [
+          "complete"
+        ]
+      },
+      "join_candidates": [],
+      "gaps": [],
+      "notes": [
+        "299 raw event(s), 296 mapped, 3 session-meta validated/excluded"
+      ],
+      "ok": true
+    },
+    "attemptRequestLinksPromoted": [
+      null,
+      182
+    ],
+    "sourceCommit": "502f561",
+    "noteCycled": true,
+    "cartRemoved": true
+  },
+  "sourceWorld": {
+    "path": "D:\\MC\\MC_Game\\.minecraft\\versions\\26.2-Fabric\\saves\\Minecart ROM test",
+    "before": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "after": "8cd54c86af9fa8d6b9ea33441fb21dac295cd2b5ddaa60327f5fb3a30255324a",
+    "unchanged": true
+  },
+  "bundleOnlyReproduction": {
+    "command": "python tools/stage1_integration.py run --bundle-only",
+    "artifactsIdentical": {
+      "bundle/artifacts/trace_persistence/tool-trace.jsonl": "1e9f9a4e0c6d0174e2005630912f8f480da906b2d683580d3c04cb70a9a447e4",
+      "bundle/artifacts/independent_test_mod/audit-events.jsonl": "aeafe1a6003b2a3f66e8e4a238cdbbd1bb59e1389fa8f22340e416926eda50de",
+      "bundle/mapping/trace-report.json": "cebb58a82c3b403954d03f620500e94f2af5989ccfbc1adb886d9cc21732b895",
+      "bundle/mapping/audit-report.json": "12f790caf2feaaafdc0fced94670bc9a8b3465ddc97920e4a0c0dac164495211",
+      "bundle/bundle.json": "59cae3d61a48471e723fcf5119ce97c42775668ea5108654ff5059ffc9f14bc8",
+      "bundle/artifacts/smoke_fixture_validity/evidence-index.json": "eaa6cb2b31ce90477a32fb903184dfa11f386b62baf8fa7cea374233a21e817f"
+    },
+    "note": "three consecutive bundle-only runs reproduced these files byte for byte from normalize-inputs.json"
+  },
+  "bridge6RestoreCollection": {
+    "ok": true,
+    "sameRunBinding": false,
+    "orderHash": "a663c5c0dfd7ec6f",
+    "restoreProblems": [],
+    "sourceUnchangedProblems": [],
+    "failureEvidence": {
+      "wrongEndpointRejected": true,
+      "duplicatePreExistingRejected": true,
+      "inventoryMutationTested": true,
+      "unverifiedScenarioRows": 5
+    },
+    "copied": {
+      "snapshot-before": "f0a5ee36bb3afe69b3338399b33beb2da3a4b5155aa6b56d955859bcde429b02",
+      "snapshot-after": "a7a1069054ac12fc103325bd0ba4ac0b8fff61533c12b176a0bf1fb83654a7d1"
+    },
+    "bridgeFinalHead": "4116ebb34b60e962e95834791d521b369fd52c65"
+  },
+  "gate": {
+    "overall": "blocked",
+    "checks": [
+      {
+        "id": "fixture_map",
+        "status": "blocked"
+      },
+      {
+        "id": "restore_fidelity",
+        "status": "blocked"
+      },
+      {
+        "id": "player_context",
+        "status": "pass"
+      },
+      {
+        "id": "agent_dev_capability",
+        "status": "blocked"
+      },
+      {
+        "id": "independent_test_mod",
+        "status": "blocked"
+      },
+      {
+        "id": "trace_persistence",
+        "status": "blocked"
+      },
+      {
+        "id": "smoke_fixture_validity",
+        "status": "blocked"
+      },
+      {
+        "id": "evidence_integrity",
+        "status": "blocked"
+      }
+    ]
+  },
+  "gaps": [],
+  "remaining": [
+    "#15 fixture map (PR27 candidates f2a636f exist but are not accepted yet)",
+    "bridge#6 restore same-run binding: the collected bridge6 evidence is a separate run and is not joined here",
+    "#18 test-mod completeness: test-mod manifest, negative cases, audit lifecycle declaration",
+    "#19 cold-start harness: tool environment, missing-log detection, version lock, smoke suites",
+    "agent-phase joins: the agent must join its own tool calls with explicit proof"
+  ]
+}

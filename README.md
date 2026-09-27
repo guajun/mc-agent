@@ -1,191 +1,114 @@
-# mc-agent
+# Minecraft Agent Toolkit
 
-Infrastructure for letting agent runtimes observe and act inside a Minecraft
-client - generically. No cannons, no sulfur cubes, no use-case logic in the
-core: the framework moves data and the agent decides what it means.
+Let your AI agent inspect a Minecraft world, find players and entities, run
+commands, and work with world snapshots. Use your existing MCP-compatible agent
+application, or try the tools directly from a terminal.
 
-📖 **[Documentation site](https://guajun.github.io/mc-agent/)** ([中文](https://guajun.github.io/mc-agent/zh/)) -
-installation, a guided tour, the mental model, and the traps.
+**[Start here](docs/getting-started.md)** · **[Documentation website](https://guajun.github.io/mc-agent/)** · **[中文 README](README.zh.md)**
 
-## Install
+## What can I do with it?
 
-```bash
-# the mod: build against your own instance, then copy the jar into mods/
-python mc-agent-interface-mod/build.py --minecraft-dir <instance> \
-    --version 26.2-Fabric --jdk <jdk25>
+| Capability | Example request |
+| --- | --- |
+| Read the world | “Summarize the current world state and online players.” |
+| Inspect players and entities | “Find my player and describe the entities around me.” |
+| Run commands and read results | “List the online players.” |
+| Capture snapshots | “Capture an entity-order snapshot for this experiment.” |
+| Repeat experiments | Fork a world and check restoration with the [world-fork guide](docs/protocol-snapshot.md). |
 
-# the Python side: the loop depends on the bridge, so one environment for both
+Available operations depend on the connected mod. The agent checks `capabilities`
+before using them. Your agent application supplies the model and conversation.
+
+**Verified example:** [Minecart ROM](docs/minecart-rom-runbook.md) completed all
+three acceptance stages on 2026-09-26: a live toolchain gate, an autonomous agent
+cold start, and regression on fresh game instances. See the guide for evidence
+and reproduction; the scripted regression is distinct from the autonomous run.
+
+## Install and make your first connection
+
+**You need:** Minecraft **26.2**, Fabric Loader **0.19+**, Fabric API,
+**JDK 25**, **Python 3.11+**, and Git. Run the game endpoint, Toolkit and agent
+application on the same machine. A single-player world is a good starting point.
+
+1. **Install the game mod.** Follow [the build and install steps](docs/getting-started.md), then open a world or start the server. The documented path currently builds the mod from source.
+2. **Install the Toolkit** using the commands for your OS below, in a folder you want to keep.
+3. **Check the connection, then connect your agent.** The [first-run guide](docs/getting-started.md) includes expected results and MCP settings.
+
+### Windows · PowerShell
+
+```powershell
+git clone https://github.com/guajun/mc-agent-bridge
 python -m venv .venv
-.venv/Scripts/pip install -e "mc-agent-bridge[mcp]" -e mc-agent-loop
+.venv/Scripts/python -m pip install -e "mc-agent-bridge[mcp]"
 
-# run
-.venv/Scripts/mc-bridge run
+# Replace with the game/server folder containing mc-agent-server/.
+# Keep this terminal open while using the Toolkit.
+.venv/Scripts/mc-bridge run --server-dir "C:/Minecraft/my-instance"
 ```
 
-Needs Minecraft 26.2 with Fabric Loader 0.19+ and Fabric API, plus Java 25 and
-Python 3.11+. The full instructions - versions, upgrades, uninstalls, where
-everything lands - are on the [Installation](https://guajun.github.io/mc-agent/install/) page.
+Open a **second terminal in the same folder**:
 
-## Modules
-
-Three independent repositories, one job each:
-
-| Module | Role | Repository |
-| --- | --- | --- |
-| **interface mod** | game adapter: a versioned local interface inside the client | [mc-agent-interface-mod](https://github.com/guajun/mc-agent-interface-mod) |
-| **bridge** | agent-agnostic bridge: owns the mod connection, serves a loopback API and an optional MCP front-end | [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge) |
-| **agent loop** | the active side: listen for chat, wake a backend, reply | [mc-agent-loop](https://github.com/guajun/mc-agent-loop) |
-
-```
- agent runtime            bridge daemon             interface mod        Minecraft
- ┌───────────────┐       ┌──────────────┐          ┌─────────────┐      ┌─────────┐
- │ Hermes / Codex│─chat─►│ loop / MCP   │◄─lines──►│ TCP 25580   │◄────►│ client  │
- │ your own loop │◄events│ JSONL 8765   │          │ events.jsonl│      │ 26.2    │
- └───────────────┘       └──────────────┘          └─────────────┘      └─────────┘
+```powershell
+.venv/Scripts/mc-bridge call status
+.venv/Scripts/mc-bridge call capabilities
+.venv/Scripts/mc-bridge call state
 ```
 
-The same bridge serves every runtime: swap the agent without touching the game,
-restart the agent without dropping the game connection.
-
-## Why not MCP alone
-
-MCP servers are spawned by the agent, so nothing in the game can wake an agent
-through them. Event-driven behaviour needs a resident listener on the agent's
-side; that is the loop, and MCP stays an optional *pull* interface. See
-[RFC 0001](docs/rfc/0001-agent-interface.md).
-
-## Open questions live in the issue tracker
-
-Design discussion that is not settled is filed as an issue rather than decided
-in code. Phase 1 ships the plumbing; later phases are not designed yet, on
-purpose.
-
-- [RFC 0001 - agent interface and bridge architecture](docs/rfc/0001-agent-interface.md) - implemented, closed; what is still open moved to [#4](https://github.com/guajun/mc-agent/issues/4), [#5](https://github.com/guajun/mc-agent/issues/5), [#6](https://github.com/guajun/mc-agent/issues/6), [#7](https://github.com/guajun/mc-agent/issues/7)
-- [RFC 0002 - programmable tool calls (running agent-written code in the game)](docs/rfc/0002-programmable-tool-calls.md) - deferred, not implemented; the decision is in [concepts.md](docs/concepts.md)
-- [Wiring Hermes to the bridge](docs/hermes-setup.md) - install, model, API
-  server, MCP tools, and the end-to-end check
-- [Who is the agent, in game?](docs/player-identity.md) - second client,
-  Carpet fake players, and when to want a server-side adapter
-- [Lab servers the agent raises itself](docs/lab-server.md) - `tools/lab_server.py`:
-  a headless Fabric server per experiment, provisioned and commanded over RCON
-
-## Quick start
-
-With the pieces from [Install](#install) in place and the game running:
+### macOS / Linux · shell
 
 ```bash
-mc-bridge run                                    # owns the game connection
-mc-bridge call state                             # look at the world
-mc-agent-loop run --backend hermes --trigger @codex
+git clone https://github.com/guajun/mc-agent-bridge
+python3 -m venv .venv
+.venv/bin/python -m pip install -e "mc-agent-bridge[mcp]"
+
+# Replace with the game/server folder containing mc-agent-server/.
+# Keep this terminal open while using the Toolkit.
+.venv/bin/mc-bridge run --server-dir "/path/to/minecraft-instance"
 ```
 
-Now `@codex <anything>` in game chat reaches the backend, and the backend can
-read or change the world through `mc_state`, `mc_entities`, `mc_command`,
-`mc_record_start` and friends. No model to hand? `--backend echo` answers with an
-echo, and `mc-bridge watch` shows the raw event stream.
-
-## Verify the wiring without the game
+Open a **second terminal in the same folder**:
 
 ```bash
-python tools/smoke_offline.py                     # echo backend: checks the plumbing
-python tools/smoke_offline.py --backend hermes    # real model through the Hermes API server
+.venv/bin/mc-bridge call status
+.venv/bin/mc-bridge call capabilities
+.venv/bin/mc-bridge call state
 ```
 
-Runs the real `mc-bridge run` and `mc-agent-loop run` processes against a
-stand-in for the in-game mod, then checks state passthrough, chat-triggered
-replies and event replay. With `--backend hermes` the reply comes from the
-model, and it can call the `mc_*` MCP tools - which is the whole stack except
-Minecraft itself. Keep the Hermes API key in `.env` next to this README.
+**Success:** `status` reports `connected: true` and `vantage: server`, and
+`state` returns world data. No model account is needed for these checks.
+If a check fails, use the [first-run help](docs/getting-started.md).
 
-The bridge in this test listens on the default port 8765 so the `mc-agent` MCP
-server registered with Hermes can reach it.
+## How it fits together
 
-Two more tools for driving things by hand:
-
-```bash
-python tools/launch_instance.py --minecraft-dir <instance> --version 26.2-Fabric --world <level>
-python tools/mcp_probe.py mc_entities --arg radius=64 --arg types=sulfur_cube
+```text
+You → Agent application → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft world
+       (the Harness)       MCP / CLI + daemon         server view
 ```
 
-`launch_instance.py` starts the client without the GUI launcher (HMCL has no
-CLI), so an agent can bring up its own game. `mcp_probe.py` calls one MCP tool
-against the running bridge, which is how the agent-facing summaries are tested.
+The mod reads the server's authoritative world state, including the integrated
+server in single-player. The Toolkit keeps the game connection alive; the agent
+application decides which tools to use. Its MCP adapter connects to that running
+daemon. Game-control connections stay local (loopback).
 
-## Working locally
+| Piece | What to install |
+| --- | --- |
+| Game mod | [mc-agent-interface-mod](https://github.com/guajun/mc-agent-interface-mod) in your instance's `mods/` folder |
+| Toolkit | [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge), which provides the `mc-bridge` command |
+| Agent application | Your existing MCP client (such as Codex, Claude Code or Hermes), or an agent able to run the CLI |
+| Optional operating instructions | The portable [Toolkit Skill](docs/toolkit-skill.md) |
 
-The recommended layout puts the four checkouts side by side, with one virtual
-environment at the root:
+This repository holds documentation, the shared Skill and experiment utilities.
+The standard setup needs the mod and Toolkit alongside your agent app.
+See [Architecture](docs/concepts.md) for deployment choices and terminology.
+Unattended Hermes still has a signed-delivery integration issue; its status and
+setup live in the [separate guide](docs/hermes-unattended.md).
 
-```
-mc-agent/                  this repository (docs, RFCs, tools)
-mc-agent/.venv/            python -m venv .venv
-mc-agent/interface-mod/    mc-agent-interface-mod
-mc-agent/bridge/           mc-agent-bridge
-mc-agent/agent-loop/       mc-agent-loop
-```
+## Go further
 
-```bash
-python -m venv .venv
-.venv/Scripts/python -m pip install -e "bridge[mcp]" -e agent-loop    # Windows
-.venv/bin/python     -m pip install -e "bridge[mcp]" -e agent-loop    # POSIX
-
-.venv/Scripts/mc-bridge.exe run
-.venv/Scripts/mc-agent-loop.exe run --backend hermes --trigger @codex
-```
-
-The mod writes its `port.txt` into `<gameDir>/mc-agent/`, so a client on the
-same machine finds the game without extra configuration; `--mod-port` or
-`--port-file` override that.
-
-## Phase 1 scope
-
-In scope, and shipped:
-
-* a versioned, generic interface inside the client (state, entities, command,
-  chat, recording, waiting, markers, events);
-* a bridge that owns the connection and re-serves it on loopback, with event
-  replay;
-* an agent loop that turns chat into backend turns;
-* a Hermes-first backend, with echo (tests) and Codex (experimental) adapters.
-
-Explicitly out of scope for now:
-
-* any use-case logic (experiments, cannons, analysis);
-* a mandatory always-on deterministic runtime - the agent may start, wait and
-  stop things itself;
-* new game-side abstractions beyond the interface above;
-* phases 2+ - they will be designed later, in RFCs.
-
-## Design principles
-
-1. **Decoupled by default.** Each module is useful alone; the seams are the wire
-   protocol and the loopback API.
-2. **One connection owner.** Exactly one process talks to the game.
-3. **The agent is the actor.** The bridge is a tool, not a scheduler; things
-   happen because an agent asked for them.
-4. **No use-case logic in the core.** If it only matters for one experiment, it
-   lives in that experiment.
-
-## Repositories
-
-```
-mc-agent/            meta: docs and RFCs (this repo)
-mc-agent-interface-mod/   Fabric client mod
-mc-agent-bridge/          Python bridge, CLI and MCP front-end
-mc-agent-loop/            Python agent loop and backends
-```
-
-## Working on the docs
-
-The site is MkDocs Material, built from `docs/` (English) and `docs/zh/`
-(Chinese) by `mkdocs-static-i18n`; `mkdocs.yml` and `requirements-docs.txt` at
-the repository root configure it, and `.github/workflows/pages.yml` builds and
-deploys it on every push that touches the docs.
-
-```bash
-.venv/Scripts/pip install -r requirements-docs.txt
-.venv/Scripts/python -m mkdocs serve        # http://127.0.0.1:8000
-```
+- [Install, upgrade or remove components](docs/install.md)
+- [Browse CLI commands and MCP tools](docs/tools.md)
+- [Explore advanced guides, experiments and design history](docs/advanced.md)
+- [Develop and preview this documentation](docs/contributing-docs.md)
 
 ## License
 

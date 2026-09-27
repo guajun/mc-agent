@@ -1,0 +1,244 @@
+{
+  "started_at": "2026-09-26T02:17:13+0800",
+  "seconds": 40.471,
+  "steps": [
+    {
+      "at": "2026-09-26T02:16:33+0800",
+      "step": "interface",
+      "detail": {
+        "port": 27158,
+        "protocol": "SNAPSHOT",
+        "snapshot_name": "ready-rom15d"
+      }
+    },
+    {
+      "at": "2026-09-26T02:16:37+0800",
+      "step": "machine-base",
+      "detail": {
+        "forceload": "0 -3 2 -1",
+        "machine": {
+          "ok": true,
+          "checks": [
+            {
+              "pos": [
+                11,
+                -54,
+                -23
+              ],
+              "block": "minecraft:note_block[instrument=harp,powered=false]",
+              "ok": true
+            },
+            {
+              "pos": [
+                11,
+                -54,
+                -22
+              ],
+              "block": "minecraft:sticky_piston[extended=false,facing=up]",
+              "ok": true
+            },
+            {
+              "pos": [
+                11,
+                -53,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                12,
+                -53,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                13,
+                -53,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                14,
+                -53,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                11,
+                -52,
+                -22
+              ],
+              "block": "minecraft:redstone_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                14,
+                -52,
+                -22
+              ],
+              "block": "minecraft:powered_rail[powered=false,shape=north_south]",
+              "ok": true
+            },
+            {
+              "pos": [
+                11,
+                -51,
+                -22
+              ],
+              "block": "minecraft:sand",
+              "ok": true
+            },
+            {
+              "pos": [
+                11,
+                -50,
+                -22
+              ],
+              "block": "minecraft:sand",
+              "ok": true
+            },
+            {
+              "pos": [
+                13,
+                -49,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                11,
+                -48,
+                -22
+              ],
+              "block": "minecraft:sticky_piston[extended=false,facing=east]",
+              "ok": true
+            },
+            {
+              "pos": [
+                12,
+                -48,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                13,
+                -48,
+                -22
+              ],
+              "block": "minecraft:slime_block",
+              "ok": true
+            },
+            {
+              "pos": [
+                12,
+                -47,
+                -22
+              ],
+              "block": "minecraft:redstone_block",
+              "ok": true
+            }
+          ]
+        }
+      }
+    },
+    {
+      "at": "2026-09-26T02:16:48+0800",
+      "step": "user",
+      "detail": {
+        "name": "Romuser",
+        "aim": {
+          "requested": [
+            -0.0,
+            50.5055
+          ],
+          "actual": [
+            0.0,
+            50.5055
+          ]
+        },
+        "seat": {
+          "enabled": true,
+          "pos": [
+            11.5,
+            -53.0,
+            -24.5
+          ],
+          "nbt": "{NoGravity:1b,Invisible:1b,Marker:1b,Tags:[\"minecart-rom-fixture\"]}",
+          "notes": "The machine floats over the void and the fake player has no flight toggle; an invisible NoGravity marker armor stand keeps the creative user at the operating position. It has no collision, no AI, and is not part of the machine."
+        }
+      }
+    },
+    {
+      "at": "2026-09-26T02:16:48+0800",
+      "step": "note-block-reset",
+      "detail": 20
+    },
+    {
+      "at": "2026-09-26T02:16:52+0800",
+      "step": "cart",
+      "detail": {
+        "index": 0,
+        "uuid": "a6aa7cc6-145a-4cf1-866b-5344e0c55d6b",
+        "items": [
+          {
+            "slot": 0,
+            "id": "minecraft:stone",
+            "count": 1
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-09-26T02:16:56+0800",
+      "step": "cart",
+      "detail": {
+        "index": 1,
+        "uuid": "6b6d3c4b-e7d3-43e8-8731-0156c4ea9ec4",
+        "items": [
+          {
+            "slot": 1,
+            "id": "minecraft:dirt",
+            "count": 2
+          }
+        ]
+      }
+    },
+    {
+      "at": "2026-09-26T02:17:00+0800",
+      "step": "cart",
+      "detail": {
+        "index": 2,
+        "uuid": "4e3c48df-9bf5-4224-80a3-719ebbdb8e1c",
+        "items": [
+          {
+            "slot": 2,
+            "id": "minecraft:gold_ingot",
+            "count": 3
+          }
+        ]
+      }
+    }
+  ],
+  "program_entries": 3,
+  "program_name": "calibration-default-v1",
+  "user": "romuser",
+  "spec_version": "1.0.0",
+  "order_source": "interface-snapshot"
+}

@@ -1,0 +1,265 @@
+{
+  "format": "mc-agent/rom21-verification@1",
+  "runId": "rom21-20260926T083500Z-b1",
+  "configId": "calibrated-b",
+  "instance": "rom21-om21-20260926t083500z-b1-exp",
+  "expectedCartCount": 4,
+  "verdict": "pass",
+  "failures": [],
+  "problems": [],
+  "checks": {
+    "run_manifest": {
+      "pass": true,
+      "detail": "run manifest consistent"
+    },
+    "logger_session": {
+      "pass": true,
+      "detail": "logger session 2 scoped and identified"
+    },
+    "audit_oracle": {
+      "pass": true,
+      "detail": "independent oracle present and PASS"
+    },
+    "agent_operations": {
+      "pass": true,
+      "detail": "4 calibrated note-block operation(s)"
+    },
+    "causal_joins": {
+      "pass": true,
+      "detail": "4 pop(s) joined to exact presses in tick order"
+    },
+    "transient_captures": {
+      "pass": true,
+      "detail": "4 transient live-inventory capture(s)"
+    },
+    "natural_void_captures": {
+      "pass": true,
+      "detail": "4 natural void capture(s) at removal"
+    },
+    "capture_timing": {
+      "pass": true,
+      "detail": "capture and removal ticks inside the calibrated windows"
+    },
+    "output_order": {
+      "pass": true,
+      "detail": "observed pop order is consistent across logger and audit"
+    },
+    "inventory_matches": {
+      "pass": true,
+      "detail": "live inventory equal across logger, audit exit and audit removal"
+    },
+    "inventory_matches_program": {
+      "pass": true,
+      "detail": "all 4 observed inventories match the sealed program exactly"
+    },
+    "restore_verified": {
+      "pass": true,
+      "detail": "guarded restore verified (order, UUID order, counts, dimension)"
+    },
+    "jar_provenance": {
+      "pass": true,
+      "detail": "logger jar(s) pinned by SHA-256 (and size+source for iteration)"
+    },
+    "source_world": {
+      "pass": true,
+      "detail": "source world (and map artifact) unchanged"
+    },
+    "answer_matches_oracle": {
+      "pass": true,
+      "detail": "4 cart(s) match the independent oracle exactly"
+    }
+  },
+  "answer": [
+    {
+      "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+      "tick": 586,
+      "seq": 12,
+      "via": "left_stack_region",
+      "items": [
+        [
+          16,
+          "minecraft:stone",
+          4
+        ],
+        [
+          22,
+          "minecraft:copper_ingot",
+          5
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 16,
+          "id": "minecraft:stone",
+          "count": 4
+        },
+        {
+          "slot": 22,
+          "id": "minecraft:copper_ingot",
+          "count": 5
+        }
+      ],
+      "digest": "22b02cf3d92f9c6a"
+    },
+    {
+      "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+      "tick": 861,
+      "seq": 14,
+      "via": "left_stack_region",
+      "items": [
+        [
+          2,
+          "minecraft:glass",
+          1
+        ],
+        [
+          13,
+          "minecraft:coal",
+          5
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 2,
+          "id": "minecraft:glass",
+          "count": 1
+        },
+        {
+          "slot": 13,
+          "id": "minecraft:coal",
+          "count": 5
+        }
+      ],
+      "digest": "be3c4d95060f082d"
+    },
+    {
+      "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+      "tick": 1136,
+      "seq": 16,
+      "via": "left_stack_region",
+      "items": [
+        [
+          0,
+          "minecraft:glass",
+          4
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 0,
+          "id": "minecraft:glass",
+          "count": 4
+        }
+      ],
+      "digest": "e2bfc003d3b85b9c"
+    },
+    {
+      "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+      "tick": 1415,
+      "seq": 18,
+      "via": "left_stack_region",
+      "items": [
+        [
+          1,
+          "minecraft:copper_ingot",
+          6
+        ],
+        [
+          2,
+          "minecraft:redstone",
+          4
+        ]
+      ],
+      "rawItems": [
+        {
+          "slot": 1,
+          "id": "minecraft:copper_ingot",
+          "count": 6
+        },
+        {
+          "slot": 2,
+          "id": "minecraft:redstone",
+          "count": 4
+        }
+      ],
+      "digest": "b0a06bc29fa55256"
+    }
+  ],
+  "oracle": [
+    {
+      "uuid": "ad270d2b-c266-4bdd-b96c-88b272598e45",
+      "tick": 723,
+      "seq": 314,
+      "items": [
+        [
+          16,
+          "minecraft:stone",
+          4
+        ],
+        [
+          22,
+          "minecraft:copper_ingot",
+          5
+        ]
+      ],
+      "digest": "4c3e522766059e4b"
+    },
+    {
+      "uuid": "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+      "tick": 998,
+      "seq": 362,
+      "items": [
+        [
+          2,
+          "minecraft:glass",
+          1
+        ],
+        [
+          13,
+          "minecraft:coal",
+          5
+        ]
+      ],
+      "digest": "7f4cb01024cc8c6b"
+    },
+    {
+      "uuid": "e90dec84-cc7b-407f-b22f-a24250138b00",
+      "tick": 1273,
+      "seq": 396,
+      "items": [
+        [
+          0,
+          "minecraft:glass",
+          4
+        ]
+      ],
+      "digest": "4466c027c317d318"
+    },
+    {
+      "uuid": "74c877d2-6345-48a6-b5ad-ca9a86848e5d",
+      "tick": 1552,
+      "seq": 416,
+      "items": [
+        [
+          1,
+          "minecraft:copper_ingot",
+          6
+        ],
+        [
+          2,
+          "minecraft:redstone",
+          4
+        ]
+      ],
+      "digest": "d517c7bdffb64abe"
+    }
+  ],
+  "observedPopOrder": [
+    "ad270d2b-c266-4bdd-b96c-88b272598e45",
+    "5a9a2853-a941-4e95-b28e-7566dd1da54b",
+    "e90dec84-cc7b-407f-b22f-a24250138b00",
+    "74c877d2-6345-48a6-b5ad-ca9a86848e5d"
+  ],
+  "popOrderSource": "observed live (logger transient captures joined to audit cart_exit/cart_remove); spawn order never assumed",
+  "pressedOperations": 4
+}

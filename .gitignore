@@ -25,3 +25,18 @@ dist/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# versioned Minecart ROM fixture assets: the map artifact, the command
+# transcripts and the raw calibration logs are part of the evidence
+!examples/minecart-rom/dist/
+!examples/minecart-rom/dist/**
+!examples/minecart-rom/**/*.log
+!examples/minecart-rom/**/*.jsonl
+
+# ROM20 cold-start evidence: canonical trajectory and canonical test-mod/
+# logger projections are review artifacts, not throwaway lab logs
+!docs/evidence/rom20-coldstart/**/*.jsonl
+
+# ROM21 regression evidence: raw agent-logger JSONL and projected audit
+# samples are review artifacts, not throwaway lab logs
+!docs/evidence/rom21-regression/**/*.jsonl

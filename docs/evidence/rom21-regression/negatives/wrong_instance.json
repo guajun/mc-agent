@@ -1,0 +1,13 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "wrong_instance",
+  "kind": "offline",
+  "injected": "logger instance/run id changed to a different instance",
+  "expectedCheck": "logger_session",
+  "verdict": "fail",
+  "failedChecks": [
+    "logger_session"
+  ],
+  "failClosed": true,
+  "runId": "rom21-20260926T083500Z-a1"
+}

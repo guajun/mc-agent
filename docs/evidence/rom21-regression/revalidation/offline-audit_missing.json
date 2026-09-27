@@ -1,0 +1,20 @@
+{
+  "format": "mc-agent/rom21-negative@1",
+  "case": "audit_missing",
+  "kind": "offline",
+  "injected": "the independent audit log removed from a copy of the run",
+  "expectedCheck": "audit_oracle",
+  "verdict": "fail",
+  "failedChecks": [
+    "logger_session",
+    "audit_oracle",
+    "agent_operations",
+    "causal_joins",
+    "answer_matches_oracle"
+  ],
+  "failClosed": true,
+  "runId": "rom21-20260926T083500Z-a1",
+  "gameExecutionHead": "c5fa37b7e902779baf5cb2daed94a3e06f87aa02",
+  "verifierHead": "8f28aea06ba3644fd06485f4338bfeda999da6bf",
+  "verifierSha256": "18bbe6da3511d19c30a936b6b64a5031facd573711b3551cfc18c44f5b4389a4"
+}
