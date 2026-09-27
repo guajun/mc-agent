@@ -2,6 +2,7 @@
 /interface-mod/
 /bridge/
 /agent-loop/
+/.worktrees/
 
 # local secrets (HERMES_API_KEY, ...)
 .env
