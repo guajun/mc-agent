@@ -37,7 +37,7 @@ accepts `--target` unless it manages targets or the daemon itself.
 | `target list` / `show NAME` / `remove NAME` / `use NAME` / `reload` | - | target management; credentials are never printed |
 | `capabilities` / `caps` | daemon | supported and unsupported operations for the instance |
 | `schema [op]` | daemon (full params) | operation contract and parameter schema |
-| `call <op> [--params JSON] [--param key=value] [--timeout SECONDS]` | daemon | raw operation call |
+| `call <op> [--params JSON] [--param key=value] [--request-id ID] [--timeout SECONDS]` | daemon | raw operation call; `--request-id` only exists here |
 | `state` | `state` | world/server state, tick, level, world dir, online players |
 | `player <name\|uuid>` | `player` | server-known context and live view target |
 | `entities [--radius N]` | `entities` | summarised entity list |
@@ -49,7 +49,7 @@ accepts `--target` unless it manages targets or the daemon itself.
 | `save` | `state` | world-save metadata |
 | `snapshot [--name N] [--dimension D] [--radius R]` | `snapshot` | write an entity-order snapshot on the game host |
 | `snapshots` | `snapshot` | list snapshots on the instance |
-| `events [--since N] [--limit N] [--category C] [--follow]` | daemon | replay/stream buffered events |
+| `events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | daemon | replay/stream buffered events by (streamId, seq) |
 | `requests` | daemon | unknown-write ledger |
 | `request-status <id>` | daemon | resolved/unknown state of one write |
 | `exclusive-acquire/renew/release/status <key> [--ttl S]` | daemon | cross-daemon leases |
@@ -116,20 +116,35 @@ player.
 `events` returns:
 
 ```jsonc
-{"events":[ ... ], "next": 42, "dropped": false, "truncated": false, "streamId":"..."}
+{"events":[ ... ], "next": 42, "dropped": false, "truncated": false,
+ "streamId":"...", "reset": false}
 ```
 
-- pass `next` back as `since` for incremental reads;
-- `truncated: true` means more events exist past `limit`; ask again;
+The cursor is a **(streamId, seq)** pair; persist both. Call with
+`--stream-id <id> --since <seq>`:
+
+- `reset: true` (with the new `streamId`) means the cursor belongs to another
+  daemon run (the local sequence resets on restart); start again from 0 on the
+  new stream instead of trusting the old position;
+- `truncated: true` means more events exist past `limit`; ask again with
+  `next`. It is not loss;
 - `dropped: true` means the ring buffer no longer reaches your cursor;
+- a plain sequence jump with `--category`/`--target` filters is not loss
+  (unrelated events consume sequence numbers);
+- `--follow` subscribes first, pages the whole replay, then streams live with
+  sequence de-duplication and emits `{"type":"stream","event":"gap"}` when a
+  client-side overflow was recovered from the last delivered sequence;
 - `game_restarted` (run id change) never replays across the restart;
 - `event_gap` reports a gap the daemon noticed; treat it as loss, not silence.
 
-No automatic replay of non-idempotent writes happens on reconnect. The daemon
-persists each write in the unknown-write ledger before it leaves the process,
-resolves it with the server's `request_status` when the link returns, and keeps
-it visible as `unresolved` when the server has no record. `requests` lists the
-ledger; `request-status <id>` queries one entry.
+No automatic replay of non-idempotent writes happens on reconnect. Each write
+is assigned a stable end-to-end request id (`cli-<nonce>-<n>`, or an explicit
+`mc-agent call --request-id <id>`) before it is sent, persisted in the
+unknown-write ledger, and resolved with the server's `request_status` when the
+link returns; if the server has no record the entry stays visible as
+`unresolved`. A lost local reply produces `resultUnknown: true` with the same
+`requestId` and a `hint` to resolve it with `request-status`. `requests` lists
+the ledger; `request-status <id>` queries one entry.
 
 ## Target setup and discovery
 

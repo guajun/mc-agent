@@ -79,12 +79,16 @@ It belongs in the agent when it requires judgement.
 
 ## Events, reconnects and context
 
-The daemon buffers events and exposes cursored replay. Reconnects are reported
-instead of hidden: `bridge_connected`/`bridge_disconnected`, `event_gap` when
-the buffer no longer reaches the cursor, `game_restarted` when the run id
-changes (no replay crosses a restart), and `request_resolved` when an unknown
-write becomes known. Non-idempotent writes are never replayed automatically;
-the ledger persists them and `request-status` reports their outcome.
+The daemon buffers events and exposes cursored replay. A cursor is a
+`(streamId, seq)` pair: `events --stream-id <id> --since <seq>` reports
+`reset: true` when the cursor belongs to another daemon run, `dropped` for
+buffer eviction, and `truncated` only when more pages exist (not loss).
+Reconnects are reported instead of hidden: `bridge_connected`/
+`bridge_disconnected`, `event_gap`, `game_restarted` (no replay crosses a
+restart), and `request_resolved` when an unknown write becomes known.
+Non-idempotent writes are never replayed automatically; each write carries a
+stable end-to-end request id, the ledger persists it, and `request-status`
+reports the outcome (`resultUnknown` errors include the id and a resolve hint).
 
 The optional webhook sends selected events to one HTTP(S) receiver using
 HMAC-SHA256 signatures. It is receiver-neutral, in-memory, best effort and

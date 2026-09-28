@@ -69,9 +69,16 @@ Minecraft 26.2 把 gamerule 改为 `snake_case`：
 | `randomTickSpeed` | `random_tick_speed` |
 | `doDaylightCycle` | `advance_time` |
 
+### daemon 重启后返回 `reset: true`
+
+事件游标是 `(streamId, seq)` 对。`reset: true` 表示游标属于另一次 daemon 运行：
+保存新的 `streamId` 并从 `--since 0` 重新开始，不要把旧位置当作有效。
+`truncated: true` 只表示还有下一页；`dropped: true` 才是真正的丢失信号。
+
 ### 写操作超时且 `resultUnknown`
 
-不要盲目重放。查看 `mc-agent request-status <id>` 与 `mc-agent requests` 账本：
+错误会携带稳定的 request id 和解析提示。不要盲目重放：查看 `mc-agent request-status <id>`
+与 `mc-agent requests` 账本：
 在服务器认领之前就超时的请求会被取消、可以安全重试；已经在运行的会保留账本条目，
 直到服务器报告最终状态。如果服务器没有记录（例如游戏重启），条目保持 `unresolved`，
 由运营者决定。

@@ -72,7 +72,10 @@ Toolkit 是本地基础设施，不是智能体运行时。它暴露事实与基
 
 ## 事件、重连与上下文
 
-daemon 缓冲事件并提供游标回放。重连会明确报告而不是隐藏：`bridge_connected` /
+daemon 缓冲事件并提供游标回放。游标是 `(streamId, seq)` 对：
+`events --stream-id <id> --since <seq>` 在游标属于另一次 daemon 运行时返回
+`reset: true`，`dropped` 表示缓冲区淘汰，`truncated` 仅表示还有分页（不是丢失）。
+重连会明确报告而不是隐藏：`bridge_connected` /
 `bridge_disconnected`、缓冲无法到达游标时的 `event_gap`、run id 变化时的
 `game_restarted`（不跨重启回放），以及未知写变为已知时的 `request_resolved`。
 非幂等写不会自动重放；账本持久化它们，`request-status` 报告结果。

@@ -1,10 +1,10 @@
 ---
 name: minecraft-toolkit
-description: Operate a Minecraft world through the local mc-agent Toolkit (Go CLI + daemon). Use for Minecraft requests, connection checks, in-game chat or forwarded events, and controlled experiments. Covers CLI discovery, daemon reconnect and event cursors, player/context identity, authoritative queries, scoped commands, unknown-write results, and unsupported-capability boundaries.
+description: Operate a Minecraft world through the local mc-agent Toolkit (Go CLI + daemon). Use for Minecraft requests, connection checks, in-game chat or forwarded events, and controlled experiments. Covers CLI discovery, daemon reconnect and (streamId, seq) event cursors, player/context identity, authoritative queries, scoped commands, unknown-write request ids, and unsupported-capability boundaries.
 license: MIT
 metadata:
   author: mc-agent
-  version: "0.3.0"
+  version: "0.3.1"
 ---
 
 # Minecraft Toolkit
@@ -138,7 +138,7 @@ Ask for the minimum you need; large worlds answer with large payloads.
 | Chat-time context | `mc-agent context <id>` | bundle by `context_id` |
 | Run a command | `mc-agent command "<line>"` | write; returns `writeSeq`; no leading slash |
 | Run a command and read its answer | `mc-agent command-output "<line>" [--wait S]` | use when the reply matters |
-| Events | `mc-agent events [--since N] [--limit N] [--category C]` | replay by cursor |
+| Events | `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C]` | replay by (streamId, seq) cursor |
 | Watch events | `mc-agent events --follow` | one JSON value per line |
 | Save metadata / snapshots | `mc-agent save`, `mc-agent snapshots` | reads |
 | Entity-order snapshot | `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | write; the game host writes files |
@@ -154,21 +154,34 @@ Skill, and treat this Toolkit as the observable primitive layer.
 ## 5. Events, reconnects and unknown results
 
 The daemon keeps a bounded replay buffer and reports connection state per
-target. Every event has a stable sequence. After a gap, `events` returns
-`truncated: true` (or `dropped` for evicted entries) - ask again with `since`
-= the returned `next`; never assume continuity.
+target. An event cursor is a **(streamId, seq) pair**: the stream id binds the
+sequence to one daemon run, so a stale cursor is detected instead of silently
+returning nothing. Read with `mc-agent events --stream-id <id> --since <seq>`
+and persist both values from the reply.
 
-- `bridge_connected` / `bridge_disconnected` mark link changes.
-- `event_gap` means the replay buffer can no longer reach your last sequence.
-- `game_restarted` means the run id changed; no replay crosses a restart.
-- `request_resolved` means a write whose outcome was unknown became known.
+- `reset: true` (with the new `streamId`) means the cursor belongs to another
+daemon run (restart); restart the cursor at 0 against the new stream.
+- `dropped: true` is buffer eviction: events you asked for are gone. A
+  `--follow` gap is a machine-readable marker (`{"type":"stream","event":"gap"}`),
+  and live overflow is recovered from the last delivered sequence.
+- `truncated: true` only means more pages exist past the limit - ask again with
+  `next`; it is **not** loss.
+- A sequence jump with a `--category`/`--target` filter is not loss either;
+  unrelated events consume sequence numbers legitimately.
+- `bridge_connected` / `bridge_disconnected` mark link changes; `event_gap`
+  reports a real gap; `game_restarted` means the run id changed (no replay
+  crosses a restart); `request_resolved` means a write whose outcome was
+  unknown became known.
 
 Non-idempotent writes (`command`, `mark`, `snapshot`, client `chat`/`world`)
-are never resent automatically. If a write returns `resultUnknown` or the
-daemon reports it as `unresolved`, do not repeat it blindly: check
-`mc-agent request-status <id>` (and the `requests` ledger) and let the operator
-decide. A request that timed out before the server claimed it is safe to
-retry; one that was already running keeps its ledger entry until the server
+are never resent automatically. Each write gets a stable end-to-end request id
+(`cli-<nonce>-<n>`; `mc-agent call --request-id <id>` accepts an explicit one)
+before anything is sent, and the daemon persists it in the unknown-write
+ledger. If the reply is lost, the CLI reports `resultUnknown: true` with the
+same id and a `hint` to resolve it. Do not repeat it blindly: check
+`mc-agent request-status <id>` (and the `requests` ledger) and let the
+operator decide. A request the transport knows was never sent is retryable;
+one that may have been delivered keeps its ledger entry until the server
 reports the final state.
 
 ## 6. Act within your mandate
@@ -248,7 +261,7 @@ delivery as authorization.
 | Operation reported unsupported with a `dependency` | the connected mod is older or the operation is not provided; report the dependency, do not fall back |
 | `context` returns `not_found`/`expired` | mistyped id, expired TTL, or evicted - use a fresh event |
 | Two players chat close together | each event has its own `context_id`; keep them separate |
-| `resultUnknown` after a write timeout | check `request-status`; do not replay blindly |
+| `resultUnknown` after a write timeout | the error carries the request id and a hint; check `request-status`; do not replay blindly |
 | Game restarted | run id changed; re-query `state`; do not replay old writes |
 
 ## Reference

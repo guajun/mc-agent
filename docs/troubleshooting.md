@@ -73,9 +73,17 @@ Minecraft 26.2 renamed the gamerules to `snake_case`:
 | `randomTickSpeed` | `random_tick_speed` |
 | `doDaylightCycle` | `advance_time` |
 
+### `reset: true` after a daemon restart
+
+The event cursor is a `(streamId, seq)` pair. `reset: true` means the cursor
+belongs to another daemon run: persist the new `streamId` and start from `since
+0` instead of treating the old position as valid. `truncated: true` only means
+another page is available; `dropped: true` is the actual loss signal.
+
 ### A write timed out with `resultUnknown`
 
-Do not repeat it blindly. Check `mc-agent request-status <id>` and the
+The error carries the stable request id and a `hint` to resolve it. Do not
+repeat it blindly: check `mc-agent request-status <id>` and the
 `mc-agent requests` ledger; a request that timed out before the server claimed
 it is cancelled and safe to retry, while one that was already running keeps its
 entry until the server reports the final state. If the server has no record

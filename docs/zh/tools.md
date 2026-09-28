@@ -15,7 +15,7 @@ Minecraft Agent Toolkit 由 `mc-agent` Go 二进制实现。实时的 **capabili
 | `mc-agent doctor` | 版本、状态目录、目标、daemon、TLS 与能力检查 |
 | `mc-agent daemon start` / `run` / `stop` / `status` / `doctor` | daemon 生命周期 |
 | `mc-agent target add/list/show/remove/use/reload` | 目标与凭证管理 |
-| `mc-agent capabilities`、`mc-agent schema [op]`、`mc-agent call <op>` | 发现并调用操作 |
+| `mc-agent capabilities`、`mc-agent schema [op]`、`mc-agent call <op> [--request-id ID]` | 发现并调用操作；`--request-id` 仅存在于 `call` |
 | `mc-agent status` | daemon 与每个目标的连接状态 |
 | `mc-agent state` | 权威世界/tick 状态与在线玩家 |
 | `mc-agent player <name\|uuid>` | 按 UUID（或名字）解析玩家并返回实时上下文/视线 |
@@ -23,7 +23,7 @@ Minecraft Agent Toolkit 由 `mc-agent` Go 二进制实现。实时的 **capabili
 | `mc-agent entities [--radius N]` | 附近实体摘要 |
 | `mc-agent command "<line>"` | 执行命令（写；返回 `writeSeq`） |
 | `mc-agent command-output "<line>" [--wait S]` | 执行命令并读取回答 |
-| `mc-agent events [--since N] [--limit N] [--category C] [--follow]` | 回放或流式读取事件 |
+| `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | 按 (streamId, seq) 游标回放或流式读取事件 |
 | `mc-agent requests`、`mc-agent request-status <id>` | 未知写账本与查询 |
 | `mc-agent save`、`mc-agent snapshots` | 存档元数据与快照列表 |
 | `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | 在游戏主机写入实体顺序快照 |

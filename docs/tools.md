@@ -16,7 +16,7 @@ Global options: `--home DIR`, `--target NAME`, `--pretty`.
 | `mc-agent doctor` | version, state dir, targets, daemon, TLS and capability checks |
 | `mc-agent daemon start` / `run` / `stop` / `status` / `doctor` | daemon lifecycle |
 | `mc-agent target add/list/show/remove/use/reload` | target and credential management |
-| `mc-agent capabilities`, `mc-agent schema [op]`, `mc-agent call <op>` | discover and call operations |
+| `mc-agent capabilities`, `mc-agent schema [op]`, `mc-agent call <op> [--request-id ID]` | discover and call operations; `--request-id` exists only on `call` |
 | `mc-agent status` | daemon and per-target connection state |
 | `mc-agent state` | authoritative world/tick state and online players |
 | `mc-agent player <name\|uuid>` | resolve a player by UUID (or name) and return live context/view |
@@ -24,7 +24,7 @@ Global options: `--home DIR`, `--target NAME`, `--pretty`.
 | `mc-agent entities [--radius N]` | nearby entities, summarised |
 | `mc-agent command "<line>"` | issue a command (write; returns `writeSeq`) |
 | `mc-agent command-output "<line>" [--wait S]` | issue a command and read its answer |
-| `mc-agent events [--since N] [--limit N] [--category C] [--follow]` | replay or stream buffered events |
+| `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | replay or stream buffered events by (streamId, seq) cursor |
 | `mc-agent requests`, `mc-agent request-status <id>` | unknown-write ledger and lookup |
 | `mc-agent save`, `mc-agent snapshots` | world-save metadata and snapshot list |
 | `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | entity-order snapshot written on the game host |
