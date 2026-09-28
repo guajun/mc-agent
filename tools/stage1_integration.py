@@ -768,12 +768,13 @@ class Driver:
         self._probes(rec, summary, jar_path, jar_path, interface_extra)
         self._audit_mod(rec, summary, interface_extra)
         # Final traced steps: real coverage for the gate's terminal/file/source
-        # and mcp categories, all before the run is frozen.
+        # and cli categories, all before the run is frozen. MCP was removed in
+        # mc-agent-bridge#12; the Go CLI is the product surface.
         rec.run("pin-revisions", ["git", "rev-parse", "HEAD"], tool="git", instance=labs["src"].name)
         rec.run(
-            "mcp-probe-help",
-            [PY, str(ROOT / "tools" / "mcp_probe.py"), "--help"],
-            tool="mcp_probe",
+            "cli-version",
+            ["mc-agent", "version"],
+            tool="cli",
             instance=labs["exp"].name,
         )
         marker = base / "build" / "INTEGRATION-MARKER.txt"

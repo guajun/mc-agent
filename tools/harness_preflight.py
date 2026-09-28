@@ -451,6 +451,7 @@ def check_build_install(config: dict[str, Any], probe: Probe, out_dir: Path) -> 
 
 
 def bridge_command(config: dict[str, Any]) -> str:
+    """Resolve the legacy Python bridge command (smoke/loop path)."""
     configured = str((config.get("bridge") or {}).get("command") or "")
     if configured:
         return configured
@@ -463,27 +464,38 @@ def bridge_command(config: dict[str, Any]) -> str:
     return "mc-bridge"
 
 
+def product_command(config: dict[str, Any]) -> str:
+    """Resolve the released Go CLI (the only supported product surface)."""
+    configured = str((config.get("bridge") or {}).get("productCommand") or "")
+    if configured:
+        return configured
+    found = shutil.which("mc-agent") or shutil.which("mc-agent.exe")
+    if found:
+        return found
+    return "mc-agent"
+
+
 def check_bridge_cli(config: dict[str, Any], probe: Probe) -> dict[str, Any]:
-    command = bridge_command(config)
-    result = probe.command("bridge-cli", resolved_argv(command, ["--help"]), timeout=60)
+    command = product_command(config)
+    result = probe.command("bridge-cli", resolved_argv(command, ["version"]), timeout=60)
+    if result["exit_code"] == 0:
+        return check_result("bridge_cli", True, "mc-agent CLI answered version", [result])
     return check_result(
         "bridge_cli",
-        result["exit_code"] == 0,
-        "mc-bridge CLI answered --help" if result["exit_code"] == 0 else "mc-bridge CLI is not runnable",
+        False,
+        "mc-agent CLI is not runnable; install the released binary (MCP is removed, the CLI is the product surface)",
         [result],
     )
 
 
 def check_bridge_mcp(config: dict[str, Any], probe: Probe) -> dict[str, Any]:
-    command = bridge_command(config)
-    result = probe.command("bridge-mcp", resolved_argv(command, ["mcp", "--help"]), timeout=60)
-    if result["exit_code"] == 0:
-        return check_result("bridge_mcp", True, "mc-bridge MCP front-end answers --help", [result])
+    # MCP was removed in mc-agent-bridge#12; keep the check id for historical
+    # bundles but never run an MCP path again.
     return {
         "id": "bridge_mcp",
         "status": "SKIP",
-        "detail": "MCP front-end unavailable; the JSON CLI (checked separately) is the accepted surface",
-        "evidence": [result],
+        "detail": "MCP was removed in mc-agent-bridge#12; the mc-agent CLI is the only supported surface",
+        "evidence": [],
         "versions": {},
     }
 
