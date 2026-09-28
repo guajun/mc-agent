@@ -43,6 +43,7 @@ nav:
       - "Unattended Hermes: webhook + Skill": hermes-unattended.md
       - Running the agent on Hermes: hermes-setup.md
       - Who is the agent in game: player-identity.md
+      - Multi-daemon write coordination: coordination.md
       - Forking a live world: protocol-snapshot.md
       - Headless lab servers: lab-server.md
       - Building a mod for a lab: mod-building.md
