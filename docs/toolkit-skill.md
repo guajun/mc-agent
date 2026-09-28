@@ -17,14 +17,26 @@ with one supporting reference,
 
 | Step | What the agent does |
 | --- | --- |
+| Reconnect | checks existing MCP tools with `mc_status` / `mc_capabilities`; reuses healthy services without routinely asking the user to open a terminal |
 | Discover | calls `mc_capabilities` (MCP) or `mc-bridge call capabilities` (CLI) first; calls only operations the connected mod advertises |
 | Resolve | finds the caller in `state` and asks the `player` operation by UUID; a name is a convenience, the reply's UUID is the identity |
 | Correlate | takes `context_id` from a pushed game event and fetches the bundle with `context`; never rebuilds the id from a player name |
 | Query | requests the minimum it needs: `state`, `entities`, `save` metadata, `snapshots`, or `events` by cursor |
 | Act | uses `command` / `command_output` within its task, treats chat identity as context (not authorization), and reports unsupported operations instead of faking them |
+| Experiment | repeats trials at the same dimension and full X/Y/Z; restores and checks the baseline, changes only the declared variable, and records observed outcomes |
 
 The skill is deliberately discovery-first: the Toolkit's capability reply is the
 authority, so the instructions stay correct as the mod gains operations.
+
+For experiments, the same X/Z at a different height is not an in-place repeat.
+Height/location may vary when explicitly selected as the independent variable.
+If baseline restoration cannot be verified, the agent must report the limitation
+instead of presenting a relocated test as a controlled comparison.
+
+These are harness-side behavioral instructions. The Toolkit does not enforce
+them as command guards. After updating an installed copy, verify the actual run
+loads `minecraft-toolkit` and follows the connection and experiment guidance;
+an enabled entry in the skill list alone does not establish that.
 
 ## Prerequisites
 

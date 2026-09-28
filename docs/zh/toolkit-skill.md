@@ -15,14 +15,23 @@ Skill 位于本仓库
 
 | 步骤 | 智能体做什么 |
 | --- | --- |
+| 重连 | 先用 `mc_status` / `mc_capabilities` 检查已有 MCP 工具；复用健康服务，不例行要求用户打开终端 |
 | 发现 | 先调 `mc_capabilities`（MCP）或 `mc-bridge call capabilities`（CLI）；只调连接的 mod 声明的操作 |
 | 解析 | 从 `state` 找到调用者，用 UUID 调 `player` 操作；名字只是便利，回包里的 UUID 才是身份 |
 | 关联 | 从推送来的游戏事件里取 `context_id`，用 `context` 取回上下文包；绝不按玩家名重建这个 id |
 | 查询 | 只取需要的：`state`、`entities`、`save` 元数据、`snapshots`，或用游标读 `events` |
 | 行动 | 在任务范围内使用 `command` / `command_output`；聊天里的身份是上下文不是授权；不支持的操作如实报告，不编造兜底 |
+| 实验 | 在同一维度、完整 X/Y/Z 不变的位置复测；恢复并核验初始状态，只改变声明的变量，记录实际观测结果 |
 
 Skill 刻意以"先发现"开头：Toolkit 的能力回包才是权威，mod 增加操作后说明依旧
 正确。
+
+同 XZ、不同高度不能算原地复测；只有显式把高度或位置选作自变量时才应改变它。
+如果无法验证初始状态已恢复，应报告限制，不得把异地测试当作受控对照实验。
+
+这些约束属于 harness 侧的行为指令，Toolkit 没有通过命令守卫强制执行。
+更新已安装副本后，要检查实际运行是否加载 `minecraft-toolkit` 并遵循接入和
+实验约束；仅在 skill 列表里显示 enabled 不能证明它已经生效。
 
 ## 前置条件
 

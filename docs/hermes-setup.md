@@ -41,8 +41,9 @@ component duplicates the other's job.
 
 ## Use the Toolkit interactively today
 
-Start the daemon and register its MCP adapter with Hermes using the MCP
-configuration supported by the installed Hermes version:
+For first-time deployment, start the daemon and register its MCP adapter with
+Hermes using the MCP configuration supported by the installed Hermes version.
+Skip these steps when the existing connection is healthy:
 
 ~~~powershell
 mc-bridge run
@@ -54,11 +55,25 @@ Start a new Hermes session after changing MCP configuration. First call
 **mc_status** and **mc_capabilities**. Use **mc_player** for current caller
 context and **mc_context** only when a received event supplies a **context_id**.
 
+For subsequent sessions, the agent should inspect its existing MCP tools and
+run those probes itself. It should not routinely ask the user to open a
+terminal or repeat registration. If a probe fails, report the actual failure
+and recover through the deployment's authorized procedure; ask for a specific
+operator action only when the agent lacks the access needed to recover.
+An MCP-only route can perform supported game operations without terminal tools.
+
 Install the portable Skill with the commands in
 [Installing the Toolkit Skill](toolkit-skill.md). Hermes has no native
 **gh skill** target; the verified path installs it into the Hermes custom Skill
 directory. Configure the webhook route, restricted MCP toolset and delivery
 target with [Hermes unattended operation](hermes-unattended.md).
+
+The Skill also requires controlled experiments to use the same dimension and
+full X/Y/Z coordinates by default, restoring and checking the baseline before
+each trial. Copies at the same X/Z but different Y are not in-place repeats.
+Verify that the run actually loads the updated `minecraft-toolkit` Skill;
+installation alone does not prove it was included in the model context. These
+are agent instructions, not a command validator enforced by the Toolkit.
 
 ## Configure the event sender
 
