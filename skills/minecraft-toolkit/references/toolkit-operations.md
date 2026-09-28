@@ -1,184 +1,183 @@
 # Toolkit operation reference
 
-Details behind [SKILL.md](../SKILL.md): the operation catalog, the MCP and CLI
-invocation forms, the event and context shapes, endpoint discovery, and cursors.
+Details behind [SKILL.md](../SKILL.md): the command catalog, parameter and
+event shapes, error codes, target setup, cursors and the webhook contract.
 
-The connected mod's capability reply is the authority. The bridge filters this
-catalog against it and reports anything else as unsupported, with an upstream
-dependency when the supporting mod API has not shipped yet.
+The connected mod's capability reply is the authority. The daemon filters the
+catalog against it and reports anything else as `capability_not_supported`,
+with an upstream dependency when the supporting mod API has not shipped yet.
 
 ## Surfaces
 
-| Surface | Start | Call |
+| Surface | How to use it |
+| --- | --- |
+| CLI | `mc-agent <command>`; one JSON value on stdout, errors on stderr |
+| Daemon | `mc-agent daemon start` (detached) or `daemon run` (foreground/supervised) |
+| Local IPC | token-protected loopback socket; the CLI uses it automatically |
+| Remote transport | `target add ... --transport remote`; the daemon speaks TLS to the mod |
+| Legacy transport | `target add ... --transport legacy` for the pre-0.8 loopback adapter |
+
+There is no MCP server and no Python bridge in the product path. The optional
+webhook is outbound-only; the daemon never calls a model and never manages a
+harness session.
+
+## Command catalog
+
+Global options: `--home DIR`, `--target NAME` / `-t`, `--pretty`. Every command
+accepts `--target` unless it manages targets or the daemon itself.
+
+| Command | Requires | What it does |
 | --- | --- | --- |
-| MCP (preferred) | the harness spawns `mc-bridge mcp` (stdio) | one `mc_*` tool per operation |
-| JSON CLI | `mc-bridge run` keeps the daemon alive | `mc-bridge call <operation> '<json>'` |
-| Raw loopback API | `mc-bridge run` | newline-delimited JSON on `127.0.0.1:8765` (`MC_AGENT_API_HOST`, `MC_AGENT_API_PORT`) |
+| `version` | - | product, control protocol and mod minimum |
+| `doctor` | - | version, state dir, targets, daemon, TLS and capability checks |
+| `status` | daemon | daemon and per-target connection state |
+| `daemon run` | - | foreground daemon (accepts webhook flags) |
+| `daemon start` / `stop` / `status` / `doctor` | - | detached daemon lifecycle |
+| `target add <name> --transport remote --address H:P (--pin sha256:HEX \| --ca FILE) [--token-stdin \| --token-env VAR \| --token-file FILE] [--default]` | - | register a server; `--force` replaces |
+| `target list` / `show NAME` / `remove NAME` / `use NAME` / `reload` | - | target management; credentials are never printed |
+| `capabilities` / `caps` | daemon | supported and unsupported operations for the instance |
+| `schema [op]` | daemon (full params) | operation contract and parameter schema |
+| `call <op> [--params JSON] [--param key=value] [--timeout SECONDS]` | daemon | raw operation call |
+| `state` | `state` | world/server state, tick, level, world dir, online players |
+| `player <name\|uuid>` | `player` | server-known context and live view target |
+| `entities [--radius N]` | `entities` | summarised entity list |
+| `context <id>` | `context` | chat-time context bundle by `context_id` |
+| `command <line>` | `command` | write; returns `writeSeq` |
+| `command-output <line> [--wait S]` | `command` | write plus collected output |
+| `mark <text>` | `mark` | write; annotates the event stream |
+| `wait <ticks>` | `wait` | block until the game advanced |
+| `save` | `state` | world-save metadata |
+| `snapshot [--name N] [--dimension D] [--radius R]` | `snapshot` | write an entity-order snapshot on the game host |
+| `snapshots` | `snapshot` | list snapshots on the instance |
+| `events [--since N] [--limit N] [--category C] [--follow]` | daemon | replay/stream buffered events |
+| `requests` | daemon | unknown-write ledger |
+| `request-status <id>` | daemon | resolved/unknown state of one write |
+| `exclusive-acquire/renew/release/status <key> [--ttl S]` | daemon | cross-daemon leases |
+| `chat` / `screen` / `connect` / `world` / `lan` / `record-start` / `record-stop` | legacy client vantage | client-only operations |
 
-MCP tools follow the `mc_<operation>` convention (for example `mc_state`,
-`mc_player`, `mc_context`). Use `mc_capabilities` / `mc-bridge call
-capabilities` to confirm which ones this connection actually exposes before
-relying on a name.
+`fork`, `restore`, `order` and `stop`-style Python operations are not part of
+the Go CLI. Remote targets refuse fork/restore: local file snapshots need the
+daemon host to read the game's world directory, and a remote path is never
+interpreted as a local one. Entity snapshots are not process-memory
+checkpoints, and full freeze/re-attach guarantees are not claimed.
 
-## Operation catalog
+`command-output` returns output from the command ack (`source: "ack"`) or, when
+needed, from the event buffer; use it when the reply matters.
 
-| Operation | MCP tool | CLI | Requires | What it does |
-| --- | --- | --- | --- | --- |
-| `status` | `mc_status` | `mc-bridge call status` | - | bridge health: connection, resolved port/vantage, buffered events |
-| `capabilities` | `mc_capabilities` | `mc-bridge call capabilities` | - | the connected mod's capabilities and the filtered operation surface |
-| `state` | `mc_state` | `mc-bridge call state` | `state` | world/server state and the online player list |
-| `player` | `mc_player` | `mc-bridge call player '{"player":"<uuid>"}'` | player context | one player's server-known context and view target |
-| `entities` | `mc_entities` | `mc-bridge call entities '{"radius":64}'` | `entities` | summarised entity list: counts by type plus the closest N |
-| `command` | `mc_command` | `mc-bridge call command '{"command":"time set day"}'` | `command` | run a command, without the leading slash |
-| `command_output` | `mc_command_output` | `mc-bridge call command_output '{"command":"time set day"}'` | `command` | run a command and collect the answer it produced |
-| `events` | `mc_events` | `mc-bridge call events '{"since":0}'` | - | replay buffered events after a cursor |
-| `context` | `mc_context` | `mc-bridge call context '{"id":"<context_id>"}'` | chat context | fetch a chat-time context bundle by `context_id` |
-| `save` | `mc_save` | `mc-bridge call save` | `state` | world-save metadata reported by `state` (`levelName`, `worldDir`, whether that directory exists on this host) |
-| `snapshot` | `mc_snapshot` | `mc-bridge call snapshot '{"name":"before"}'` | `snapshot` | write the entity set, in tick order, to the instance's disk |
-| `snapshots` | `mc_snapshots` | `mc-bridge call snapshots` | `snapshot` | list snapshots already on the instance |
-| `fork` | `mc_fork` | `mc-bridge call fork '{"name":"before"}'` | `snapshot`, `command` | freeze, save, snapshot entities, copy the world, resume |
-| `restore` | `mc_restore` | `mc-bridge call restore '{"directory":"<dir>","dry_run":true}'` | `command` | summon a fork's entities back in the recorded order |
-| `order` | `mc_order` | `mc-bridge call order '{"directory":"<dir>"}'` | `snapshot` | compare a fresh snapshot's order hash with a saved fork |
-| `wait` | `mc_wait` | `mc-bridge call wait '{"ticks":20}'` | `wait` | block until the game advanced N ticks |
-| `mark` | `mc_mark` | `mc-bridge call mark '{"text":"start"}'` | `mark` | annotate the event stream |
-| `chat` | `mc_chat` | `mc-bridge call chat '{"message":"..."}'` | `chat` | send chat as the client-vantage player (client only) |
-| `record_start` / `record_stop` | `mc_record_start` / `mc_record_stop` | `mc-bridge call record_start '{"ticks":200}'` | `record` | per-tick entity sampling (client only) |
-| `screen` | `mc_screen` | `mc-bridge call screen` | `screen` | current client GUI screen (client only) |
-| `connect` | `mc_connect` | `mc-bridge call connect '{"address":"host:port"}'` | `connect` | join a server (client only) |
-| `world` | `mc_world` | `mc-bridge call world '{"level":"<name>"}'` | `world` | open a single-player save (client only) |
-| `lan` | `mc_lan` | `mc-bridge call lan '{"mode":"offline"}'` | `lan` | publish the single-player world to the LAN (client only) |
-| `stop` | - | `mc-bridge call stop` | - | shut the daemon down |
+## Errors and exit codes
 
-Client-only operations disappear on a server-vantage connection; the
-capability reply, not this table, decides. `command_output` is one operation:
-on the server vantage the answer comes back in the command's own ack, and on a
-client vantage the toolkit falls back to collecting it from the event buffer.
+Errors on stderr have a stable shape:
 
-## Typical sequences
-
-Look around:
-
-```bash
-mc-bridge call capabilities
-mc-bridge call state
-mc-bridge call entities '{"radius": 32, "limit": 10, "types": "minecraft:zombie"}'
+```json
+{"ok":false,"error":{"code":"timeout","message":"...","retryable":true,"resultUnknown":true,"requestId":"..."}}
 ```
 
-Handle a pushed chat event:
+| Exit | Codes |
+| --- | --- |
+| 2 | `usage` |
+| 3 | `target_required`, `target_unknown`, `not_found` |
+| 4 | `connection_failed`, `connection_lost`, `daemon_not_running` |
+| 5 | `unauthorized`, `forbidden` |
+| 6 | `capability_not_supported`, `unsupported_transport` |
+| 7 | `timeout`, `result_unknown` |
+| 1 | anything else (`internal`, `bad_request`, `game_error`) |
+
+A write with `resultUnknown: true` must not be replayed blindly; see the
+unknown-write ledger below.
+
+## Identity, context and events
+
+`state` lists online players with stable UUIDs. `player` accepts a name but the
+reply's UUID is what to carry forward:
 
 ```jsonc
-// event (from the forwarder, or mc-bridge watch --events chat)
-{
-  "eventId": "9f2c0a1b...:7",
-  "sequence": 7,
-  "streamId": "9f2c0a1b...",
-  "event": "chat",
-  "type": "chat",
-  "category": "chat",
-  "timestamp": 1730000000123,
-  "tick": 4211,
-  "sender": "Alice",
-  "context_id": "ctx-42",
-  "data": {
-    "type": "chat",
-    "seq": 7,
-    "text": "what is in front of me?",
-    "sender": "Alice",
-    "context_id": "ctx-42",
-    "context": {
-      "schema": "player-context/1",
-      "uuid": "1a2b3c4d-...",
-      "name": "Alice",
-      "tick": 4210,
-      "dimension": "minecraft:overworld",
-      "x": 103.5, "y": 95.0, "z": 52.5,
-      "yaw": 180.0, "pitch": 0.0,
-      "view": { "type": "block" }
-    }
-  }
-}
+{"type":"player_context","found":true,"uuid":"1a2b3c4d-...","name":"Alice",
+ "player":{"dimension":"minecraft:overworld","x":103.5,"y":95.0,"z":52.5,
+           "yaw":180.0,"pitch":0.0,
+           "view":{"target":"block"}}}
 ```
 
-```bash
-# fetch what Alice saw when she spoke, by the opaque id
-mc-bridge call context '{"id": "ctx-42"}'
-# then act with the live, authoritative view if the task needs it
-mc-bridge call player '{"player": "1a2b3c4d-..."}'
-```
-
-The toolkit returns a stable envelope around whatever the connected mod reports;
-`found` is the field to branch on:
+`context <id>` fetches the bundle captured with a chat event:
 
 ```jsonc
-{
-  "type": "context_bundle",
-  "id": "ctx-42",
-  "found": true,
-  "status": "ok",                    // present when the mod reports one
-  "context": {
-    "schema": "player-context/1",
-    "context_id": "ctx-42",
-    "seq": 7,
-    "capturedAt": 1730000000000,
-    "tick": 4210,
-    "timing": "receipt",             // receipt = network chat packet; broadcast = server-side say
-    "uuid": "1a2b3c4d-...",
-    "name": "Alice",
-    "dimension": "minecraft:overworld",
-    "x": 103.5, "y": 95.0, "z": 52.5,
-    "yaw": 180.0, "pitch": 0.0,
-    "view": { "...": "the ray result, in the player view's shape" }
-  }
-}
+{"type":"context_bundle","id":"ctx-42","found":true,
+ "context":{"schema":"player-context/1","context_id":"ctx-42","seq":7,
+            "capturedAt":1730000000000,"tick":4210,"timing":"receipt",
+            "uuid":"1a2b3c4d-...","name":"Alice","dimension":"minecraft:overworld",
+            "x":103.5,"y":95.0,"z":52.5,"view":{"target":"block"}}}
 ```
 
-A miss is structured and never another player's bundle:
+`timing` is `receipt` for a network chat packet and `broadcast` for a
+server-side broadcast (including a Carpet fake player's `execute as <name> run
+say ...`); a broadcast bundle is not packet-time history. A miss is structured
+(`found:false`, `status:"not_found"|"expired"`) and never substitutes another
+player.
+
+`events` returns:
 
 ```jsonc
-{ "type": "context_bundle", "id": "ctx-42", "found": false, "status": "expired", "context": null }
+{"events":[ ... ], "next": 42, "dropped": false, "truncated": false, "streamId":"..."}
 ```
 
-`timing` is the honesty field. `receipt` means the bundle was frozen when a
-network chat packet arrived. `broadcast` means a server-side broadcast - a
-Carpet fake player's `execute as <name> run say ...` is one - and is not
-packet-time history. Both are real, fetchable bundles; label them as what they
-are.
+- pass `next` back as `since` for incremental reads;
+- `truncated: true` means more events exist past `limit`; ask again;
+- `dropped: true` means the ring buffer no longer reaches your cursor;
+- `game_restarted` (run id change) never replays across the restart;
+- `event_gap` reports a gap the daemon noticed; treat it as loss, not silence.
 
-`player` wraps its answer the same way (`type: "player_context"`, `found`,
-`uuid`, `name`, and the `player` object), and `player.view` carries the live
-ray (`eye`, `direction`, `blockRange`, `entityRange`, `target`), so `found` is
-always the branch and the view is always with the player.
+No automatic replay of non-idempotent writes happens on reconnect. The daemon
+persists each write in the unknown-write ledger before it leaves the process,
+resolves it with the server's `request_status` when the link returns, and keeps
+it visible as `unresolved` when the server has no record. `requests` lists the
+ledger; `request-status <id>` queries one entry.
 
-Read a command's answer:
+## Target setup and discovery
 
 ```bash
-mc-bridge call command_output '{"command": "data get entity Alice Pos"}'
-# {"type":"command_output","command":"...","output":["..."],"source":"ack"}
+# Remote server with the control transport on the game port
+mc-agent target add dedicated --transport remote --address 203.0.113.10:25565 \
+    --pin sha256:<fingerprint> --token-stdin --default
+mc-agent daemon start
+mc-agent doctor
 ```
 
-On the server vantage the answer comes back in the command ack
-(`source: "ack"`); on a client vantage the toolkit collects it from the event
-buffer (`source: "events"`), which is why that call can take a few seconds.
+- The mod writes the certificate fingerprint to
+  `<gameDir>/mc-agent-server/control/fingerprint.txt`; the credential is minted
+  on the server console with `/mcagent control token add ...`. Pass it on
+  stdin, never on the command line that gets logged.
+- `--ca FILE [--server-name NAME]` verifies with a CA/PEM instead of a pin.
+  Verification is always on.
+- `target list`/`show`/`doctor` report the credential source (`store`, `env`,
+  `file`) but never the secret.
+- `daemon start` picks a random loopback IPC port; the CLI reads the state
+  file. `MC_AGENT_DAEMON_ADDR` + `MC_AGENT_IPC_TOKEN` cover containers and
+  remote shells.
 
-## Events and cursors
+Legacy transport (pre-0.8 loopback JSON lines) uses
+`--transport legacy [--server-dir DIR | --port-file FILE | --address H:P]` and
+`--vantage client|server`; it exists for older mods and the explicit client
+vantage, not as a fallback for a failed remote connection.
 
-`events` returns `{"events": [...], "next": <cursor>, "dropped": <bool>}`. Pass
-`next` back as `since` to poll incrementally; `dropped: true` means the ring
-buffer discarded events you never saw. Categories include `chat`, `game`,
-`mark`, `sample`, `error`, `other`. `mc-bridge watch --events chat,game` streams
-the same records as JSON lines for a human or a terminal-driven harness.
+## Webhook contract
 
-## Endpoint discovery
+Optional and off by default. Start the daemon in the foreground (or under a
+service manager) with webhook flags; `daemon start` does not accept them:
 
-The Toolkit targets the server vantage:
+```bash
+mc-agent daemon run --webhook-url https://receiver.example/hook \
+    --webhook-secret "$SECRET" --webhook-events chat,game,mark,error
+```
 
-- port file: `<gameDir>/mc-agent-server/port.txt`;
-- `--server-dir <gameDir>` (or `MC_AGENT_SERVER_DIR`) when the game directory is
-  not the working directory;
-- `--port-file <path>` (or `MC_AGENT_PORT_FILE`) for the exact file;
-- `--mod-port <port>` when the port is known and no file exists.
+`MC_AGENT_WEBHOOK_URL`, `MC_AGENT_WEBHOOK_SECRET`, `MC_AGENT_WEBHOOK_EVENTS`,
+`MC_AGENT_WEBHOOK_CONFIG` and `--webhook-config` are also accepted. Delivery
+is best-effort, in-memory and bounded; queued events are lost on daemon
+restart.
 
-No client-port guessing happens. `--vantage client` (client port file
-`<gameDir>/mc-agent/port.txt`, default 25580) exists only for an explicit legacy
-setup. The MCP front-end talks to the daemon, not the game: `MC_AGENT_API_HOST`
-and `MC_AGENT_API_PORT` (default `127.0.0.1:8765`).
+Every POST carries a stable event id, timestamp, event type and attempt number,
+plus `X-MC-Agent-Signature: sha256=<hex(HMAC-SHA256(secret, "<timestamp>.<body>"))>`.
+The receiver must verify the signature and timestamp and de-duplicate the
+stable id across retries. Replies are not posted back into Minecraft; the
+harness/route owns that.
+
+Uptime: the game must run with the mod; user-driven use needs the daemon up,
+unattended use needs the daemon, the receiver and the model harness all up.
