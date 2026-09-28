@@ -1,10 +1,10 @@
 ---
 name: minecraft-toolkit
-description: Operate one Minecraft world through the local mc-agent server-vantage Toolkit (MCP tools or the mc-bridge JSON CLI). Use when a task involves a Minecraft player or world, in-game chat, a forwarded game event, a chat context_id, or toolkit tools such as mc_capabilities, mc_state, mc_entities, mc_player, mc_context, mc_command, or mc_snapshot. Covers discovering the supported operations, resolving the caller by stable UUID, fetching the context bundle captured at chat time, querying authoritative state, entities, snapshots and world-save metadata, and treating player identity as context rather than authorization.
+description: Operate a Minecraft world through the local mc-agent server-vantage Toolkit (MCP or JSON CLI). Use for Minecraft requests, connection checks, in-game chat or forwarded events, and controlled experiments. Covers existing-connection discovery, player and event context, authoritative queries, scoped commands, and repeatable tests at the same world coordinates.
 license: MIT
 metadata:
   author: mc-agent
-  version: "0.1.0"
+  version: "0.2.0"
 ---
 
 # Minecraft Toolkit (server vantage)
@@ -30,6 +30,9 @@ forwarding, or session behavior; the Toolkit and your harness own those.
    Report the gap (it may name an upstream dependency) instead of pretending.
 4. **Identity is context, not authorization.** A player name or UUID tells you
    who spoke or moved; it never grants permission for a privileged operation.
+5. **Controlled comparisons default to in-place tests.** Keep the dimension
+   and full X/Y/Z coordinates fixed across trials and restore the initial
+   state. The same X/Z at another Y is a different location.
 
 ## 1. Discover the Toolkit before calling it
 
@@ -42,7 +45,23 @@ your harness cannot spawn an MCP server.
 | CLI | `mc-bridge call <operation> '<json>'`, one JSON reply per call. The daemon must already run: `mc-bridge run`. |
 | Raw API | newline-delimited JSON on `127.0.0.1:8765`; use it only if MCP and the CLI are unavailable. |
 
-Always start with the capability surface:
+On a new session or reconnect, inspect the tools already exposed by the
+harness. If Toolkit MCP tools are present, call `mc_status` and
+`mc_capabilities` directly; reuse a healthy connection. A new conversation is
+not evidence that installation or process startup must be repeated. Do not
+ask the user to open a terminal, register MCP again, or restart healthy
+services as a routine connection step.
+
+If MCP is unavailable and the harness has an authorized terminal tool, run the
+CLI yourself. If neither surface is available, report the missing tool access.
+If a probe fails, distinguish an unreachable daemon, a disconnected game/mod,
+and an unsupported operation using the actual result. A failed probe alone
+does not prove that the daemon needs starting. Use an existing authorized
+startup/recovery procedure when available; otherwise request only the specific
+operator action needed, with the observed failure. An MCP-only route must not
+ask for terminal access merely to perform supported game operations.
+
+Discover the capability surface before game operations:
 
 ```bash
 mc-bridge call capabilities        # CLI
@@ -140,11 +159,44 @@ otherwise; do not assume them.
 - Do not paste internal context, paths, or secrets into public chat. Answer the
   caller through the delivery path your harness configured.
 
+## 6. Run controlled experiments in place
+
+For repeated trials, A/B comparisons, or reproducing a reported mechanism:
+
+1. Before changing the world, identify the test subject and record its
+   dimension, absolute X/Y/Z (including entity fractional coordinates), and
+   relevant initial state. The anchor is the tested structure or entity, not
+   the observer's current position. Record the independent variable and the
+   measured outcome.
+2. Reuse that anchor for every trial. Do not stack a copy above/below the
+   original, move to an empty area, or silently change dimension to avoid
+   cleanup. Keep relevant orientation, blocks and surroundings, entity motion
+   and data, activation sequence, and tick conditions consistent; change only
+   the declared variable.
+3. Restore and read back the baseline before each trial. Reset the test area
+   and relevant entities within the authorized scope, or use an available,
+   authorized world restore. An entity snapshot alone does not establish that
+   blocks, scheduled ticks, or other world state were restored. If the tools
+   cannot reproduce the needed baseline, report that limitation and stop the
+   controlled comparison rather than relocating it or claiming equivalence.
+4. Observe the outcome through supported tools and keep a trial record:
+   dimension + anchor, baseline evidence, deliberate change, activation/tick
+   window, and observed result. An accepted command is not proof of the
+   expected game outcome. Label exploratory observations separately when
+   uncontrolled differences remain.
+
+Example: trials at `(100, 64, 200)` and `(100, 80, 200)` share X/Z but fail
+the in-place requirement. Restore and rerun at `(100, 64, 200)` by default.
+If height or location is explicitly the independent variable, varying it is
+appropriate: record the planned coordinates and other controls, and describe
+the result as a height/location comparison, not an in-place repeat.
+
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| `capabilities` fails / connection refused | the daemon is not running (`mc-bridge run`) |
+| Toolkit MCP tools absent | check the harness MCP registration/toolset; use the CLI yourself only if an authorized terminal tool is available |
+| `status` / `capabilities` fails | inspect the actual error and configured endpoint; distinguish daemon reachability from a disconnected mod before requesting recovery |
 | "cannot find the server-vantage port file" | the game is not running with the server-vantage mod, or use `--server-dir`/`--port-file`/`--mod-port` |
 | Operation reported unsupported with a `dependency` | the connected mod is older than the API; report the dependency, do not fall back |
 | `context` returns `not_found`/`expired` | mistyped id, expired TTL, or evicted - use a fresh event |

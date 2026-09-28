@@ -39,7 +39,8 @@ Hermes 负责路由、会话、模型、Skill 订阅与回复目标；Toolkit da
 
 ## 今天可用的交互式 Toolkit
 
-启动守护进程，并按已安装 Hermes 版本支持的 MCP 配置注册适配器：
+首次部署时，启动守护进程，并按已安装 Hermes 版本支持的 MCP 配置注册适配器。
+已有连接健康时跳过这些步骤：
 
 ~~~powershell
 mc-bridge run
@@ -51,10 +52,20 @@ C:/path/to/.venv/Scripts/mc-bridge.exe mcp
 **mc_capabilities**。当前调用者上下文使用 **mc_player**；只有收到的事件带
 **context_id** 时才使用 **mc_context**。
 
+后续会话应由智能体检查已有 MCP 工具并自行调用上述探针，不应例行要求用户打开
+终端或重新注册。探针失败时，根据实际错误定位问题，使用部署中已有且获授权的
+恢复流程；只有缺少恢复所需权限或工具时，才要求操作者执行具体的必要步骤。
+只有 MCP 工具的 route 也能完成受支持的游戏操作，不需要为此开放终端。
+
 按 [安装 Toolkit Skill](toolkit-skill.md) 中已验证的命令安装便携 Skill。
 Hermes 没有原生 **gh skill** target；受支持路径是装进 Hermes 自定义 Skill
 目录。webhook route、受限 MCP toolset 与投递目标见
 [Hermes 无人值守运行](hermes-unattended.md)。
+
+Skill 同时要求对照实验默认在同一维度、完整 X/Y/Z 坐标不变的位置进行，每轮
+恢复并检查初始状态。同 XZ、不同 Y 的副本不能算原地复测。应确认实际运行加载了
+更新后的 `minecraft-toolkit` Skill；仅安装文件不能证明说明已进入模型上下文。
+这些是智能体行为指令，Toolkit 尚未通过命令校验器强制执行这些约束。
 
 ## 配置事件发送端
 
