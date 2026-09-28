@@ -65,7 +65,22 @@ amd64、macOS arm64）。运行发行版二进制不需要 Python 或 Go。
         ./install.ps1 -Version 0.5.0 -SkillHarness codex
         ```
 
-3. **连接并检查。**
+3. **把二进制加入当前 shell 的 PATH，然后连接。** 安装器不会主动修改 PATH
+   （除非使用了 `--add-to-path` / `-AddToPath`）；也可以为当前会话手动设置：
+
+    === "Linux amd64 / macOS arm64"
+
+        ```bash
+        export PATH="$HOME/.mc-agent/bin:$PATH"
+        ```
+
+    === "Windows amd64"
+
+        ```powershell
+        $env:Path = "$env:LOCALAPPDATA\mc-agent\bin;$env:Path"
+        ```
+
+4. **连接并检查。**
 
     ```bash
     mc-agent daemon start
