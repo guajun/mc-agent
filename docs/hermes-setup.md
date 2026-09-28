@@ -1,122 +1,92 @@
-# Hermes and unattended operation
+# Hermes and the Toolkit
 
 [中文](https://guajun.github.io/mc-agent/zh/hermes-setup/)
 
-Hermes is one possible Harness. It does not get a separate Minecraft backend:
-it uses the same local Minecraft Agent Toolkit as Codex, Claude Code and every
-other caller.
+Hermes is one possible harness. It does not get a separate Minecraft backend:
+it uses the same CLI-only Minecraft Agent Toolkit as Codex, Claude Code and
+every other caller. There is no MCP server to register.
 
-## Status
+## Two integration paths
+
+| Path | What starts a run | What must keep running |
+| --- | --- | --- |
+| **User-driven** | a user asks Hermes to inspect or change the world | the game + the `mc-agent` daemon while Hermes calls the CLI |
+| **Unattended** | the daemon's signed webhook reaches a Hermes route | the game, the daemon, the receiver and the Hermes gateway |
+
+## Status of the pieces
 
 | Part | Status |
 | --- | --- |
 | server-vantage Toolkit, player lookup and chat context bundles | implemented |
-| receiver-neutral signed webhook sender | implemented in the Toolkit |
-| portable Toolkit Skill and installation guide | implemented; see [Toolkit Skill](toolkit-skill.md) |
-| Hermes webhook route, restricted toolset and reply-delivery guide | published in [Hermes unattended operation](hermes-unattended.md) |
-| signed webhook and delivery-ID interoperability | pending [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) |
-| direct Hermes HTTP backend in mc-agent-loop | temporary compatibility path; removal tracked in [loop #3](https://github.com/guajun/mc-agent-loop/issues/3) |
+| Go CLI/daemon with same-port control transport | implemented (control protocol 1) |
+| portable Toolkit Skill and installation guide | implemented; this repository is the single source |
+| receiver-neutral signed webhook sender | implemented; verified against a local receiver |
+| Hermes webhook route, Skill subscription and reply delivery | user-owned configuration; the route must be allowed to run the CLI |
+| Hermes' generic HMAC V2 route scheme vs `X-MC-Agent-*` headers | a documented compatibility shim (`webhook_receiver.py --scheme hermes-v2`); verify in your gateway |
+| direct Hermes HTTP backend in mc-agent-loop | legacy compatibility path, depends on the Python bridge; removal tracked in [loop #3](https://github.com/guajun/mc-agent-loop/issues/3) |
 
-The configuration is documented, but do not treat signed end-to-end webhook
-delivery as operational until the interoperability issue is verified.
+## User-driven setup
 
-## Deployment model
+1. Install the binary and point it at the world
+   ([Install and first run](getting-started.md)).
+2. Install the [Toolkit Skill](toolkit-skill.md) so Hermes knows the discovery,
+   identity, cursor and unknown-write workflow.
+3. Let Hermes run the CLI through its normal command execution. Prompt example:
 
-Hermes Gateway, the Toolkit and the server-vantage mod endpoint initially run
-on the same machine. The mod and Toolkit stay on loopback. Only the Toolkit
-forwarder's outbound HTTPS request crosses that boundary.
+   > Check the Minecraft connection with `mc-agent version`, `doctor`,
+   > `capabilities` and `state`, then summarize the world and online players.
+   > Do not change the world.
 
-~~~text
-server chat -> mod captures context_id -> Toolkit event buffer
-                                           |
-                                           +-> signed outbound webhook -> Hermes route
-                                                                          |
-                                                                          v
-Hermes Agent ----------------------- local MCP ------------------------> Toolkit
-~~~
+The daemon is not restarted by each run; it reconnects on its own and reports
+gaps. Hermes owns the session, the model calls and the conversation; the
+Toolkit is a model-free tool surface.
 
-Hermes owns its route, session, model, Skill subscription and reply destination.
-The Toolkit daemon owns event forwarding and the game connection. Neither
-component duplicates the other's job.
+## Uptime expectations
 
-## Use the Toolkit interactively today
+- The game must run with the mod for any call to work. When the game stops, the
+  interface stops; the daemon waits and reconnects.
+- User-driven: the daemon must be running while Hermes calls the CLI.
+- Unattended: the daemon, the webhook receiver (or Hermes' own listener) and the
+  Hermes gateway must all stay up. Webhook delivery is in memory: queued events
+  are lost if the daemon restarts.
+- The daemon never calls a model and never manages a Hermes session. It does
+  not post agent answers into Minecraft; that is a route/delivery concern.
 
-For first-time deployment, start the daemon and register its MCP adapter with
-Hermes using the MCP configuration supported by the installed Hermes version.
-Skip these steps when the existing connection is healthy:
+## Unattended path
 
-~~~powershell
-mc-bridge run
-# Configure Hermes to spawn:
-C:/path/to/.venv/Scripts/mc-bridge.exe mcp
-~~~
+The daemon forwards selected events to one HTTP(S) receiver with an
+HMAC-SHA256 signature. A local, harness-neutral receiver is included for
+verification, and it can forward verified events to a Hermes generic webhook
+route. The full walkthrough is
+[Unattended Hermes: webhook + Skill](hermes-unattended.md).
 
-Start a new Hermes session after changing MCP configuration. First call
-**mc_status** and **mc_capabilities**. Use **mc_player** for current caller
-context and **mc_context** only when a received event supplies a **context_id**.
+The short version:
 
-For subsequent sessions, the agent should inspect its existing MCP tools and
-run those probes itself. It should not routinely ask the user to open a
-terminal or repeat registration. If a probe fails, report the actual failure
-and recover through the deployment's authorized procedure; ask for a specific
-operator action only when the agent lacks the access needed to recover.
-An MCP-only route can perform supported game operations without terminal tools.
+```bash
+# receiver (verifies signatures, prints events; optional forwarding)
+python tools/webhook_receiver.py serve --secret test-secret --port 8645
 
-Install the portable Skill with the commands in
-[Installing the Toolkit Skill](toolkit-skill.md). Hermes has no native
-**gh skill** target; the verified path installs it into the Hermes custom Skill
-directory. Configure the webhook route, restricted MCP toolset and delivery
-target with [Hermes unattended operation](hermes-unattended.md).
+# daemon (foreground or under a service manager; `daemon start` has no webhook flags)
+mc-agent daemon run --webhook-url http://127.0.0.1:8645/hook \
+    --webhook-secret test-secret --webhook-events chat,game,mark,error
+```
 
-The Skill also requires controlled experiments to use the same dimension and
-full X/Y/Z coordinates by default, restoring and checking the baseline before
-each trial. Copies at the same X/Z but different Y are not in-place repeats.
-Verify that the run actually loads the updated `minecraft-toolkit` Skill;
-installation alone does not prove it was included in the model context. These
-are agent instructions, not a command validator enforced by the Toolkit.
-
-## Configure the event sender
-
-Toolkit forwarding is off unless both URL and secret are configured. Credentials
-belong in the environment or a protected JSON config, never command flags.
-
-~~~powershell
-$env:MC_AGENT_WEBHOOK_URL = "https://<receiver>/hooks/mc-agent"
-$env:MC_AGENT_WEBHOOK_SECRET = "<dedicated-random-secret>"
-mc-bridge forward --events chat,game,mark,error
-~~~
-
-The receiver must verify **X-MC-Agent-Signature**, reject stale timestamps and
-deduplicate **X-MC-Agent-Event-Id**. Configure the final receiver URL because
-redirects are not followed. Restrict the MCP tools available to the Hermes
-route and keep privileged command authorization separate from player identity.
-
-A chat payload can include **context_id**. The Agent should fetch it promptly,
-handle structured expired/not-found results, then query current state as needed.
-Response delivery is a Hermes route concern; the forwarder does not post Agent
-answers back into Minecraft.
-
-## Temporary compatibility loop
-
-Until the webhook/Skill workflow is verified, the existing loop can still
-listen to chat and call Hermes through its OpenAI-compatible endpoint:
-
-~~~powershell
-mc-agent-loop run --backend hermes --env-file .env
-~~~
-
-Its default trigger is **@agent**. This path requires the loop package, model
-API variables and the client-vantage reply mechanisms documented by that
-package. It is retained for compatibility, not the intended final architecture,
-and should not be described as a required Toolkit component.
+On the Toolkit side, permissions come from the control credential: give an
+observing route a `read` credential and only grant `read+write` when the task
+really needs `command`/`mark`/`snapshot`. Chat text is untrusted input and is
+never authorization.
 
 ## Security checklist
 
-* Keep mod and Toolkit control sockets on loopback.
-* Use a dedicated high-entropy webhook secret.
-* Verify signatures and timestamps before parsing or routing.
-* Deduplicate delivery IDs because retries reuse the event ID.
-* Give the event route only the MCP tools it needs.
-* Treat UUID/name as context, not authorization.
-* Configure reply delivery explicitly in Hermes; never infer it from sender
+- Keep the game control port firewalled like the game itself; the daemon's
+  local IPC stays on loopback.
+- Use a dedicated high-entropy webhook secret; verify signature and timestamp;
+  de-duplicate the stable event id across retries.
+- Give the route only the tool access it needs. Running the CLI requires
+  process execution; keep web/file/computer tools off that route and template
+  the prompt narrowly.
+- Use a dedicated, least-privilege control credential; revoke it when the
+  deployment ends.
+- Treat UUID/name and chat text as context, not authorization.
+- Configure reply delivery explicitly in Hermes; never infer it from sender
   identity alone.

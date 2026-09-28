@@ -1,204 +1,203 @@
 # 安装与首次运行
 
-完成本页后，你将能在终端读取 Minecraft 世界状态，并把同一套工具接入智能体。
-终端检查不需要模型账号。如果还没有独立服务端，建议从单机世界开始。
+先在终端读取 Minecraft 世界状态，再把同样的工具交给智能体。终端检查不需要模型
+账号。单机世界或专用服务器都可以：游戏服务器只需要 mod，二进制安装在你运行
+智能体的环境。
 
-## 开始前准备
+## 开始之前
 
-| 需要什么 | 如何检查 |
+| 需要 | 检查 |
 | --- | --- |
-| Minecraft 26.2、Fabric Loader 0.19+、Fabric API | 启动对应游戏配置一次，确认可以正常打开。 |
-| JDK 25，包含编译器 | `java -version` 和 `javac -version` 显示 25，或在下方指定 JDK 路径。 |
-| Python 3.11+ 与 Git | `python --version`（macOS/Linux 用 `python3`）和 `git --version`。 |
-| 智能体应用，仅最后一步需要 | 支持 MCP，或有运行 CLI 命令的权限。 |
+| 游戏：Minecraft 26.2、Fabric Loader 0.19.5+、Fabric API 0.161.0 | 该配置能正常启动并进入世界。 |
+| Java 25 | Fabric 服务端/客户端配置可正常启动。 |
+| 二进制支持的平台：Windows amd64、Linux glibc amd64 或 macOS arm64 | 见[安装参考](install.md)。 |
+| 智能体应用（最后一步） | 任何能执行命令的 Harness（Codex、Claude Code、Hermes、shell）。 |
 
-游戏接口、Toolkit 和智能体应用使用同一台机器。先创建工作目录，
-例如 `C:/Minecraft/toolkit-workspace`，在其中打开终端。
-以下命令都在这个工作目录运行，无需激活虚拟环境。示例路径需要改为实际路径。
+运行发行版 Toolkit **不需要** Python 和 Go。没有 MCP 服务器，也没有需要注册的
+MCP 设置。
 
 ## 1. 安装游戏 mod { #1-install-the-game-mod }
 
-目前文档提供源码构建安装方式。先确认以下四个值：
-
-| 设置 | 应该填什么？ |
-| --- | --- |
-| `MinecraftDir` / `MINECRAFT_DIR` | 包含 `versions/` 和 `libraries/` 的资源根目录。构建需要 `versions/<版本>/<版本>.json` 和 `<版本>.jar`。 |
-| `Version` / `MC_VERSION` | `versions/` 中实际的文件夹名，例如 `26.2-Fabric`。 |
-| `GameDir` / `GAME_DIR` | 实际运行实例的目录，包含 `mods/` 和 `saves/`；独立服务端则填包含 `mods/` 的服务端目录。 |
-| `JdkDir` / `JDK_DIR` | JDK 25 安装目录，其中应有 `bin/javac` 或 `javac.exe`。 |
-
-启用启动器的版本隔离后，资源根目录与游戏目录可能不同。
-构建脚本从资源根目录的 `mods/` 或 `versions/<版本>/.fabric/processedMods/` 查找 Fabric API。
-如果两处都没有，在资源根目录的 `mods/` 中也放一份匹配版本的 Fabric API jar 用于编译。
-
-只有服务端文件的目录不能直接作为这个脚本所需的客户端构建资源目录；
-先使用已安装的客户端配置构建，再把 jar 复制到服务端。
-[实验室 mod 构建](mod-building.md)是另一条进阶路径。
-
-复制 mod 前关闭游戏或服务端。修改四个值后运行：
+从 [mod releases](https://github.com/guajun/mc-agent-interface-mod/releases) 下载
+最新的 `mc-agent-interface-0.8.0.jar` 和 `checksums.txt`，校验 SHA-256，然后把
+jar 与 Fabric API 一起放入实例的 `mods/`：
 
 === "Windows · PowerShell"
 
     ```powershell
-    git clone https://github.com/guajun/mc-agent-interface-mod
-    $MinecraftDir = "C:/Minecraft"
-    $GameDir = "C:/Minecraft/instances/my-world"
-    $Version = "26.2-Fabric"
-    $JdkDir = "C:/Program Files/Java/jdk-25"
-    python mc-agent-interface-mod/build.py --minecraft-dir "$MinecraftDir" --version "$Version" --jdk "$JdkDir"
-    New-Item -ItemType Directory -Force -Path "$GameDir/mods" | Out-Null
-    Copy-Item mc-agent-interface-mod/dist/mc-agent-interface-*.jar "$GameDir/mods/"
+    # 校验下载（与发布的 checksums.txt 对比）
+    (Get-FileHash -Algorithm SHA256 .\mc-agent-interface-0.8.0.jar).Hash.ToLower()
+    Copy-Item .\mc-agent-interface-0.8.0.jar "C:/Minecraft/instances/my-world/mods/"
     ```
 
 === "macOS / Linux"
 
     ```bash
-    git clone https://github.com/guajun/mc-agent-interface-mod
-    MINECRAFT_DIR="/path/to/minecraft"
-    GAME_DIR="/path/to/minecraft/instances/my-world"
-    MC_VERSION="26.2-Fabric"
-    JDK_DIR="/path/to/jdk-25"
-    python3 mc-agent-interface-mod/build.py --minecraft-dir "$MINECRAFT_DIR" --version "$MC_VERSION" --jdk "$JDK_DIR"
-    mkdir -p "$GAME_DIR/mods"
-    cp mc-agent-interface-mod/dist/mc-agent-interface-*.jar "$GAME_DIR/mods/"
+    # Linux
+    sha256sum mc-agent-interface-0.8.0.jar   # 与 checksums.txt 对比
+    # macOS（默认没有 GNU sha256sum）
+    shasum -a 256 mc-agent-interface-0.8.0.jar
+    cp mc-agent-interface-0.8.0.jar /path/to/instance/mods/
     ```
 
-构建成功会输出 `built: ...jar`。目标 `mods/` 中只保留**一个版本**的 interface mod，
-并放入匹配的 **Fabric API** jar。启动 Fabric 服务端，或启动客户端并**进入单机世界**；
-停留在主菜单不会启动集成服务端。
+如果对应版本还没有发行包，请[自行构建 mod](mod-building.md)，并确保 `mods/` 中
+只有一个 interface jar，且 Fabric API 与之匹配。
 
-**成功标志：** `<GameDir>/mc-agent-server/port.txt` 出现，里面是一个端口号。
-第 3 步的 `--server-dir` 就填这里的 `GameDir`，单机世界也一样。
-如果只是加入别人的多人服务器，这条服务端视角路径需要那个服务器也安装 mod。
+mod 有两个适配器，取决于游戏形态：
 
-## 2. 安装 Toolkit { #2-install-the-toolkit }
+| 适配器 | 游戏监听位置 | 启用方式 |
+| --- | --- | --- |
+| **控制传输**（推荐） | 实际 Minecraft 游戏端口，与玩家共用 | 在 JVM 参数中加入 `-Dmcagent.control=true` |
+| **遗留 loopback 适配器** | 独立 loopback 端口 | 默认启用；用于显式单机本地路径 |
 
-继续在同一个工作目录运行：
+专用服务器在 `user_jvm_args.txt`（Fabric）中加入该参数后启动；客户端则加入实例的
+JVM 参数。
 
-=== "Windows · PowerShell"
+**成功标志：** 实例目录出现 `mc-agent-server/control/fingerprint.txt`，其中是一行
+`sha256:...`；服务器控制台也能响应 `/mcagent control` 命令。
+
+### 凭证
+
+控制凭证由服务器控制台的**所有者**（权限等级 4）签发：
+
+```
+/mcagent control status
+/mcagent control token add <label> read|write|read+write [ttlSeconds]
+/mcagent control token list
+/mcagent control token revoke <id>
+```
+
+密钥只显示一次，格式为 `mca1.<id>.<base64url>`。观察类操作（state、entities、
+player/chat 上下文、snapshots、events）需要 `read` 凭证；`write` 额外允许
+`command`、`mark` 和 `snapshot`。只有 write 的凭证收不到事件与回放。如果服务器还没有可用凭证，mod 会
+签发一个 bootstrap `read+write` 凭证并写入
+`<gameDir>/mc-agent-server/control/bootstrap-token.txt`（仅属主可读）。把它交给
+daemon（标准输入）并在签发每个 daemon 专属凭证后吊销 bootstrap 凭证。`read` 凭证
+只能观察；`write` 额外允许 `command`、`mark` 和 `snapshot`。聊天身份永远不是授权，
+权限来自凭证。
+
+## 2. 安装二进制与 Skill { #2-install-the-toolkit }
+
+=== "Windows amd64 · PowerShell"
 
     ```powershell
-    git clone https://github.com/guajun/mc-agent-bridge
-    python -m venv .venv
-    .venv/Scripts/python -m pip install -e "mc-agent-bridge[mcp]"
-    .venv/Scripts/mc-bridge --help
+    iwr -useb https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.ps1 -OutFile install.ps1
+    ./install.ps1 -Version 0.5.0 -SkillHarness codex
     ```
 
-=== "macOS / Linux"
+=== "Linux amd64 · shell"
 
     ```bash
-    git clone https://github.com/guajun/mc-agent-bridge
-    python3 -m venv .venv
-    .venv/bin/python -m pip install -e "mc-agent-bridge[mcp]"
-    .venv/bin/mc-bridge --help
+    curl -fsSL https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.sh \
+        | sh -s -- --version 0.5.0 --skill-harness codex
     ```
 
-**成功标志：** 最后一条命令显示 CLI 帮助。`[mcp]` 会安装智能体应用所需的 MCP 适配器。
-标准用法无需安装 `mc-agent-loop`。
+=== "macOS arm64 · shell"
+
+    ```bash
+    curl -fsSL https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.sh \
+        | sh -s -- --version 0.5.0 --skill-harness codex
+    ```
+
+把 skill 目标换成你的 Harness（`claude-code`、`universal`、`hermes`），或用
+`--skill-dir DIR` 指定自定义目录；`--no-skill` 跳过安装。安装器会校验发布校验和，
+除非指定 `--update-skill` 否则不会覆盖已有 Skill 目录，并打印后续 `version` 和
+`doctor` 命令。除非传入 `--add-to-path`，安装器不会修改 PATH；当前 shell 可运行
+`export PATH="$HOME/.mc-agent/bin:$PATH"`（Windows：
+`$env:Path = "$env:LOCALAPPDATA\mc-agent\bin;$env:Path"`）。映射表和手动方式见
+[安装 Toolkit Skill](toolkit-skill.md)。
+
+**成功标志：** `mc-agent version` 输出
+`mc-agent 0.5.0 (control protocol 1, mod >= 0.8.0)`。
 
 ## 3. 检查连接 { #3-check-the-connection }
 
-**终端 A：启动常驻进程，保持运行。** `--server-dir` 填第 1 步的游戏目录，
-也就是 `mc-agent-server/` 的上一级：
+### 专用服务器或 LAN 世界
+
+用 mod 指纹注册目标。地址是**实际游戏端口**；LAN 世界的地址是聊天中公布的实际
+端口，而不是假定的 25565。
 
 === "Windows · PowerShell"
 
     ```powershell
-    .venv/Scripts/mc-bridge run --server-dir "C:/Minecraft/instances/my-world"
+    $fp = (Get-Content "C:/Minecraft/server/mc-agent-server/control/fingerprint.txt").Trim()
+    Get-Content "C:/Minecraft/server/mc-agent-server/control/bootstrap-token.txt" |
+        mc-agent target add dedicated --transport remote --address 127.0.0.1:25565 `
+            --pin $fp --token-stdin --default
+    mc-agent daemon start
+    mc-agent doctor
+    mc-agent state
     ```
 
 === "macOS / Linux"
 
     ```bash
-    .venv/bin/mc-bridge run --server-dir "/path/to/minecraft/instances/my-world"
+    fp="$(cat /srv/minecraft/mc-agent-server/control/fingerprint.txt)"
+    cat /srv/minecraft/mc-agent-server/control/bootstrap-token.txt |
+        mc-agent target add dedicated --transport remote --address 127.0.0.1:25565 \
+            --pin "$fp" --token-stdin --default
+    mc-agent daemon start
+    mc-agent doctor
+    mc-agent state
     ```
 
-这是长期运行的进程，正常工作时不会返回命令提示符。游戏世界也要保持打开。
+远程服务器把 `127.0.0.1` 换成服务器主机，并使用为该 daemon 签发的凭证。不要把
+凭证写在会被记录的命令行里；`--token-stdin`、`--token-env`、`--token-file` 可避免
+泄露。
 
-**终端 B：在同一个工作目录另开终端**，依次运行：
-
-=== "Windows · PowerShell"
-
-    ```powershell
-    .venv/Scripts/mc-bridge call status
-    .venv/Scripts/mc-bridge call capabilities
-    .venv/Scripts/mc-bridge call state
-    ```
-
-=== "macOS / Linux"
-
-    ```bash
-    .venv/bin/mc-bridge call status
-    .venv/bin/mc-bridge call capabilities
-    .venv/bin/mc-bridge call state
-    ```
-
-| 检查 | 成功标志 |
+| 检查 | 成功表现 |
 | --- | --- |
-| `status` | JSON 结果中显示 `connected: true` 和 `vantage: server`。 |
-| `capabilities` | 返回当前 mod 支持的操作列表，以此确定可用工具。 |
-| `state` | 返回服务端世界数据，没有连接错误。 |
+| `mc-agent doctor` | `version`、`targets`、`credential`、`daemon`、`target:dedicated` 均为绿色 |
+| `mc-agent capabilities` | 连接 mod 支持与不支持的操作列表 |
+| `mc-agent state` | 返回世界数据和在线玩家，而不是连接错误 |
 
-**连接完成。** 以上检查只读取连接与世界信息。
-可以继续使用 CLI，也可以接入智能体。
+**连接成功。** 以上只检查连接与世界。
+
+### 未开放 LAN 的单机
+
+使用显式的遗留 loopback 适配器，它读取 mod 服务端适配器绑定的端口：
+
+```bash
+mc-agent target add singleplayer --transport legacy \
+    --server-dir "/path/to/instance" --vantage server --default
+mc-agent daemon start
+mc-agent doctor
+mc-agent state
+```
+
+把单机世界开放到 LAN 会切换到推荐路径：控制传输监听实际公布端口，用 LAN 房主的
+指纹按上面的方式创建 `remote` 目标。
 
 ## 4. 接入智能体 { #4-connect-your-agent }
 
-在智能体应用的 **MCP 服务设置**中，添加一个本地 **stdio** 服务：
+Harness 调用同一个 `mc-agent` 命令；没有 MCP 注册。把 Toolkit Skill 和首个任务
+交给它：
 
-| 字段 | 填写内容 |
+> 用 `mc-agent version`、`doctor`、`capabilities` 和 `state` 检查 Minecraft
+> 连接，总结世界与在线玩家。不要改变世界。
+
+**成功标志：** 智能体执行命令并总结真实世界数据。[Toolkit Skill](toolkit-skill.md)
+教会它发现、身份、上下文、游标和未知写结果的完整流程。
+
+## 出问题了？ { #something-didnt-work }
+
+| 症状 | 先检查 |
 | --- | --- |
-| 名称 | `minecraft`，或你容易识别的名称 |
-| 命令 · Windows | 工作目录下 `.venv/Scripts/mc-bridge.exe` 的绝对路径 |
-| 命令 · macOS/Linux | 工作目录下 `.venv/bin/mc-bridge` 的绝对路径 |
-| 参数 | `mcp` |
+| 没有 `mc-agent-server/control/fingerprint.txt` | 加入 `-Dmcagent.control=true` 并重启；确认 mod 与 Fabric API 已加载 |
+| `/mcagent` 提示控制传输关闭 | 该实例的 JVM 参数缺少开关 |
+| `doctor` 报 `daemon_not_running` | `mc-agent daemon start`；查看 `mc-agent daemon status` 和 daemon 日志 |
+| `connection_failed` 或 pin/认证错误 | 重新读取 `fingerprint.txt`；重新签发/复制凭证；校验始终开启 |
+| `target_unknown` | `mc-agent target list`；传 `--target NAME` 或设置 `--default` |
+| 写操作超时且 `resultUnknown` | 不要重放；查看 `mc-agent request-status <id>` 和 `requests` 账本 |
+| 智能体能回复聊天但游戏内没有消息 | daemon 从不回写回复；在 Harness 中配置投递路径（见 [Hermes 无人值守](hermes-unattended.md)） |
 
-如果客户端支持 `mcpServers` JSON 配置，可使用下面的例子，并替换命令路径。
-其它客户端使用各自的设置格式，但启动命令和参数相同。
+[更多故障排查](troubleshooting.md) · [安装参考](install.md)
 
-```json
-{
-  "mcpServers": {
-    "minecraft": {
-      "command": "C:/Minecraft/toolkit-workspace/.venv/Scripts/mc-bridge.exe",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+## 下一步
 
-macOS/Linux 的命令路径例如 `/path/to/toolkit-workspace/.venv/bin/mc-bridge`。
-务必使用**绝对路径**，因为智能体可能从其它目录启动。
-保持终端 A 运行：MCP 适配器连接已有常驻进程，不会替你启动它。
+- [工具参考](tools.md) —— CLI 命令面与能力模型。
+- [架构](concepts.md) —— 组件、部署选择与边界。
+- [无人值守 Hermes](hermes-unattended.md) —— 签名 webhook、在线要求与回复投递。
 
-重新加载客户端的 MCP 服务，或新开一个智能体会话，然后发送：
-
-> 使用 mc_status 检查 Minecraft 连接，用 mc_capabilities 查询工具，
-> 再读取 mc_state，概括当前世界状态和在线玩家。不要修改世界。
-
-**成功标志：** 智能体调用工具，并根据实际世界数据给出概括。
-不支持 MCP 的智能体也可以运行第 3 步的 CLI 命令。
-还可以[安装 Toolkit Skill](toolkit-skill.md)，教智能体按能力发现、玩家定位的顺序使用工具。
-
-## 遇到问题？ { #something-didnt-work }
-
-| 现象 | 先检查这里 |
-| --- | --- |
-| 构建提示 `missing version json` 或 `missing client jar` | 核对第 1 步的资源根目录和实际版本文件夹名；两个文件都要存在。 |
-| 找不到 Fabric API 或 `javac` | 核对第 1 步说明的 Fabric API 位置和 JDK 路径。 |
-| 没有 `mc-agent-server/port.txt` | 确认 mod 和 Fabric API 已加载；进入世界或启动独立服务端。 |
-| `status` 显示 `connected: false` | 查看终端 A 的错误和 `--server-dir`，应指向运行实例，不是 Toolkit 仓库或 `saves/`。 |
-| 调用 `status` 时连接被拒绝 | 启动终端 A 的常驻进程，并保持运行。 |
-| CLI 正常，智能体却没有 `mc_*` 工具 | 检查 MCP 可执行文件的绝对路径、`mcp` 参数以及是否安装了 `[mcp]`，然后重新加载配置。 |
-| 游戏聊天里没有智能体回复 | 本指南从智能体应用主动发起请求；聊天触发需要另行配置[无人值守模式](hermes-unattended.md)，该模式仍有投递联调问题。 |
-
-[更多疑难排查](troubleshooting.md) · [安装参考](install.md)
-
-## 接下来
-
-- [工具参考](tools.md)：更多 CLI 调用与 MCP 操作。
-- [架构说明](concepts.md)：部署方案与组件职责。
-- [进阶指南](advanced.md)：事件触发、无人值守、世界分叉与实验。
-
-使用结束后，在**终端 A 按 Ctrl+C** 停止常驻进程。
-下次只需打开世界并重复第 3 步，无需重新安装或注册 MCP。
+用 `mc-agent daemon stop` 停止 daemon。下次打开世界后重复第 3 步；安装和 Skill
+只需做一次。

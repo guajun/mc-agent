@@ -5,7 +5,9 @@
     [架构与术语](../concepts.md)中描述的服务端视角 Minecraft Agent Toolkit，
     由[方案 #8](https://github.com/guajun/mc-agent/issues/8)确立。agent loop
     现在只是可选兼容基础设施；Codex 与 Claude Code 是用户主动型 Harness，
-    不是项目维护的 backend。
+    不是项目维护的 backend。这里描述的 MCP 前端已在
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12)
+    中移除；当前入口是 Go CLI。
 
 * 状态：已实现——Phase 1 已发出，讨论关闭。仍未定论的问题已拆成 issue：[#4](https://github.com/guajun/mc-agent/issues/4)（背压）、[#5](https://github.com/guajun/mc-agent/issues/5)（更丰富的游戏事件）、[#6](https://github.com/guajun/mc-agent/issues/6)（多个客户端）、[#7](https://github.com/guajun/mc-agent/issues/7)（游戏向智能体推送）
 * 范围：Minecraft 客户端与智能体运行时之间的通用管道

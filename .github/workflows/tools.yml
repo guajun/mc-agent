@@ -39,3 +39,5 @@ jobs:
         run: python tools/stage1_gate.py selftest
       - name: Minecart ROM regression tooling selftest (no Minecraft, no network)
         run: python tools/rom21_regression.py selftest
+      - name: Webhook receiver selftest (no daemon, no network)
+        run: python tools/webhook_receiver.py selftest

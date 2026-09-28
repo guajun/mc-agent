@@ -1,5 +1,11 @@
 # Minecart ROM 验收 runbook
 
+!!! note "历史实验记录（MCP 时期工具）"
+    本页记录使用 MCP 时期工具完成的实验，仅作为历史记录保留。MCP 已在
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12)
+    中移除；当前产品入口是 `mc-agent` Go CLI/daemon。文中引用的 Python 工具
+    属于开发者/显式遗留工具。
+
 本页是 [issue #13](https://github.com/guajun/mc-agent/issues/13) 的父级验收链记录：工具链
 就绪（[#14](https://github.com/guajun/mc-agent/issues/14)）、一次可审计的真实智能体冷启动
 （[#20](https://github.com/guajun/mc-agent/issues/20)），以及固化的真实游戏回归

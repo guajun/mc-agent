@@ -1,5 +1,12 @@
 # Snapshot protocol v1 (forking a live world)
 
+!!! warning "Legacy local tooling"
+    `fork`/`restore`/`verify` are not part of the Go CLI. They remain local
+    Python tooling that needs access to the game host world directory, and
+    they are refused for remote targets. An entity snapshot is an entity-order
+    record, not a process memory checkpoint; full freeze/re-attach guarantees
+    are not claimed.
+
 The contract between the in-game mod, the bridge, and the lab tooling. Written
 before the code so the three pieces can be built in parallel; anything here can
 change, but not silently.

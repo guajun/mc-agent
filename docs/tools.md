@@ -1,83 +1,92 @@
-# Toolkit tools
+# Toolkit tools and commands
 
 [中文](https://guajun.github.io/mc-agent/zh/tools/)
 
-The Minecraft Agent Toolkit is implemented by **mc-agent-bridge**. Its live
-**capabilities** result is authoritative: the MCP surface is filtered to match
-the connected mod and vantage.
+The Minecraft Agent Toolkit is implemented by the `mc-agent` Go binary. Its live
+**capabilities** result is authoritative: the command surface is filtered to
+match the connected mod and vantage. There is no MCP server.
 
 ## CLI
 
+Global options: `--home DIR`, `--target NAME`, `--pretty`.
+
 | Command | Purpose |
 | --- | --- |
-| **mc-bridge discover** | explain server-vantage port discovery without starting the daemon |
-| **mc-bridge run** | own the mod connection and serve the loopback API |
-| **mc-bridge call <method> [json]** | make one JSON call to the daemon |
-| **mc-bridge watch --events chat,game** | stream buffered/live events |
-| **mc-bridge mcp** | expose the Toolkit over MCP for a Harness |
-| **mc-bridge forward --events ...** | send selected events to one configured signed webhook |
+| `mc-agent version` | product, control protocol and mod minimum |
+| `mc-agent doctor` | version, state dir, targets, daemon, TLS and capability checks |
+| `mc-agent daemon start` / `run` / `stop` / `status` / `doctor` | daemon lifecycle |
+| `mc-agent target add/list/show/remove/use/reload` | target and credential management |
+| `mc-agent capabilities`, `mc-agent schema [op]`, `mc-agent call <op> [--request-id ID]` | discover and call operations; `--request-id` exists only on `call` |
+| `mc-agent status` | daemon and per-target connection state |
+| `mc-agent state` | authoritative world/tick state and online players |
+| `mc-agent player <name\|uuid>` | resolve a player by UUID (or name) and return live context/view |
+| `mc-agent context <id>` | fetch a bounded chat-time bundle by `context_id` |
+| `mc-agent entities [--radius N]` | nearby entities, summarised |
+| `mc-agent command "<line>"` | issue a command (write; returns `writeSeq`) |
+| `mc-agent command-output "<line>" [--wait S]` | issue a command and read its answer |
+| `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | replay or stream buffered events by (streamId, seq) cursor |
+| `mc-agent requests`, `mc-agent request-status <id>` | unknown-write ledger and lookup |
+| `mc-agent save`, `mc-agent snapshots` | world-save metadata and snapshot list |
+| `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | entity-order snapshot written on the game host |
+| `mc-agent mark <text>`, `mc-agent wait <ticks>` | annotate the stream; wait for game ticks |
+| `mc-agent exclusive-* <key>` | cross-daemon leases |
 
-Run **status** and **capabilities** first. Common server-vantage methods are:
+Client-only legacy commands (`chat`, `screen`, `connect`, `world`, `lan`,
+`record-start`, `record-stop`) appear only for an explicit client vantage and
+only when the mod advertises them.
 
-| Method | Purpose |
-| --- | --- |
-| **status**, **capabilities** | connection, discovery and supported surface |
-| **state** | authoritative world/tick state |
-| **player** | resolve an online player by UUID or name and return live context/view |
-| **context** | fetch a bounded chat-time bundle by context ID |
-| **entities** | nearby entities |
-| **command**, **command_output** | issue a command; the latter also waits for its answer |
-| **events** | replay buffered events from a cursor |
-| **save** | report world-save metadata |
-| **snapshot**, **snapshots** | capture/list entity-order snapshots |
-| **fork**, **restore**, **verify**, **order** | copy and validate a world fork |
-| **wait**, **mark**, **stop** | timing, annotation and daemon control |
+An agent should:
 
-Client-only methods such as **screen**, **chat**, **connect**, **world**, **lan**
-and recording appear only after explicitly selecting client vantage and only
-when the mod advertises them.
+1. run `version` and `doctor` to understand the environment;
+2. run `capabilities` / `schema` and call only supported operations;
+3. resolve the relevant player by UUID when the request needs player context;
+4. fetch only the live world data it needs, and `context` promptly when an
+   event supplied a `context_id`;
+5. treat identity as context, not command authorization;
+6. check `request-status` instead of replaying an unknown write.
 
-## MCP
+Exit codes and error codes are stable; see the
+[operation reference](https://github.com/guajun/mc-agent/blob/main/skills/minecraft-toolkit/references/toolkit-operations.md).
 
-MCP tools use the **mc_** prefix: **mc_status**, **mc_capabilities**,
-**mc_player**, **mc_context**, **mc_state**, **mc_entities**,
-**mc_command_output**, **mc_events**, **mc_snapshot** and so on. The MCP process
-is an adapter that connects to the running daemon. It does not own the game
-connection.
+## Boundaries
 
-A Harness should:
-
-1. call **mc_status** and **mc_capabilities**;
-2. resolve the relevant player when the request needs player context;
-3. fetch only the live world data needed;
-4. use **mc_context** promptly when an event supplied a context ID;
-5. treat identity as context, not command authorization.
+- **Remote paths are remote.** A server's world directory is never a path on
+  the daemon host. `snapshot` writes on the game host.
+- **Snapshots are entity-order records, not memory checkpoints.** Full freeze,
+  fork and re-attach guarantees are not claimed by this CLI. `fork`/`restore`
+  are legacy local Python tooling and are refused for remote targets.
+- **Bodies, fake players and chunk loading are external.** Use a Carpet Skill
+  or the server's own Skill; the Toolkit exposes observable primitives.
+- **An unavailable operation is reported, never faked.** The capability reply
+  carries `unsupported` entries, reasons and upstream dependencies when known.
 
 ## Event forwarding
 
-The optional forwarder is receiver-neutral. It signs each outbound POST, retries
-transient failures and reuses a stable event ID for deduplication. URL and secret
-come from environment or a protected config file. It does not run a model,
-manage a session or deliver Agent replies.
-
-See [Hermes and unattended operation](hermes-setup.md) and the
-[Toolkit reference](https://github.com/guajun/mc-agent-bridge#forwarding-events-to-a-webhook).
+The daemon can forward selected events to one webhook receiver. Delivery is
+signed with HMAC-SHA256, retried with a stable event id, and never posts a
+model reply back into Minecraft. Configure it on `daemon run` (not
+`daemon start`) or with `MC_AGENT_WEBHOOK_*`; see
+[Hermes and unattended operation](hermes-setup.md).
 
 ## Repository utilities
 
+These tools support experiments and documentation; they are development
+utilities, not product runtime requirements.
+
 | Tool | Purpose |
 | --- | --- |
-| **lab_server.py** | provision and control a headless Fabric lab |
-| **fork_verify.py** | inspect, restore and compare recorded forks |
-| **fake_player.py** | create and drive a Carpet fake player |
-| **game_cmd.py** | run a game command and print feedback |
-| **mcp_probe.py** | call one MCP tool against a running Toolkit |
-| **launch_instance.py** | launch a client without a GUI launcher |
-| **smoke_offline.py** | compatibility test for the old daemon/agent-loop path |
+| `lab_server.py` | provision and control a headless Fabric lab |
+| `launch_instance.py` | launch a client without a GUI launcher |
+| `game_cmd.py` | run a game command and print feedback |
+| `fake_player.py` | create and drive a Carpet fake player |
+| `fork_verify.py` | inspect, restore and compare recorded forks (legacy local path) |
+| `webhook_receiver.py` | local HMAC-verifying receiver for webhook testing |
+| `smoke_offline.py` | developer smoke test of the legacy Python daemon/agent-loop path |
 
 ## Legacy agent-loop
 
-**mc-agent-loop** is not part of the Toolkit surface. It remains an optional
-compatibility listener with **echo** and temporary **hermes** backends. Its
-default chat trigger is **@agent**. Codex and Claude Code run as user-driven
-Harnesses and must not be described as loop backends.
+`mc-agent-loop` is not part of the Toolkit contract. It remains an optional
+compatibility listener with `echo` and temporary `hermes` backends and depends
+on the legacy Python bridge. Codex, Claude Code and other user-driven harnesses
+run the CLI directly and must not be described as loop backends. Its default
+chat trigger is `@agent`.

@@ -1,5 +1,11 @@
 # 阶段一集成运行
 
+!!! note "历史实验记录（MCP 时期工具）"
+    本页记录使用 MCP 时期工具完成的实验，仅作为历史记录保留。MCP 已在
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12)
+    中移除；当前产品入口是 `mc-agent` Go CLI/daemon。文中引用的 Python 工具
+    属于开发者/显式遗留工具。
+
 !!! success "完整门禁通过（权威运行，分支 `codex/rom13-fullgate`）"
     issue #14 的验收运行（`tools/stage1_fullgate.py`，run id
     `rom13-fullgate-20260926T044858Z`，执行源提交

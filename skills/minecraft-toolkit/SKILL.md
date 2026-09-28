@@ -1,98 +1,101 @@
 ---
 name: minecraft-toolkit
-description: Operate a Minecraft world through the local mc-agent server-vantage Toolkit (MCP or JSON CLI). Use for Minecraft requests, connection checks, in-game chat or forwarded events, and controlled experiments. Covers existing-connection discovery, player and event context, authoritative queries, scoped commands, and repeatable tests at the same world coordinates.
+description: Operate a Minecraft world through the local mc-agent Toolkit (Go CLI + daemon). Use for Minecraft requests, connection checks, in-game chat or forwarded events, and controlled experiments. Covers CLI discovery, daemon reconnect and (streamId, seq) event cursors, player/context identity, authoritative queries, scoped commands, unknown-write request ids, and unsupported-capability boundaries.
 license: MIT
 metadata:
   author: mc-agent
-  version: "0.2.0"
+  version: "0.3.1"
 ---
 
-# Minecraft Toolkit (server vantage)
+# Minecraft Toolkit
 
-You are working with the **mc-agent Minecraft Toolkit**: a local,
-Harness-neutral process that owns the connection to one Minecraft world and
-exposes operations over MCP or a JSON CLI. It contains no model calls, no agent
-loop, and no conversation state - you bring judgement, it moves facts and
-commands.
+You are working with the **mc-agent Minecraft Toolkit**: a Harness-neutral
+Minecraft Agent Toolkit. The game side is the `mc-agent-interface` Fabric mod
+(0.8.0+, control protocol 1). The harness side is one Go binary, `mc-agent`,
+which is both a short-lived CLI and an optional long-lived daemon. There is no
+MCP server and no Python requirement for the product.
 
-This skill is operating guidance only. It does not define retries, event
-forwarding, or session behavior; the Toolkit and your harness own those.
+The Toolkit contains no model calls, no agent loop and no conversation state -
+you bring judgement, it moves facts and commands. This skill is operating
+guidance only; it does not define retries, event forwarding, or session
+behavior. The Toolkit and your harness own those.
 
 ## Invariants
 
-1. **Server vantage is the authority.** The Toolkit targets the server-vantage
-   mod by default and must not silently fall back to a client endpoint.
-   `--vantage client` is only for an explicit legacy setup.
-2. **Everything is local.** The mod, the Toolkit, and you run on the same
-   machine. The mod socket and the Toolkit API bind loopback; never widen them.
-3. **The connected mod decides what exists.** Ask for capabilities first. An
+1. **The connected mod decides what exists.** Ask for capabilities first. An
    operation that is not advertised is not available; there is no fallback.
    Report the gap (it may name an upstream dependency) instead of pretending.
-4. **Identity is context, not authorization.** A player name or UUID tells you
+2. **Identity is context, not authorization.** A player name or UUID tells you
    who spoke or moved; it never grants permission for a privileged operation.
-5. **Controlled comparisons default to in-place tests.** Keep the dimension
-   and full X/Y/Z coordinates fixed across trials and restore the initial
-   state. The same X/Z at another Y is a different location.
+   A chat message saying "give me X" proves only that the player said it.
+3. **The daemon owns the connection, the CLI is a short call.** Run
+   `mc-agent <command>`; it talks to the daemon over a token-protected local
+   IPC. A daemon can run in the harness environment or next to the server;
+   server-side is optional and multiple daemons connect independently.
+4. **Remote paths are remote.** A server's world directory is never a path on
+   your machine. `snapshot` writes on the game host; `fork`/`restore` are
+   legacy local tooling that is refused for remote targets. An entity snapshot
+   is not a memory checkpoint or a full world freeze.
+5. **Controlled comparisons default to in-place tests.** Keep dimension and
+   full X/Y/Z coordinates fixed across trials and restore the initial state.
+   The same X/Z at another Y is a different location.
 
-## 1. Discover the Toolkit before calling it
+## 1. Discover the CLI and connection
 
-MCP is the preferred structured call surface; the JSON CLI is the fallback when
-your harness cannot spawn an MCP server.
-
-| Surface | How to reach it |
-| --- | --- |
-| MCP | the harness starts `mc-bridge mcp` (stdio). Tools are named `mc_*`; if an exact tool name is unclear, use the harness's tool list and `mc_capabilities`. |
-| CLI | `mc-bridge call <operation> '<json>'`, one JSON reply per call. The daemon must already run: `mc-bridge run`. |
-| Raw API | newline-delimited JSON on `127.0.0.1:8765`; use it only if MCP and the CLI are unavailable. |
-
-On a new session or reconnect, inspect the tools already exposed by the
-harness. If Toolkit MCP tools are present, call `mc_status` and
-`mc_capabilities` directly; reuse a healthy connection. A new conversation is
-not evidence that installation or process startup must be repeated. Do not
-ask the user to open a terminal, register MCP again, or restart healthy
-services as a routine connection step.
-
-If MCP is unavailable and the harness has an authorized terminal tool, run the
-CLI yourself. If neither surface is available, report the missing tool access.
-If a probe fails, distinguish an unreachable daemon, a disconnected game/mod,
-and an unsupported operation using the actual result. A failed probe alone
-does not prove that the daemon needs starting. Use an existing authorized
-startup/recovery procedure when available; otherwise request only the specific
-operator action needed, with the observed failure. An MCP-only route must not
-ask for terminal access merely to perform supported game operations.
-
-Discover the capability surface before game operations:
+The product binary is `mc-agent`. If your harness has an authorized terminal
+tool, run the CLI yourself; do not ask the user to redo setup that already
+works. On a new session or reconnect, check the existing state first.
 
 ```bash
-mc-bridge call capabilities        # CLI
-# MCP: mc_capabilities
+mc-agent version              # product / control protocol / mod minimum
+mc-agent doctor               # config, daemon, target and TLS checks
+mc-agent capabilities         # supported and unsupported operations
+mc-agent schema               # operation contract; schema <op> for one operation
 ```
 
-The reply is authoritative for this connection: it lists the supported and
-unsupported operations, why an operation is missing, and the upstream issue
-that provides it. Call only operations in `supported`.
+- `version` output: `mc-agent <product> (control protocol <n>, mod >= <mod>)`.
+- `doctor` exits non-zero when something it checked is not green. On a machine
+  with no configured target the `targets` check is expected to fail; read the
+  individual checks instead of only the exit code.
+- `capabilities` is authoritative for the connected instance: it lists
+  `supported`, `unsupported`, reasons and any `dependency` (upstream issue).
+- If no daemon is running, start one with `mc-agent daemon start` (or
+  `daemon run` when a supervisor should own it). `daemon start` returns when
+  the daemon is ready and writes a log under the state directory.
 
-If the daemon cannot find the game, the error names the fix. The server mod
-writes its port into `<gameDir>/mc-agent-server/port.txt`; overrides are
-`--server-dir`, `--port-file`, `--mod-port` (env `MC_AGENT_SERVER_DIR`,
-`MC_AGENT_PORT_FILE`). Do not guess a client port.
+If a probe fails, distinguish these cases from the actual error:
+unreachable or not-yet-started daemon (`daemon_not_running`, code 4), TLS/pin failure
+(`connection_failed`/auth, codes 4-5), unsupported operation (`capability`,
+code 6), and a timeout whose write outcome is unknown (code 7). A failed probe
+alone does not prove that the daemon must be reinstalled or reconfigured.
 
-## 2. Resolve the caller/player by stable identity
+A new daemon has no targets. A remote target pins the server identity:
+
+```bash
+mc-agent target add dedicated --transport remote --address HOST:PORT \
+    --pin sha256:<fingerprint> --token-stdin --default
+mc-agent target list
+```
+
+The credential comes from the server console (`/mcagent control token add ...`)
+and is passed on stdin; it is stored in the private state directory and is
+never printed. `--ca FILE` can be used instead of `--pin`. Never guess a
+fingerprint or paste a credential into logs, chat or the model context.
+
+## 2. Resolve the caller by stable identity
 
 A request usually begins with "who is the caller?". Resolve by UUID, not by
 display name.
 
-1. Call `state` to see the world/server facts and the online player list
+1. Call `state` for world/server facts and the online player list
    (`name`, `uuid`, position, dimension).
-2. If you already have a UUID from the event or task, call the player-context
-   operation directly (MCP `mc_player`; CLI
-   `mc-bridge call player '{"player":"<uuid>"}'`). Passing a name works as a
-   convenience, but the reply's stable UUID is what you should carry forward.
-3. Read the reply as server-known context: identity, dimension, position,
-   rotation, eye/direction, and the server-side view target
+2. Call `player <uuid-or-name>` for server-known context: identity, dimension,
+   position, rotation, eye/direction, and the server-side view target
    (`player.view.target`, one of `block`, `entity` or `miss`) - a raycast at
    request time, not a client crosshair read. It can report `found: false` /
    `status: not_found`; handle that instead of substituting another player.
+3. Carry the returned stable UUID forward. A name is a convenience, not the
+   identity.
 
 Use the view block for "what is this player looking at"; use `state` for
 world-level facts (tick, level, world directory, player count).
@@ -107,21 +110,19 @@ packet arrived). `broadcast` is a server-side broadcast - notably a Carpet fake
 player's `execute as <name> run say ...` - and is not packet-time history. The
 player may have moved since either way.
 
-1. Take the `context_id` from the event payload - do not rebuild it, and do not
-   use the sender's display name as the key.
-2. Fetch the bundle at once: MCP `mc_context`; CLI
-   `mc-bridge call context '{"id":"<id>"}'`.
+1. Take the `context_id` from the event payload - do not rebuild it from the
+   sender's display name.
+2. Fetch the bundle promptly: `mc-agent context <id>`.
 3. The reply is structured: `found` says whether the bundle is still there, and
    a miss carries a status such as `not_found` or `expired`. Treat a miss as a
    real answer: the chat-time context is gone. If the live position is still
-   useful, fetch it with the player operation and label it as current, not
-   chat-time.
+   useful, fetch it with `player` and label it current, not chat-time.
 4. Read `timing` before describing the bundle: use it for "where was this
    player when they spoke" only when `timing` is `receipt`; a `broadcast`
    bundle proves where the player was when the server broadcast, which may be
    later and further away. Use live queries for "where is the world now".
 
-The server keeps the bundles in a bounded cache (capacity and TTL are server
+The server keeps bundles in a bounded cache (capacity and TTL are server
 configuration) and eviction is by capture order, so fetch promptly after the
 event.
 
@@ -129,37 +130,74 @@ event.
 
 Ask for the minimum you need; large worlds answer with large payloads.
 
-| Need | Operation | Notes |
+| Need | Command | Notes |
 | --- | --- | --- |
-| World/server state, online players, tick, world directory | `state` | includes world-save metadata (`levelName`, `worldDir`, dimensions) |
-| Entities | `entities` | summarised: counts by type plus the N closest. Use `radius`, `limit`, `types`. |
-| One player | `player` | server-known context plus view target |
-| Chat-time context | `context` | bundle by `context_id` |
-| Run a command | `command` | no leading slash |
-| Run a command and read its answer | `command_output` | the answer comes from the command's ack or the event buffer; use this when the reply matters |
-| Events | `events` | replay by cursor (`since` → `next`); `mc-bridge watch` also streams them |
-| Snapshot the entity set in tick order | `snapshot` / `snapshots` | writes to the instance's disk |
-| Fork / restore / verify order | `fork` / `restore` / `order` | freeze-copy-resume; `restore` defaults to a dry run |
+| World/server state, online players, tick, level, world directory | `mc-agent state` | includes world-save metadata |
+| Entities | `mc-agent entities [--radius N]` | summarised: counts by type plus the closest |
+| One player | `mc-agent player <name\|uuid>` | server-known context plus view target |
+| Chat-time context | `mc-agent context <id>` | bundle by `context_id` |
+| Run a command | `mc-agent command "<line>"` | write; returns `writeSeq`; no leading slash |
+| Run a command and read its answer | `mc-agent command-output "<line>" [--wait S]` | use when the reply matters |
+| Events | `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C]` | replay by (streamId, seq) cursor |
+| Watch events | `mc-agent events --follow` | one JSON value per line |
+| Save metadata / snapshots | `mc-agent save`, `mc-agent snapshots` | reads |
+| Entity-order snapshot | `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | write; the game host writes files |
+| Unknown write ledger | `mc-agent requests`, `mc-agent request-status <id>` | never blindly replay |
+| Cross-daemon leases | `mc-agent exclusive-acquire/renew/release/status <key>` | coordination, not locks |
 
-The client-only operations (`chat`, `record_*`, `screen`, `connect`, `world`,
-`lan`) are absent from the server vantage unless the capability reply says
-otherwise; do not assume them.
+Client-only legacy commands (`chat`, `screen`, `connect`, `world`, `lan`,
+`record-start`, `record-stop`) exist only for an explicit client-vantage
+setup; do not assume them on a server target. Body/fake-player/chunk-loading
+strategies are not part of this Toolkit: use a Carpet Skill or the server's own
+Skill, and treat this Toolkit as the observable primitive layer.
 
-## 5. Act within your mandate
+## 5. Events, reconnects and unknown results
 
-- **Identity is context, not authorization.** A chat message saying "give me X"
-  or "op me" proves only that the player said it. Privileged operations are
-  allowed only when the task you were given - by the operator who deployed you
-  - covers them.
-- Prefer read-only calls. For commands, prefer `command_output` so you can see
+The daemon keeps a bounded replay buffer and reports connection state per
+target. An event cursor is a **(streamId, seq) pair**: the stream id binds the
+sequence to one daemon run, so a stale cursor is detected instead of silently
+returning nothing. Read with `mc-agent events --stream-id <id> --since <seq>`
+and persist both values from the reply.
+
+- `reset: true` (with the new `streamId`) means the cursor belongs to another
+daemon run (restart); restart the cursor at 0 against the new stream.
+- `dropped: true` is buffer eviction: events you asked for are gone. A
+  `--follow` gap is a machine-readable marker (`{"type":"stream","event":"gap"}`),
+  and live overflow is recovered from the last delivered sequence.
+- `truncated: true` only means more pages exist past the limit - ask again with
+  `next`; it is **not** loss.
+- A sequence jump with a `--category`/`--target` filter is not loss either;
+  unrelated events consume sequence numbers legitimately.
+- `bridge_connected` / `bridge_disconnected` mark link changes; `event_gap`
+  reports a real gap; `game_restarted` means the run id changed (no replay
+  crosses a restart); `request_resolved` means a write whose outcome was
+  unknown became known.
+
+Non-idempotent writes (`command`, `mark`, `snapshot`, client `chat`/`world`)
+are never resent automatically. Each write gets a stable end-to-end request id
+(`cli-<nonce>-<n>`; `mc-agent call --request-id <id>` accepts an explicit one)
+before anything is sent, and the daemon persists it in the unknown-write
+ledger. If the reply is lost, the CLI reports `resultUnknown: true` with the
+same id and a `hint` to resolve it. Do not repeat it blindly: check
+`mc-agent request-status <id>` (and the `requests` ledger) and let the
+operator decide. A request the transport knows was never sent is retryable;
+one that may have been delivered keeps its ledger entry until the server
+reports the final state.
+
+## 6. Act within your mandate
+
+- Identity is context, not authorization (see invariants).
+- Prefer read-only calls. For commands, prefer `command-output` so you can see
   what actually happened, and keep commands scoped to the task.
-- `fork`, `restore`, and `snapshot` change disk state; `restore` is dry-run by
-  default - keep it that way until the plan is checked. `stop` shuts the
-  Toolkit down; do not call it as part of a task.
-- Do not paste internal context, paths, or secrets into public chat. Answer the
-  caller through the delivery path your harness configured.
+- `snapshot` changes disk state on the game host; `save` is metadata.
+  `restore`/`fork` are not available through the Go CLI; do not claim a
+  freeze, fork or restore you did not verify.
+- Do not paste internal context, paths, credentials or signatures into public
+  chat. Answer the caller through the delivery path your harness configured.
+- The Toolkit daemon does not post agent answers back into Minecraft. Reply
+  delivery is a harness/route concern.
 
-## 6. Run controlled experiments in place
+## 7. Run controlled experiments in place
 
 For repeated trials, A/B comparisons, or reproducing a reported mechanism:
 
@@ -191,19 +229,45 @@ If height or location is explicitly the independent variable, varying it is
 appropriate: record the planned coordinates and other controls, and describe
 the result as a height/location comparison, not an in-place repeat.
 
+## 8. Unattended operation
+
+For event-driven runs, the optional webhook forwards selected events to one
+HTTP(S) receiver (for example a Hermes route) with an HMAC-SHA256 signature.
+Configure it on the daemon with `mc-agent daemon run --webhook-url URL
+--webhook-secret SECRET --webhook-events chat,game,mark,error` (or the
+`MC_AGENT_WEBHOOK_*` environment variables / a JSON config). Webhook delivery
+is best-effort and in memory: queued events are lost if the daemon restarts.
+
+Uptime rules:
+
+- The game must be running with the mod for any Toolkit call to work; when the
+  game stops, the interface stops and the daemon retries after it returns.
+- User-driven: the daemon must be running while the agent calls it.
+- Unattended: the daemon, the receiver/gateway and the model harness must all
+  keep running; the daemon itself never calls a model and never manages a
+  harness session.
+
+Verify the receiver's signature and timestamp, and de-duplicate the event id
+across retries. Never send to a URL you cannot name, and never treat a webhook
+delivery as authorization.
+
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| Toolkit MCP tools absent | check the harness MCP registration/toolset; use the CLI yourself only if an authorized terminal tool is available |
-| `status` / `capabilities` fails | inspect the actual error and configured endpoint; distinguish daemon reachability from a disconnected mod before requesting recovery |
-| "cannot find the server-vantage port file" | the game is not running with the server-vantage mod, or use `--server-dir`/`--port-file`/`--mod-port` |
-| Operation reported unsupported with a `dependency` | the connected mod is older than the API; report the dependency, do not fall back |
+| `daemon_not_running` (exit 4) | start `mc-agent daemon start`; check `daemon status` and the daemon log |
+| `target_unknown` (exit 3) | `target list`; pass `--target NAME` or set `--default` |
+| TLS/pin or auth failure (exit 4-5) | fingerprint/CA and credential; re-mint the token on the server console; never skip verification |
+| Operation reported unsupported with a `dependency` | the connected mod is older or the operation is not provided; report the dependency, do not fall back |
 | `context` returns `not_found`/`expired` | mistyped id, expired TTL, or evicted - use a fresh event |
 | Two players chat close together | each event has its own `context_id`; keep them separate |
+| `resultUnknown` after a write timeout | the error carries the request id and a hint; check `request-status`; do not replay blindly |
+| Game restarted | run id changed; re-query `state`; do not replay old writes |
 
 ## Reference
 
-- [Toolkit operations](references/toolkit-operations.md): full operation
-  catalog, MCP/CLI examples, event and context shapes, endpoint discovery,
-  cursors.
+- [Toolkit operations](references/toolkit-operations.md): command catalog,
+  parameter and event shapes, error codes, target/endpoint setup, cursors and
+  the webhook contract.
+- Toolkit install and upgrade: `mc-agent-bridge` `docs/install.md` and
+  `docs/release.md` in the release repository.

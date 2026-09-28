@@ -1,5 +1,10 @@
 # Lab servers the agent raises itself
 
+!!! note "Developer utility"
+    The lab tooling is a developer utility and may drive the legacy Python
+    bridge. The product path is the `mc-agent` Go CLI/daemon; nothing here is
+    required to install or operate the Toolkit.
+
 `tools/lab_server.py` brings up one throwaway headless Fabric server per
 experiment - a *lab* - and gives the agent a console into it. No GUI, no
 launcher, no window to click, nothing shared with the player's live client:

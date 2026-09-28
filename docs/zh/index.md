@@ -3,103 +3,99 @@ hide:
   - toc
 ---
 
-# 让你的智能体走进 Minecraft 世界
+# 让智能体进入 Minecraft 世界
 
-**读取世界、执行命令、开展可重复的实验。**
+**读取世界。执行命令。构建可复现的实验。**
 
-Minecraft Agent Toolkit 通过本机工具连接 AI 智能体与 Minecraft。
-沿用你熟悉的智能体应用，也可以先在终端体验，不必先配置模型。
+Minecraft Agent Toolkit 通过一个轻量 Go CLI 和 Fabric mod 把 AI 智能体连接到
+Minecraft。可以使用你现有的智能体应用，也可以先在终端里试用。不需要 MCP 服务器，
+也不需要运行 Python。
 
 <div class="landing-actions" markdown>
 
-[安装并开始体验](getting-started.md){ .md-button .md-button--primary }
-[查看工具能力](tools.md){ .md-button }
+[安装并试用](getting-started.md){ .md-button .md-button--primary }
+[查看工具](tools.md){ .md-button }
 
 </div>
 
-## 可以做什么？
+## 你能做什么
 
 <div class="grid cards" markdown>
 
-- **了解世界**
+- **理解世界**
 
-    读取服务端的权威世界状态，查找在线玩家，检查附近实体。
+    读取权威世界状态、查找在线玩家、查看附近实体。
 
-    试着说：“概括当前世界状态和在线玩家。”
+    试试：“总结当前世界和在线玩家。”
 
-- **通过工具执行操作**
+- **通过工具行动**
 
-    从智能体或终端执行 Minecraft 命令，并读取命令结果。
+    从智能体或终端执行 Minecraft 命令并读取结果。
 
-    试着说：“列出当前在线玩家。”
+    试试：“列出在线玩家。”
 
-- **重复和校验实验**
+- **让实验可复现**
 
-    采集实体顺序快照，分叉世界，检查恢复结果。
+    采集实体顺序快照，并保持受控试次在原位进行。
 
-    [了解世界分叉 →](protocol-snapshot.md)
+    [实体快照与 fork →](protocol-snapshot.md)
 
-- **沿用你的智能体应用**
+- **使用你偏好的智能体**
 
-    接入 Codex、Claude Code、Hermes 等 MCP 客户端；有终端权限的智能体也能使用 CLI。
+    任何能执行命令的 Harness 都能接入：Codex、Claude Code、Hermes 或 shell 脚本。
     模型与对话由你的应用提供。
 
     [接入智能体 →](getting-started.md#4-connect-your-agent)
 
 </div>
 
-**已通过实机验收：** [Minecart ROM](minecart-rom-runbook.md) 已于 2026-09-26
-完成工具链门禁、智能体自主冷启动和全新实例回归。
-[查看结果与复现入口 →](advanced.md#verified-example)
+**真实游戏验证：**[Minecart ROM](minecart-rom-runbook.md) 于 2026-09-26 完成
+工具链门禁、智能体自主冷启动和新实例回归。[查看结果与复现路径 →](advanced.md#verified-example)
 
 ## 四步完成连接
 
-**开始前准备：** Minecraft 26.2、Fabric Loader 0.19+、Fabric API、JDK 25、
-Python 3.11+ 和 Git。Minecraft、Toolkit 和智能体运行在同一台机器。
-可以从一个单机世界开始，也可以使用已有的独立 Fabric 服务端。
+**开始前需要：** 游戏侧 Minecraft 26.2、Fabric Loader 0.19.5、Fabric API
+0.161.0、Java 25；二进制需要受支持平台（Windows amd64、Linux glibc amd64 或
+macOS arm64）。请把二进制安装在运行智能体的环境；游戏服务器只需要 mod。
 
-1. **安装 Fabric mod。** 从源码构建，将 jar 放入 `mods/`，进入世界。
-2. **安装 Toolkit。** 克隆 `mc-agent-bridge`，安装到 Python 虚拟环境。
-3. **检查连接。** 一个终端运行常驻进程，另一个终端依次检查 `status`、`capabilities` 和 `state`。
-4. **接入智能体。** 注册 MCP 适配器，让智能体描述你的世界。
+1. **安装 Fabric mod。** 下载 0.8.0 jar（或自行构建），复制到 `mods/`，打开世界。
+2. **安装二进制与 Skill。** 使用对应平台的固定版本安装器。
+3. **检查连接。** 启动 daemon；运行 `doctor`、`capabilities` 和 `state`。
+4. **接入智能体。** 让 Harness 调用 `mc-agent` 命令；不需要注册 MCP。
 
-[逐步安装指南](getting-started.md)提供 Windows 与 macOS/Linux 命令、路径示例、
-MCP 配置和成功标志。首次连接检查不需要 AI 模型。
-目前安装仍包含 mod 源码构建，指南尚未提供全自动安装器。
+[分步指南](getting-started.md)包含 Windows、macOS 和 Linux 命令、远程/LAN 目标
+设置、Skill 安装和预期结果。首次连接检查不需要 AI 模型。
 
 <div class="landing-actions" markdown>
 
 [开始安装](getting-started.md){ .md-button .md-button--primary }
-[已经装好？检查连接](getting-started.md#3-check-the-connection){ .md-button }
+[已安装？检查连接](getting-started.md#3-check-the-connection){ .md-button }
 
 </div>
 
-## 架构方案
+## 工作原理
 
 ```text
-你 → 智能体应用 → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft 世界
-     (Harness)       MCP / CLI + 常驻进程       服务端视角
+你 → 智能体应用 → mc-agent CLI → mc-agent daemon ↔ Fabric mod ↔ Minecraft 世界
+     （Harness）   短调用         长连接           服务端视角
 ```
 
-| 组件 | 负责什么 |
+| 组件 | 职责 |
 | --- | --- |
-| 智能体应用（Harness） | 运行模型和对话，决定调用哪些工具。 |
-| Toolkit（`mc-agent-bridge`） | 提供 `mc-bridge` 命令和 MCP 工具，保持与 Minecraft 的连接。 |
-| Fabric mod | 读取服务端世界状态并执行请求；单机世界也适用。 |
+| 智能体应用（Harness） | 运行模型与对话；决定调用哪些工具。 |
+| Toolkit（`mc-agent`） | 提供 CLI，以及维持 Minecraft 连接的 daemon。 |
+| Fabric mod | 读取服务端世界状态并执行请求的操作，单机同样适用。 |
 
-使用期间保持 Toolkit 常驻进程运行，智能体的 MCP 适配器会连接它。
-游戏控制连接仅限本机；实际可用工具从连接的 mod 查询。
+daemon 在你游玩时持续运行并自行重连；CLI 只是通过 loopback 与它通信的短命令。
+可用操作由连接的 mod 发现，除非你选择远程目标，游戏控制连接保持在本机。
 
-[查看完整架构与部署说明 →](concepts.md)
+[架构与部署细节 →](concepts.md)
 
-## 接下来去哪里？
+## 找到下一步
 
-| 我想…… | 打开 |
+| 我想要… | 前往 |
 | --- | --- |
-| 安装、升级或更换游戏路径 | [安装参考](install.md) |
-| 解决连接问题 | [首次运行帮助](getting-started.md#something-didnt-work) · [疑难排查](troubleshooting.md) |
-| 教智能体正确使用 Toolkit | [可选的 Toolkit Skill](toolkit-skill.md) |
-| 配置事件触发、无人值守或实验 | [进阶指南](advanced.md) |
-
-Hermes 无人值守属于进阶集成，目前仍有签名投递问题待解决。
-其[配置与状态](hermes-unattended.md)独立于上面的交互式使用流程。
+| 安装、升级或修改游戏路径 | [安装参考](install.md) |
+| 修复连接失败 | [首次运行帮助](getting-started.md#something-didnt-work) · [故障排查](troubleshooting.md) |
+| 教会智能体 Toolkit 工作流 | [Toolkit Skill](toolkit-skill.md) |
+| 配置事件、无人值守或实验 | [进阶指南](advanced.md) |

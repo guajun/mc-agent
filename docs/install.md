@@ -3,119 +3,125 @@
 [中文](https://guajun.github.io/mc-agent/zh/install/)
 
 **First installation? Follow [Install and first run](getting-started.md).** It
-includes OS-specific commands, mod copying, connection checks and MCP settings.
-This page covers deployment settings, upgrades, discovery and removal.
+includes OS commands, mod enabling, credential minting and the first
+connection. This page covers the supported matrix, placement, upgrades,
+uninstall and removal.
 
-## Requirements and placement
+## Supported platforms
+
+The released binary is built, packaged and install-verified by the release
+workflows on these platforms only:
+
+| Platform | Archive |
+| --- | --- |
+| Windows 10/11 amd64 | `mc-agent-<version>-windows-amd64.zip` |
+| Linux glibc amd64 | `mc-agent-<version>-linux-amd64.tar.gz` |
+| macOS 14+ arm64 (Apple silicon) | `mc-agent-<version>-darwin-arm64.tar.gz` |
+
+Windows arm64, Linux arm64, Linux musl/Alpine, macOS amd64 and other OS/CPU
+pairs are not tested and not claimed. The installers refuse them explicitly.
+The mod is plain Java and runs wherever Minecraft 26.2 with Fabric Loader
+0.19.5, Fabric API 0.161.0 and Java 25 runs.
+
+Component placement:
 
 | Component | Requirement | Runs on |
 | --- | --- | --- |
-| Fabric mod | Minecraft 26.2, Fabric Loader 0.19+, Fabric API, Java 25 | dedicated server or single-player integrated server |
-| Toolkit (`mc-agent-bridge`) | Python 3.11+ | the same machine as the mod endpoint and Harness |
-| Harness | MCP support or permission to run the CLI | the same machine as the Toolkit |
+| Fabric mod | Minecraft 26.2, Fabric Loader 0.19.5+, Fabric API 0.161.0, Java 25 | dedicated server, LAN host or single-player integrated server |
+| `mc-agent` binary | one of the platforms above; no Python, Go or MCP runtime | the environment that executes harness commands: local host, WSL, container or remote machine |
+| Daemon | same binary, optional long-lived process | next to the harness or next to the server |
 
-Keeping the mod socket and Toolkit API on loopback is a deployment assumption,
-not an inconvenience to work around. Do not expose either game-control port to
-the Internet.
+The mod's control socket is on the game's own TCP port and is authenticated;
+keep normal firewall hygiene, but no extra public control port is needed. The
+daemon's local IPC stays on loopback.
 
 ## Fabric mod
 
-Use the [mod build and installation steps](getting-started.md#1-install-the-game-mod).
-The build resource root (containing `versions/` and `libraries/`) can differ from
-the running instance directory. The first-run guide explains both paths.
-
-Copy the built jar and Fabric API into the server or client instance's
-**mods/** directory. The same jar has client and server entrypoints. The
-Toolkit uses the server entrypoint by default, including the integrated server
-in a single-player world.
+Enable the same-port control transport by adding `-Dmcagent.control=true` to
+the instance's JVM arguments (Fabric `user_jvm_args.txt` for a server, client
+JVM arguments for a client). The legacy loopback adapter stays available and
+needs no flag.
 
 | Property | Default | Purpose |
 | --- | --- | --- |
-| **mcagent.serverDir** | **mc-agent-server** | server-vantage state, snapshots and port file |
-| **mcagent.serverPort** | **25581** | first loopback port to try |
-| **mcagent.contextCacheSize** | **256** | maximum chat context bundles |
-| **mcagent.contextCacheTtlSeconds** | **300** | bundle lifetime |
-| **mcagent.dir** / **mcagent.port** | **<gameDir>/mc-agent** / **25580** | legacy client-vantage endpoint |
+| `mcagent.control` | `false` | enable the authenticated control transport on the game port |
+| `mcagent.serverDir` | `mc-agent-server` | server adapter state, snapshots and port file |
+| `mcagent.serverPort` | `25581` | first loopback port the legacy adapter tries |
+| `mcagent.contextCacheSize` | `256` | maximum chat context bundles |
+| `mcagent.contextCacheTtlSeconds` | `300` | bundle lifetime |
+| `mcagent.dir` / `mcagent.port` | `<gameDir>/mc-agent` / `25580` | legacy client-vantage endpoint |
 
-To upgrade, replace the jar and keep exactly one version. To uninstall, remove
-the jar; remove the data directories too only when their events and snapshots
-are no longer needed.
+To upgrade, replace the jar and keep exactly one interface version plus one
+matching Fabric API. To remove, delete the jar; remove
+`mc-agent-server/` too only when its events and snapshots are no longer needed.
 
-## Toolkit (`mc-agent-bridge`)
+## Binary
 
-Use the [Toolkit installation commands](getting-started.md#2-install-the-toolkit)
-for Windows or macOS/Linux.
+Install with the versioned installer (see [Installing mc-agent](https://github.com/guajun/mc-agent-bridge/blob/main/docs/install.md)):
 
-Use **pip install -e mc-agent-bridge** without the MCP extra when only the
-daemon, CLI or JSON-lines API is needed. An editable install upgrades with a
-pull in that checkout; delete the virtual environment to uninstall it.
+```bash
+# Linux amd64 / macOS arm64
+curl -fsSL https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.sh \
+    | sh -s -- --version 0.5.0 --skill-harness codex
+```
 
-The commands below assume the virtual environment is active. Alternatively use
-the explicit `.venv/Scripts/mc-bridge` (Windows) or `.venv/bin/mc-bridge`
-(macOS/Linux) executable from your working folder, as in the first-run guide.
-Verify the executable:
+```powershell
+# Windows amd64
+iwr -useb https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.ps1 -OutFile install.ps1
+./install.ps1 -Version 0.5.0 -SkillHarness codex
+```
 
-~~~powershell
-mc-bridge --help
-mc-bridge discover --server-dir "C:/minecraft/server"
-~~~
+Default locations: `~/.mc-agent/bin` (Linux/macOS),
+`%LOCALAPPDATA%\mc-agent\bin` (Windows). The state directory is
+`$XDG_CONFIG_HOME/mc-agent`, `~/Library/Application Support/mc-agent` or
+`%AppData%\mc-agent`; `MC_AGENT_HOME` and `--home DIR` override it.
 
-## Server-vantage discovery
+Upgrade by running the installer for the new version; the previous binary is
+kept as `mc-agent.previous`, and a failed download/checksum leaves the current
+install untouched. Uninstall with `--uninstall` (`-Uninstall`) and add
+`--remove-skill` / `--purge-state` (`-RemoveSkill` / `-PurgeState`) only when
+you want the Skill copy or state removed too.
 
-The default **mc-bridge run** resolution order is:
+## Target and transport choices
 
-1. explicit **--mod-port**;
-2. **--port-file** or **MC_AGENT_PORT_FILE**;
-3. **<--server-dir | MC_AGENT_SERVER_DIR | current directory>/mc-agent-server/port.txt**;
-4. **<--server-dir>/port.txt** when a server directory was explicitly named.
+| Situation | Target |
+| --- | --- |
+| Dedicated server with `-Dmcagent.control=true` | `--transport remote --address HOST:<game-port> --pin sha256:...` |
+| LAN world | `--transport remote --address HOST:<published-port> --pin sha256:...` (read the fingerprint on the host) |
+| Single player, no LAN | `--transport legacy --server-dir <instance> --vantage server` |
+| Older mod / explicit client vantage | `--transport legacy --vantage client [--port-file FILE]` |
 
-If none resolves, the daemon reports an error and keeps watching. It never
-guesses a server port or silently connects to client vantage.
-
-~~~powershell
-mc-bridge run --server-dir "C:/minecraft/server"
-~~~
-
-Leave the daemon running. In a second terminal, using the same environment:
-
-~~~powershell
-mc-bridge call status
-mc-bridge call capabilities
-~~~
-
-Client vantage is a deliberate legacy opt-in:
-
-~~~powershell
-mc-bridge run --vantage client --port-file "C:/minecraft/client/mc-agent/port.txt"
-~~~
-
-## Harness integration
-
-For MCP, use the [MCP settings and example configuration](getting-started.md#4-connect-your-agent).
-Configure the Harness to spawn **mc-bridge mcp** from its absolute path. This adapter
-connects to the long-running daemon; it does not replace the daemon. For a
-Harness without MCP, use **mc-bridge call** or the loopback JSON-lines API.
-
-No **mc-agent-loop** installation is required for Codex, Claude Code or another
-user-driven Harness. The loop is an optional compatibility package for its echo
-tests and temporary Hermes HTTP path.
+Remote verification is always on (`--pin` or `--ca`); there is no trust-all
+mode. Credentials are stored in the state directory and shown only by source
+(`store`/`env`/`file`).
 
 ## Verify
 
 | Check | Expected result |
 | --- | --- |
-| server log | server vantage armed/listening |
-| **mc-agent-server/port.txt** | contains the actual loopback port |
-| **mc-bridge discover** | reports **vantage: server** and its source |
-| **mc-bridge call status** | daemon and mod connected |
-| **mc-bridge call capabilities** | filtered server tool surface |
-| **mc-bridge call player** | structured found/not-found player result |
+| server/client log | control transport armed (when enabled), legacy adapter listening |
+| `mc-agent-server/control/fingerprint.txt` | `sha256:...` for the instance |
+| `mc-agent doctor` | version, home, targets, daemon and per-target TLS/capability checks |
+| `mc-agent capabilities` | supported/unsupported operations for the connected mod |
+| `mc-agent state` | world data, not a connection error |
+
+## Harness integration
+
+Point the harness at the `mc-agent` executable. There is no MCP server to
+register. Install the [Toolkit Skill](toolkit-skill.md) so the agent knows the
+discovery, identity, cursor and unknown-write workflow. A harness that cannot
+load Skills can still call the CLI directly; the command surface is in
+[tools.md](tools.md).
+
+`mc-agent-loop` is not required for user-driven harnesses. It remains an
+optional compatibility listener for its echo tests and the temporary Hermes
+HTTP path, with an explicit legacy status.
 
 ## Removal
 
 | Component | Remove |
 | --- | --- |
-| Fabric mod | jar from **mods/**; optionally **mc-agent-server/** |
-| Toolkit | its virtual environment and checkout |
-| Harness configuration | the MCP server entry and any webhook secret/route |
-| lab instances | only the chosen directory under **labs/** |
+| Fabric mod | jar from `mods/`; optionally `mc-agent-server/` |
+| Binary | `install.sh --uninstall --remove-skill --purge-state` (or the PowerShell equivalent) |
+| Harness integration | nothing to deregister; remove the Skill copy if you installed one |
+| Lab instances | only the chosen directory under `labs/` |

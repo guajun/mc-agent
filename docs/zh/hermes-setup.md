@@ -1,109 +1,78 @@
-# Hermes 与无人值守运行
+# Hermes 与 Toolkit
 
 [English](https://guajun.github.io/mc-agent/hermes-setup/)
 
-Hermes 只是可选 Harness 之一。它没有单独的 Minecraft backend；它与 Codex、
-Claude Code 和其它调用者使用同一套本地 Minecraft Agent Toolkit。
+Hermes 是可能的 Harness 之一。它没有单独的 Minecraft 后端：它和 Codex、
+Claude Code 以及所有其他调用者一样，使用同一个 CLI-only Minecraft Agent Toolkit。
+没有需要注册的 MCP 服务器。
 
-## 状态
+## 两种集成路径
+
+| 路径 | 谁发起运行 | 什么必须保持运行 |
+| --- | --- | --- |
+| **用户主动** | 用户让 Hermes 查看或修改世界 | Hermes 调用 CLI 期间：游戏 + `mc-agent` daemon |
+| **无人值守** | daemon 的签名 webhook 到达 Hermes 路由 | 游戏、daemon、接收端和 Hermes gateway |
+
+## 各部分状态
 
 | 部分 | 状态 |
 | --- | --- |
-| 服务端视角 Toolkit、玩家查询和聊天上下文包 | 已实现 |
-| 与接收方无关的签名 webhook 发送端 | 已在 Toolkit 实现 |
-| 便携 Toolkit Skill 与安装指南 | 已实现；见 [Toolkit Skill](toolkit-skill.md) |
-| Hermes webhook route、受限 toolset 与回复投递指南 | 已发布于 [Hermes 无人值守运行](hermes-unattended.md) |
-| 签名 webhook 与 delivery-ID 互操作 | 等待 [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7) |
-| mc-agent-loop 中直连 Hermes HTTP backend | 临时兼容路径；移除由 [loop #3](https://github.com/guajun/mc-agent-loop/issues/3) 跟踪 |
+| 服务端视角 Toolkit、玩家查询与聊天上下文 bundle | 已实现 |
+| 带同端口控制传输的 Go CLI/daemon | 已实现（控制协议 1） |
+| 可移植 Toolkit Skill 与安装指南 | 已实现；本仓库为唯一来源 |
+| 接收端中立的签名 webhook 发送端 | 已实现；已用本地接收端验证 |
+| Hermes webhook 路由、Skill 订阅与回复投递 | 用户自有配置；路由需要被允许执行 CLI |
+| Hermes 通用 HMAC V2 路由方案与 `X-MC-Agent-*` 头 | 有文档化的兼容 shim（`webhook_receiver.py --scheme hermes-v2`）；请在网关中验证 |
+| mc-agent-loop 里的 Hermes HTTP 直连后端 | 依赖 Python bridge 的遗留兼容路径；移除进度见 [loop #3](https://github.com/guajun/mc-agent-loop/issues/3) |
 
-配置已经写入文档，但互操作问题验证完成前，不要把签名端到端 webhook 投递
-当作可运行能力。
+## 用户主动配置
 
-## 部署模型
+1. 安装二进制并指向世界（[安装与首次运行](getting-started.md)）。
+2. 安装 [Toolkit Skill](toolkit-skill.md)，让 Hermes 了解发现、身份、游标和未知写
+   结果流程。
+3. 让 Hermes 通过正常的命令执行调用 CLI。提示示例：
 
-Hermes Gateway、Toolkit 与服务端视角 mod endpoint 初期在同一台机器上运行。
-mod 和 Toolkit 留在 loopback；只有 Toolkit forwarder 发出的 HTTPS 请求越过
-该边界。
+   > 用 `mc-agent version`、`doctor`、`capabilities` 和 `state` 检查 Minecraft
+   > 连接，然后总结世界与在线玩家。不要改变世界。
 
-~~~text
-服务端聊天 -> mod 捕获 context_id -> Toolkit 事件缓冲
-                                      |
-                                      +-> 签名出站 webhook -> Hermes route
-                                                                  |
-                                                                  v
-Hermes Agent ---------------- 本地 MCP ------------------------> Toolkit
-~~~
+daemon 不会随每次运行重启；它自行重连并报告缺口。会话、模型调用和对话归 Hermes；
+Toolkit 是无模型的工具面。
 
-Hermes 负责路由、会话、模型、Skill 订阅与回复目标；Toolkit daemon 负责事件
-转发与游戏连接。双方都不复制对方职责。
+## 在线要求
 
-## 今天可用的交互式 Toolkit
+- 游戏必须带 mod 运行，任何调用才可用。游戏停止后接口停止；daemon 等待并重连。
+- 用户主动：Hermes 调用 CLI 期间 daemon 必须运行。
+- 无人值守：daemon、webhook 接收端（或 Hermes 自己的监听）和 Hermes gateway 都必须
+  保持在线。webhook 投递在内存中：daemon 重启会丢失排队事件。
+- daemon 从不调用模型，也不管理 Hermes 会话；它不会把回答写回 Minecraft，这属于
+  路由/投递职责。
 
-首次部署时，启动守护进程，并按已安装 Hermes 版本支持的 MCP 配置注册适配器。
-已有连接健康时跳过这些步骤：
+## 无人值守路径
 
-~~~powershell
-mc-bridge run
-# 配置 Hermes 拉起：
-C:/path/to/.venv/Scripts/mc-bridge.exe mcp
-~~~
+daemon 用 HMAC-SHA256 签名把选定事件转发到一个 HTTP(S) 接收端。仓库自带一个本地、
+接收端中立的接收器用于验证，并可以把已验证事件转发到 Hermes 通用 webhook 路由。
+完整步骤见[无人值守 Hermes：webhook + Skill](hermes-unattended.md)。
 
-修改 MCP 配置后启动新的 Hermes 会话。先调用 **mc_status** 与
-**mc_capabilities**。当前调用者上下文使用 **mc_player**；只有收到的事件带
-**context_id** 时才使用 **mc_context**。
+简要版本：
 
-后续会话应由智能体检查已有 MCP 工具并自行调用上述探针，不应例行要求用户打开
-终端或重新注册。探针失败时，根据实际错误定位问题，使用部署中已有且获授权的
-恢复流程；只有缺少恢复所需权限或工具时，才要求操作者执行具体的必要步骤。
-只有 MCP 工具的 route 也能完成受支持的游戏操作，不需要为此开放终端。
+```bash
+# 接收端（校验签名、打印事件；可选转发）
+python tools/webhook_receiver.py serve --secret test-secret --port 8645
 
-按 [安装 Toolkit Skill](toolkit-skill.md) 中已验证的命令安装便携 Skill。
-Hermes 没有原生 **gh skill** target；受支持路径是装进 Hermes 自定义 Skill
-目录。webhook route、受限 MCP toolset 与投递目标见
-[Hermes 无人值守运行](hermes-unattended.md)。
+# daemon（前台或由服务管理器托管；`daemon start` 不接受 webhook 参数）
+mc-agent daemon run --webhook-url http://127.0.0.1:8645/hook \
+    --webhook-secret test-secret --webhook-events chat,game,mark,error
+```
 
-Skill 同时要求对照实验默认在同一维度、完整 X/Y/Z 坐标不变的位置进行，每轮
-恢复并检查初始状态。同 XZ、不同 Y 的副本不能算原地复测。应确认实际运行加载了
-更新后的 `minecraft-toolkit` Skill；仅安装文件不能证明说明已进入模型上下文。
-这些是智能体行为指令，Toolkit 尚未通过命令校验器强制执行这些约束。
+在 Toolkit 侧，权限来自控制凭证：只观察的路由给 `read` 凭证，只有任务确实需要
+`command`/`mark`/`snapshot` 时才给 `read+write`。聊天文本是不可信输入，永远不是授权。
 
-## 配置事件发送端
+## 安全检查清单
 
-只有同时配置 URL 与 secret 时 Toolkit forwarding 才会启动。凭据放在环境变量
-或受保护 JSON 配置中，不放进命令参数。
-
-~~~powershell
-$env:MC_AGENT_WEBHOOK_URL = "https://<receiver>/hooks/mc-agent"
-$env:MC_AGENT_WEBHOOK_SECRET = "<独立随机密钥>"
-mc-bridge forward --events chat,game,mark,error
-~~~
-
-接收方必须验证 **X-MC-Agent-Signature**、拒绝过期时间戳，并按
-**X-MC-Agent-Event-Id** 去重。forwarder 不跟随重定向，因此应配置最终 URL。
-限制该 Hermes route 可用的 MCP 工具，并把特权命令授权与玩家身份分开。
-
-聊天 payload 可以包含 **context_id**。Agent 应尽快读取它，处理结构化的
-expired/not-found 结果，再按需查询当前状态。回复投递属于 Hermes route；
-forwarder 不会把 Agent 答案发回 Minecraft。
-
-## 临时兼容 loop
-
-在 webhook/Skill 工作流验证完成前，现有 loop 仍可监听聊天，并通过
-OpenAI-compatible endpoint 调用 Hermes：
-
-~~~powershell
-mc-agent-loop run --backend hermes --env-file .env
-~~~
-
-默认触发词是 **@agent**。该路径需要 loop 包、模型 API 环境变量和该包所记录的
-客户端视角回复机制。它只为兼容保留，不是目标架构，也不是 Toolkit 必需组件。
-
-## 安全检查表
-
-* mod 与 Toolkit 控制 socket 只监听 loopback。
-* 使用独立、高熵 webhook secret。
-* 在解析或路由前验证签名与时间戳。
-* 按 delivery ID 去重，因为重试沿用同一个事件 ID。
-* 只给事件 route 必需的 MCP 工具。
-* UUID/名字只是上下文，不是授权。
-* 在 Hermes 中显式配置回复投递，不从发送者身份推断。
+- 游戏控制端口按游戏本身的方式做防火墙；daemon 本地 IPC 保持在 loopback。
+- 使用专用的高熵 webhook secret；校验签名与时间戳；按稳定事件 id 去重。
+- 路由只保留需要的工具访问。运行 CLI 需要进程执行权限；关闭该路由的 web/file/
+  computer 工具并窄化提示模板。
+- 使用专用的最小权限控制凭证，部署结束时吊销。
+- UUID/名字与聊天文本是上下文，不是授权。
+- 在 Hermes 中显式配置回复投递，绝不只凭发送者身份推断。

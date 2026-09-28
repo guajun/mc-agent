@@ -7,93 +7,117 @@
 The supported architecture has one authoritative game path:
 
 ```text
-Harness -> Minecraft Agent Toolkit daemon -> server-vantage Fabric mod -> server
+Harness -> mc-agent CLI -> mc-agent daemon -> control transport -> server-vantage Fabric mod -> server
 ```
 
-The Toolkit and Harness are co-located with the mod endpoint. On a dedicated
-server that means the server machine. In single player it means the player's
-computer, where the integrated server runs inside the client process.
+The daemon is one Go binary and can run in different deployment positions:
 
-The Toolkit is local infrastructure, not an Agent runtime. It exposes facts and
-primitives, but it does not choose a model, maintain a conversation or decide
-whether an action is allowed.
+- **Client side / harness environment** (default): the daemon runs where the
+  harness runs and connects to the server's game port. This is enough for a
+  dedicated server or LAN world that only has the mod.
+- **Server side** (optional): the same binary runs next to the game and can be
+  addressed by local harnesses. It is not a gateway other daemons must pass
+  through, and it is never required.
+- **Multiple daemons** can connect independently with independent credentials
+  and event streams; a human player leaving does not end a dedicated-server
+  control connection.
+
+The Toolkit is local infrastructure, not an agent runtime. It exposes facts and
+primitives, but it does not choose a model, maintain a conversation, manage a
+harness session or decide whether an action is allowed; it also does not manage
+bodies, fake players or chunk loading.
 
 ## Two invocation modes
 
 | Mode | What starts the turn | How context is obtained |
 | --- | --- | --- |
-| **User-driven** | a user asks Codex, Claude Code or another Harness to do something | the Harness calls `player`, `state`, `entities` or another Toolkit operation on demand |
-| **Unattended** | a separately configured receiver such as Hermes accepts a signed event webhook | the event's `context_id` retrieves the sender's bounded chat-time context; the Harness can then make fresh Toolkit calls |
+| **User-driven** | a user asks Codex, Claude Code or another harness to do something | the harness calls `player`, `state`, `entities` or another operation on demand |
+| **Unattended** | a separately configured receiver (for example a Hermes route) accepts a signed event webhook | the event's `context_id` retrieves the sender's bounded chat-time context; the harness can then make fresh calls |
 
-An outside-game request has no captured chat moment. The Harness resolves the
+An outside-game request has no captured chat moment. The harness resolves the
 caller's stable player identity and asks for current context. An in-game chat
 event can carry context captured when the server received the message, before
-the Agent starts working. The two mechanisms are complementary.
+the agent starts working. The two mechanisms are complementary.
 
 Player identity is context, not authorization. A name or UUID does not prove
-that a caller may run privileged commands; that policy belongs to the Harness
-and its operator.
+that a caller may run privileged commands; permission comes from the control
+credential, and the policy belongs to the harness and its operator.
 
 ## Glossary
 
 | Term | Meaning |
 | --- | --- |
 | **Agent** | the reasoning process deciding what to do |
-| **Harness** | the host application that runs the Agent, supplies tools and owns its session; examples include Codex, Claude Code and Hermes |
-| **Minecraft Agent Toolkit** | the `mc-agent-bridge` package and its complete local Minecraft capability surface |
-| **Toolkit daemon** | the long-running process started by `mc-bridge run`; “Bridge daemon” is its historical name, not another layer |
-| **Fabric mod** | `mc-agent-interface-mod`, running in Minecraft and exposing server-known state over loopback |
-| **server vantage** | the authoritative endpoint in a dedicated or integrated server; the Toolkit default |
-| **client vantage** | the older opt-in endpoint tied to one client; retained for screen/client operations and compatibility |
-| **Skill** | portable instructions that teach a Harness how to operate the Toolkit; it does not implement transport, retries or sessions |
-| **agent-loop** | an optional compatibility listener, not part of the Toolkit contract and not required by user-driven Harnesses |
+| **Harness** | the host application that runs the agent, supplies tools and owns its session; examples include Codex, Claude Code and Hermes |
+| **Minecraft Agent Toolkit** | the Fabric mod plus the `mc-agent` Go CLI/daemon and the portable Skill |
+| **CLI** | a short-lived `mc-agent` process; one JSON result, then exit |
+| **daemon** | the long-running process that owns the game connection, replay buffer, unknown-write ledger and optional webhook |
+| **control transport** | the authenticated TLS connection on the actual Minecraft game port (control protocol 1) |
+| **legacy adapter** | the pre-0.8 plaintext loopback JSON-lines transport, kept for older mods, explicit client vantage and the single-player local path |
+| **Fabric mod** | `mc-agent-interface-mod`, running in Minecraft and exposing server-known state |
+| **server vantage** | the authoritative endpoint in a dedicated or integrated server |
+| **client vantage** | the older opt-in endpoint tied to one client; retained for screen/client operations |
+| **Skill** | portable instructions that teach a harness how to operate the Toolkit; it does not implement transport, retries or sessions |
+| **agent-loop** | an optional legacy compatibility listener that depends on the Python bridge; not part of the product contract |
 | **context bundle** | a bounded, short-lived snapshot of a chat sender's server-known identity, transform and view, retrieved by opaque `context_id` |
 | **webhook** | optional outbound, signed event delivery to a receiver configured by the user |
-
-The former Bridge project has become the Toolkit; the repository and CLI retain
-the `mc-agent-bridge` / `mc-bridge` names for compatibility. A Bridge daemon is
-therefore the Toolkit daemon, not a component behind the Toolkit. Codex, Claude
-Code and Hermes are Harnesses, not Toolkit backends.
 
 ## Ownership boundaries
 
 | Concern | Owner |
 | --- | --- |
 | facts available only inside the game process; per-tick capture | Fabric mod |
-| connection ownership, event replay, primitive composition and transport adapters | Toolkit daemon |
-| deciding which facts to fetch, interpreting them and choosing actions | Agent in its Harness |
-| model provider, conversation state, approvals, webhook route and delivery target | Harness/operator |
-| operating guidance shared between Harnesses | portable Skill |
+| connection ownership, reconnect, event replay, unknown-write ledger, transport adapters | daemon |
+| deciding which facts to fetch, interpreting them, choosing actions | agent in its harness |
+| model provider, conversation state, approvals, webhook route and reply delivery | harness/operator |
+| operating guidance shared between harnesses | portable Skill |
+| bodies, fake players, chunk loading | Carpet Skill or the server's own Skill |
 
 A new capability belongs in the mod if only the game process can know it. It
-belongs in the Toolkit when it composes existing primitives or adapts transport. It
-belongs in the Agent when it requires judgement.
+belongs in the daemon when it composes existing primitives or adapts transport.
+It belongs in the agent when it requires judgement.
 
-## Events and context
+## Events, reconnects and context
 
-The Toolkit daemon buffers events and exposes cursored replay. Its optional
-`forward` command sends selected events to one HTTP(S) receiver using
-HMAC-SHA256 signatures. It is receiver-neutral and makes no model calls.
+The daemon buffers events and exposes cursored replay. A cursor is a
+`(streamId, seq)` pair: `events --stream-id <id> --since <seq>` reports
+`reset: true` when the cursor belongs to another daemon run, `dropped` for
+buffer eviction, and `truncated` only when more pages exist (not loss).
+Reconnects are reported instead of hidden: `bridge_connected`/
+`bridge_disconnected`, `event_gap`, `game_restarted` (no replay crosses a
+restart), and `request_resolved` when an unknown write becomes known.
+Non-idempotent writes are never replayed automatically; each write carries a
+stable end-to-end request id, the ledger persists it, and `request-status`
+reports the outcome (`resultUnknown` errors include the id and a resolve hint).
 
-A server chat event can include a `context_id`. The mod keeps at most a bounded
-number of bundles for a bounded time; unknown or expired IDs return structured
-results and never substitute another player's data. Agents should fetch the
-bundle early, then query fresh world state as needed.
+The optional webhook sends selected events to one HTTP(S) receiver using
+HMAC-SHA256 signatures. It is receiver-neutral, in-memory, best effort and
+makes no model calls.
 
-The webhook sender and portable [Toolkit Skill](toolkit-skill.md) are shipped.
-The [Hermes unattended guide](hermes-unattended.md) documents route setup,
-restricted tools and reply delivery. Signed end-to-end delivery remains blocked
-by the header and delivery-ID interoperability follow-up in
-[mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7).
+A server chat event can include a `context_id`. The mod keeps a bounded number
+of bundles for a bounded time; unknown or expired IDs return structured results
+and never substitute another player's data. `timing` distinguishes a network
+chat packet (`receipt`) from a server-side broadcast such as a Carpet fake
+player's say (`broadcast`); a broadcast bundle is not packet-time history.
+
+## Honest boundaries
+
+- **Remote paths are remote.** A server's `worldDir` is never interpreted as a
+  path on the daemon host; `snapshot` writes on the game host.
+- **Snapshots are entity-order records, not memory checkpoints.** Full freeze,
+  fork and re-attach guarantees are a separate design discussion and are not
+  claimed here.
+- **Proxy compatibility.** Byte-transparent TCP relaying is the boundary;
+  Minecraft-aware or TLS-terminating proxies are untested and not claimed.
+- **The game must run.** When the game stops, the mod interface stops; the
+  daemon waits and reconnects. Starting a stopped remote game process is out
+  of scope.
 
 ## Historical paths
 
 The client-vantage endpoint and `mc-agent-loop` still support old workflows and
-offline tests. Use them only when a client-only capability such as screen state
-is actually required. They are not the architectural default, and no Harness
-name is a default game-chat trigger. The compatibility loop currently defaults
-to `@agent`.
-
-[RFC 0001](rfc/0001-agent-interface.md) records the earlier client-first
-architecture. [Plan #8](https://github.com/guajun/mc-agent/issues/8) supersedes
-that deployment model with the server-vantage Toolkit described here.
+offline tests, and the Python bridge remains the explicit legacy path for local
+`fork`/`restore` tooling. Use them only when a legacy capability is actually
+required. [RFC 0001](rfc/0001-agent-interface.md) records the earlier
+client-first, MCP-era architecture and is kept as history; it does not describe
+the current product.

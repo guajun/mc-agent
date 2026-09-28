@@ -4,87 +4,103 @@
 
 ## 调用链
 
-当前支持的架构只有一条权威游戏访问路径：
+受支持架构只有一条权威游戏路径：
 
 ```text
-Harness -> Minecraft Agent Toolkit daemon -> 服务端视角 Fabric mod -> 服务端
+Harness -> mc-agent CLI -> mc-agent daemon -> 控制传输 -> 服务端视角 Fabric mod -> 服务器
 ```
 
-Toolkit、Harness 与 mod endpoint 在同一台机器上。独立服务器场景就是服务器
-机器；单机场景就是玩家电脑，因为集成服务端运行在客户端进程内。
+daemon 是单个 Go 二进制，可部署在不同位置：
 
-Toolkit 是本地基础设施，不是 Agent 运行时。它暴露事实和原语，但不选择模型、
-维护对话，也不判断某项操作是否获准。
+- **客户端侧 / Harness 环境**（默认）：daemon 随 Harness 运行，连接服务器的游戏
+  端口。对只装 mod 的专用服务器或 LAN 世界来说这就够了。
+- **服务器侧**（可选）：同一个二进制跑在游戏旁，供本地 Harness 使用。它不是其他
+  daemon 必须经过的网关，也从不被强制要求。
+- **多个 daemon** 可用各自凭证和事件流独立连接；玩家退出不会中断专用服务器的控制
+  连接。
 
-## 两种启动方式
+Toolkit 是本地基础设施，不是智能体运行时。它暴露事实与基本操作，但不选择模型、
+不维护对话、不管理 Harness 会话、不判断动作是否允许，也不管理身体、假玩家或区块
+加载。
 
-| 模式 | 谁发起一轮任务 | 如何获得上下文 |
+## 两种调用模式
+
+| 模式 | 谁来发起回合 | 如何取得上下文 |
 | --- | --- | --- |
-| **用户主动** | 用户要求 Codex、Claude Code 或其它 Harness 做某件事 | Harness 按需调用 `player`、`state`、`entities` 或其它 Toolkit 操作 |
-| **无人值守** | Hermes 等单独配置的接收方收到签名事件 webhook | 用事件的 `context_id` 读取发送者的有界聊天时刻上下文，再按需发起新的 Toolkit 调用 |
+| **用户主动** | 用户让 Codex、Claude Code 或其他 Harness 做事 | Harness 按需调用 `player`、`state`、`entities` 等操作 |
+| **无人值守** | 用户配置的接收端（如 Hermes 路由）收到签名事件 webhook | 事件的 `context_id` 取回发送者受限的聊天时刻上下文；Harness 随后再做新的调用 |
 
-游戏外请求没有被捕获的聊天时刻。Harness 通过稳定玩家身份解析调用者，并查询
-当前上下文。游戏内聊天事件则可以携带服务端收到消息时捕获的上下文，早于
-Agent 开始执行。两种机制互补。
+游戏外的请求没有聊天时刻。Harness 通过稳定玩家身份解析调用者并请求当前上下文。
+游戏内聊天事件可以携带服务器收到消息时捕获的上下文，早于智能体开始工作。两种机制
+互补。
 
-玩家身份只是上下文，不是授权。名字或 UUID 不能证明调用者有权执行特权命令；
-策略属于 Harness 及其操作者。
+玩家身份是上下文，不是授权。名字或 UUID 不能证明调用者可以做特权操作；权限来自
+控制凭证，策略属于 Harness 与其运营者。
 
-## 术语表
+## 术语
 
 | 术语 | 含义 |
 | --- | --- |
 | **Agent** | 决定做什么的推理过程 |
-| **Harness** | 运行 Agent、提供工具并持有会话的宿主应用，例如 Codex、Claude Code、Hermes |
-| **Minecraft Agent Toolkit** | `mc-agent-bridge` 包及其完整本地 Minecraft 能力面 |
-| **Toolkit daemon** | `mc-bridge run` 启动的常驻进程；Bridge daemon 是旧称，不是另一层 |
-| **Fabric mod** | `mc-agent-interface-mod`，运行在 Minecraft 内，通过 loopback 暴露服务端已知状态 |
-| **服务端视角** | 独立或集成服务端内的权威 endpoint；Toolkit 默认目标 |
-| **客户端视角** | 绑定单个客户端的旧式显式 opt-in endpoint；保留给屏幕/客户端操作和兼容用途 |
-| **Skill** | 教 Harness 如何操作 Toolkit 的便携说明；不实现传输、重试或会话 |
-| **agent-loop** | 可选兼容监听器，不属于 Toolkit 契约，用户主动型 Harness 不需要它 |
-| **上下文包** | 聊天发送者在消息时刻的服务端身份、位置和视角的有界短期快照，通过不透明 `context_id` 读取 |
-| **webhook** | 可选的出站签名事件投递；接收方由用户配置 |
-
-原 Bridge 项目已经成为 Toolkit；仓库和 CLI 为兼容仍保留
-`mc-agent-bridge` / `mc-bridge` 名称。因此 Bridge daemon 就是 Toolkit daemon，
-不是 Toolkit 背后的另一个组件。Codex、Claude Code 和 Hermes 是 Harness，
-不是 Toolkit backend。
+| **Harness** | 运行智能体、提供工具并拥有会话的宿主应用，如 Codex、Claude Code、Hermes |
+| **Minecraft Agent Toolkit** | Fabric mod + `mc-agent` Go CLI/daemon + 可移植 Skill |
+| **CLI** | 短生命周期的 `mc-agent` 进程：输出一个 JSON 结果后退出 |
+| **daemon** | 长驻进程，拥有游戏连接、回放缓冲、未知写账本和可选 webhook |
+| **控制传输** | 游戏实际端口上的认证 TLS 连接（控制协议 1） |
+| **遗留适配器** | 0.8 之前的明文 loopback JSON-lines 传输，用于旧 mod、显式客户端视角和单机本地路径 |
+| **Fabric mod** | 在 Minecraft 内运行、暴露服务端已知状态的 `mc-agent-interface-mod` |
+| **服务端视角** | 专用或集成服务器中的权威端点 |
+| **客户端视角** | 绑定单个客户端的旧式可选端点，保留屏幕/客户端操作 |
+| **Skill** | 教 Harness 使用 Toolkit 的可移植说明；不实现传输、重试或会话 |
+| **agent-loop** | 依赖 Python bridge 的可选遗留兼容监听器，不属于产品契约 |
+| **context bundle** | 由不透明 `context_id` 取回的、聊天发送者服务端已知身份/朝向/视线的受限短期快照 |
+| **webhook** | 可选的出站签名事件投递，接收端由用户配置 |
 
 ## 职责边界
 
-| 关注点 | 负责方 |
+| 关注点 | 归属 |
 | --- | --- |
-| 只有游戏进程知道的事实、逐 tick 捕获 | Fabric mod |
-| 连接持有、事件重放、原语组合与传输适配 | Toolkit daemon |
-| 决定读取哪些事实、解释事实和选择动作 | Harness 中的 Agent |
-| 模型提供方、对话状态、审批、webhook 路由与回复目标 | Harness/操作者 |
-| 跨 Harness 共享的操作说明 | 便携 Skill |
+| 只有游戏进程知道的事实；逐 tick 捕获 | Fabric mod |
+| 连接所有权、重连、事件回放、未知写账本、传输适配 | daemon |
+| 决定取哪些事实、如何解读、做什么动作 | Harness 中的智能体 |
+| 模型提供方、对话状态、审批、webhook 路由与回复投递 | Harness/运营者 |
+| Harness 之间共享的操作指南 | 可移植 Skill |
+| 身体、假玩家、区块加载 | Carpet Skill 或服务器自己的 Skill |
 
-只有游戏进程能知道的新能力属于 mod；组合已有原语或适配传输的能力属于
-Toolkit；需要判断的能力属于 Agent。
+只有游戏进程能知道的新能力属于 mod；组合已有基本操作或适配传输的属于 daemon；
+需要判断的属于智能体。
 
-## 事件与上下文
+## 事件、重连与上下文
 
-Toolkit daemon 缓冲事件并提供基于游标的重放。可选的 `forward` 命令使用
-HMAC-SHA256 签名，把选定事件发给一个 HTTP(S) 接收方。它与接收方无关，也
-不进行模型调用。
+daemon 缓冲事件并提供游标回放。游标是 `(streamId, seq)` 对：
+`events --stream-id <id> --since <seq>` 在游标属于另一次 daemon 运行时返回
+`reset: true`，`dropped` 表示缓冲区淘汰，`truncated` 仅表示还有分页（不是丢失）。
+重连会明确报告而不是隐藏：`bridge_connected` /
+`bridge_disconnected`、缓冲无法到达游标时的 `event_gap`、run id 变化时的
+`game_restarted`（不跨重启回放），以及未知写变为已知时的 `request_resolved`。
+非幂等写不会自动重放；账本持久化它们，`request-status` 报告结果。
 
-服务端聊天事件可以包含 `context_id`。mod 只在有限容量和有限时间内保存
-上下文包；未知或过期 ID 返回结构化结果，绝不会换成另一位玩家的数据。Agent
-应尽早读取上下文包，之后再按需查询新的世界状态。
+可选 webhook 用 HMAC-SHA256 签名把选定事件发给一个 HTTP(S) 接收端，保持接收端中立、
+内存内、尽力投递，且不调用任何模型。
 
-webhook 发送端和便携 [Toolkit Skill](toolkit-skill.md) 已经发布。
-[Hermes 无人值守指南](hermes-unattended.md)记录 route、受限工具和回复投递。
-签名端到端投递仍受请求头与 delivery-ID 互操作 follow-up 阻塞，见
-[mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7)。
+服务器聊天事件可带 `context_id`。mod 在受限时间和数量内保存 bundle；未知或过期 ID
+返回结构化结果，绝不替换成其他玩家的数据。`timing` 区分网络聊天包（`receipt`）与
+服务端广播（如 Carpet 假玩家的 say，`broadcast`）；广播 bundle 不是包到达时刻的历史。
+
+## 诚实的边界
+
+- **远程路径就是远程。** 服务器 `worldDir` 绝不会被解释为 daemon 本机路径；
+  `snapshot` 在游戏主机上写文件。
+- **快照是实体顺序记录，不是内存检查点。** 完整冻结、fork 与重接入保证属于独立设计
+  讨论，这里不做承诺。
+- **代理兼容性。** 边界是字节透明的 TCP 转发；能理解 Minecraft 或终止 TLS 的代理
+  未经测试、不做承诺。
+- **游戏必须运行。** 游戏停止后 mod 接口停止；daemon 等待并重连。启动已停止的远程
+  游戏进程不在范围内。
 
 ## 历史路径
 
-客户端视角 endpoint 与 `mc-agent-loop` 仍支持旧工作流和离线测试。只有确实
-需要屏幕状态等客户端能力时才应选用；它们不是默认架构，也没有任何 Harness
-名称是默认游戏聊天触发词。兼容 loop 当前默认使用 `@agent`。
-
-[RFC 0001](rfc/0001-agent-interface.md) 记录较早的客户端优先架构。
-[方案 #8](https://github.com/guajun/mc-agent/issues/8) 已用本文描述的服务端视角
-Toolkit 取代其部署模型。
+客户端视角端点和 `mc-agent-loop` 仍支持旧工作流与离线测试，Python bridge 仍是本地
+`fork`/`restore` 工具的显式遗留路径。仅在确实需要遗留能力时使用。
+[RFC 0001](rfc/0001-agent-interface.md) 记录客户端优先、MCP 时期的早期架构，仅作为
+历史保留，不描述当前产品。

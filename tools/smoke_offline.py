@@ -1,9 +1,14 @@
 #!/usr/bin/env python3
-"""Offline integration smoke test: fake mod + bridge daemon + agent loop.
+"""Legacy developer smoke test: fake mod + Python bridge daemon + agent loop.
+
+This exercises the **legacy Python bridge** and the optional agent-loop; it is
+not the product path. The product is the Go CLI/daemon (see tools/tools.md and
+the mc-agent-bridge repository), and MCP was removed in mc-agent-bridge#12.
+Keep this script only for the compatibility/loop workflow.
 
 Runs the real CLI entry points in subprocesses against a stand-in for the
-in-game mod, so the whole chain between the three modules can be verified
-without launching Minecraft. Useful after touching the protocol or the loop.
+in-game mod, so the whole legacy chain can be verified without launching
+Minecraft.
 
     python tools/smoke_offline.py
 
@@ -36,7 +41,7 @@ def parse_args() -> argparse.Namespace:
         "--api-port",
         type=int,
         default=8765,
-        help="port for the bridge API (8765 matches the MCP server's default env)",
+        help="port for the legacy bridge API",
     )
     parser.add_argument(
         "--backend",

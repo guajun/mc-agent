@@ -12,7 +12,7 @@ mapping or an in-game event.
 Use a stable UUID when the Harness knows it; names are accepted as a convenience:
 
 ~~~powershell
-mc-bridge call player '{"player":"<uuid-or-name>"}'
+mc-agent player <uuid-or-name>
 ~~~
 
 The result includes identity, dimension, position, velocity, rotation, health,
@@ -23,7 +23,7 @@ For a game-chat task, the event can include **context_id**. That bundle freezes
 the sender's compact context when the server received the message:
 
 ~~~powershell
-mc-bridge call context '{"id":"<context_id>"}'
+mc-agent context <context_id>
 ~~~
 
 Fetch it early because the cache is bounded and expires entries. Then use
@@ -83,7 +83,8 @@ Use client vantage only when the Agent truly needs client-only capabilities,
 such as screen state, a client camera, opening a save or joining a server:
 
 ~~~powershell
-mc-bridge run --vantage client --port-file "C:/path/to/mc-agent/port.txt"
+mc-agent target add client --transport legacy --vantage client --port-file "C:/path/to/mc-agent/port.txt"
+mc-agent daemon start
 ~~~
 
 A second Minecraft client can give an Agent its own account, inventory, screen
