@@ -6,7 +6,10 @@
     [Architecture and terminology](../concepts.md), adopted by
     [plan #8](https://github.com/guajun/mc-agent/issues/8). The agent loop is
     now optional compatibility infrastructure, and Codex and Claude Code are
-    user-driven Harnesses rather than project-maintained backends.
+    user-driven Harnesses rather than project-maintained backends. The
+    MCP front-end described here was removed in
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12);
+    the current surface is the Go CLI.
 
 * Status: implemented - Phase 1 shipped, and the discussion is closed. What is
   still open moved to issues [#4](https://github.com/guajun/mc-agent/issues/4)

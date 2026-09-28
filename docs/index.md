@@ -7,8 +7,9 @@ hide:
 
 **Read the world. Run commands. Build repeatable experiments.**
 
-Minecraft Agent Toolkit connects your AI agent to Minecraft through local tools.
-Use your existing agent application, or try the tools from a terminal first.
+Minecraft Agent Toolkit connects your AI agent to Minecraft through a small Go
+CLI and a Fabric mod. Use your existing agent application, or try the tools from
+a terminal first. There is no MCP server and no Python runtime requirement.
 
 <div class="landing-actions" markdown>
 
@@ -35,14 +36,14 @@ Use your existing agent application, or try the tools from a terminal first.
 
 - **Make experiments repeatable**
 
-    Capture entity-order snapshots, fork worlds, and check restoration.
+    Capture entity-order snapshots and keep controlled trials in place.
 
-    [Explore world forks →](protocol-snapshot.md)
+    [Entity snapshots and forks →](protocol-snapshot.md)
 
 - **Use your preferred agent**
 
-    Connect an MCP client such as Codex, Claude Code or Hermes. Agents with shell
-    access can also use the CLI. Your app supplies the model and conversation.
+    Connect any harness that can run a command: Codex, Claude Code, Hermes or a
+    shell script. Your app supplies the model and conversation.
 
     [Connect your agent →](getting-started.md#4-connect-your-agent)
 
@@ -54,19 +55,19 @@ on 2026-09-26. [See the results and reproduction paths →](advanced.md#verified
 
 ## Get connected in four steps
 
-**Before you start:** Minecraft 26.2, Fabric Loader 0.19+, Fabric API, JDK 25,
-Python 3.11+, and Git. Keep Minecraft, the Toolkit and the agent on the same
-machine. Start with a single-player world or an existing dedicated Fabric server.
+**Before you start:** Minecraft 26.2, Fabric Loader 0.19.5, Fabric API 0.161.0
+and Java 25 for the game, plus a supported machine for the binary (Windows
+amd64, Linux glibc amd64 or macOS arm64). Install the binary in the environment
+that runs your agent; the game server needs only the mod.
 
-1. **Install the Fabric mod.** Build it from source, copy the jar into `mods/`, and open your world.
-2. **Install the Toolkit.** Clone `mc-agent-bridge` and install it into a Python virtual environment.
-3. **Check the connection.** Start the daemon in one terminal; run `status`, `capabilities` and `state` in another.
-4. **Connect your agent.** Register the MCP adapter, then ask the agent to describe your world.
+1. **Install the Fabric mod.** Download the 0.8.0 jar (or build it), copy it into `mods/`, and open your world.
+2. **Install the binary and Skill.** Use the versioned installer for your platform.
+3. **Check the connection.** Start the daemon; run `doctor`, `capabilities` and `state`.
+4. **Connect your agent.** Point the harness at the `mc-agent` command; no MCP registration is involved.
 
-The [step-by-step guide](getting-started.md) includes Windows and macOS/Linux
-commands, path examples, MCP settings and expected results. The first connection
-check does not need an AI model. Installation currently includes building the
-mod; there is no all-in-one installer in this guide.
+The [step-by-step guide](getting-started.md) includes Windows, macOS and Linux
+commands, remote/LAN target setup, the Skill install and expected results. The
+first connection check does not need an AI model.
 
 <div class="landing-actions" markdown>
 
@@ -78,19 +79,20 @@ mod; there is no all-in-one installer in this guide.
 ## How it works
 
 ```text
-You → Agent application → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft world
-       (the Harness)       MCP / CLI + daemon         server view
+You → Agent application → mc-agent CLI → mc-agent daemon ↔ Fabric mod ↔ Minecraft world
+       (the Harness)       short call     long connection  server view
 ```
 
 | Piece | Its job |
 | --- | --- |
 | Agent application (Harness) | Runs your model and conversation; decides which tools to call. |
-| Toolkit (`mc-agent-bridge`) | Provides the `mc-bridge` command and MCP tools; keeps the connection to Minecraft alive. |
+| Toolkit (`mc-agent`) | Provides the CLI and the daemon that keeps the connection to Minecraft alive. |
 | Fabric mod | Reads server-side world state and executes requested operations, including in single-player. |
 
-The Toolkit daemon runs while you play. Your agent's MCP adapter connects to it.
-Game-control connections stay on the local machine, and available tools are
-discovered from the connected mod.
+The daemon runs while you play and reconnects on its own; the CLI is a short
+call that talks to it over loopback. Available operations are discovered from
+the connected mod, and game-control connections stay local unless you choose a
+remote target.
 
 [Architecture and deployment details →](concepts.md)
 
@@ -100,9 +102,5 @@ discovered from the connected mod.
 | --- | --- |
 | Install, upgrade or change the game path | [Installation reference](install.md) |
 | Fix a failed connection | [First-run help](getting-started.md#something-didnt-work) · [Troubleshooting](troubleshooting.md) |
-| Teach my agent the Toolkit workflow | [Optional Toolkit Skill](toolkit-skill.md) |
+| Teach my agent the Toolkit workflow | [Toolkit Skill](toolkit-skill.md) |
 | Set up events, unattended agents or experiments | [Advanced guides](advanced.md) |
-
-Unattended Hermes is an advanced integration with a pending signed-delivery
-issue. Its [setup and status](hermes-unattended.md) are separate from the
-interactive setup above.

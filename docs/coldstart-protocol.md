@@ -1,5 +1,12 @@
 # Auditable cold-start runs
 
+!!! note "Historical experiment record (MCP-era tooling)"
+    This page documents an experiment run with the MCP-era tooling and is kept
+    as a historical record. MCP was removed in
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12);
+    the current product surface is the `mc-agent` Go CLI/daemon. Python
+    utilities referenced here are explicit developer/legacy tooling.
+
 A **cold-start run** is one attempt by a real agent, with a fresh context, to
 research and operate a Minecraft world through the Toolkit. The goal of this
 page is narrower than the science: define the *environment contract*, the

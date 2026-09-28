@@ -1,133 +1,86 @@
 # 安装 Toolkit Skill
 
-一个**可移植的 Agent Skill**，教任何运行时如何使用本机的服务端视角 Toolkit：
-发现连接的 mod 支持什么、按稳定 UUID 解析调用者、用 `context_id` 取回聊天发生
-瞬间的上下文包、按需查询权威的世界状态/实体/快照/存档元数据，并且把玩家身份
-当作上下文、而不是授权。它不包含 Hermes、Codex 或 Claude Code 的会话逻辑——
-只要能调 MCP 或运行 Toolkit CLI，同一份说明在所有运行时都成立。
+一个**可移植 Agent Skill** 教任何 Harness 使用 CLI-only 的服务端视角 Toolkit：
+发现连接与能力面、按稳定 UUID 解析调用者、按 `context_id` 取回聊天时刻上下文、
+处理事件游标与缺口、处理未知写结果，以及做受控的原位实验。它不包含 Hermes、
+Codex 或 Claude Code 的会话逻辑——同样的说明适用于任何能执行命令的 Harness。
 
 Skill 位于本仓库
 [`skills/minecraft-toolkit/SKILL.md`](https://github.com/guajun/mc-agent/tree/main/skills/minecraft-toolkit)，
-另有一份支撑参考
+带一个参考文件
 [`references/toolkit-operations.md`](https://github.com/guajun/mc-agent/blob/main/skills/minecraft-toolkit/references/toolkit-operations.md)。
+本仓库是**唯一权威来源**：发行包从 bridge 发布中 `skill-pin.json` 记录的固定提交
+打包，绝不使用手工维护的副本。
 
 ## Skill 教什么
 
 | 步骤 | 智能体做什么 |
 | --- | --- |
-| 重连 | 先用 `mc_status` / `mc_capabilities` 检查已有 MCP 工具；复用健康服务，不例行要求用户打开终端 |
-| 发现 | 先调 `mc_capabilities`（MCP）或 `mc-bridge call capabilities`（CLI）；只调连接的 mod 声明的操作 |
-| 解析 | 从 `state` 找到调用者，用 UUID 调 `player` 操作；名字只是便利，回包里的 UUID 才是身份 |
-| 关联 | 从推送来的游戏事件里取 `context_id`，用 `context` 取回上下文包；绝不按玩家名重建这个 id |
-| 查询 | 只取需要的：`state`、`entities`、`save` 元数据、`snapshots`，或用游标读 `events` |
-| 行动 | 在任务范围内使用 `command` / `command_output`；聊天里的身份是上下文不是授权；不支持的操作如实报告，不编造兜底 |
-| 实验 | 在同一维度、完整 X/Y/Z 不变的位置复测；恢复并核验初始状态，只改变声明的变量，记录实际观测结果 |
+| 发现 | 运行 `mc-agent version`/`doctor`，再运行 `capabilities` 和 `schema`；只调用连接 mod 声明的操作 |
+| 连接 | 启动或复用 daemon；按错误码区分 daemon 未运行、mod 未连接、操作不支持与未知写结果 |
+| 解析 | 从 `state` 找到调用者，按 UUID 调用 `player`；名字只是便利，回复中的 UUID 才是身份 |
+| 关联 | 从推送的事件取 `context_id` 并及时取回 bundle；绝不按玩家名重建 id |
+| 查询 | 只取所需：`state`、`entities`、`save` 元数据、`snapshots`，或按游标读 `events` |
+| 行动 | 在任务范围内使用 `command`/`command-output`，把聊天身份当上下文而非授权，不支持的操作如实报告 |
+| 恢复 | 如实处理 `event_gap`、`game_restarted` 与 `truncated`；先查 `request-status` 而不是重放非幂等写 |
+| 实验 | 在同一维度与完整 X/Y/Z 重复试次；恢复并核对基线，只改变声明的变量，记录观察结果 |
 
-Skill 刻意以"先发现"开头：Toolkit 的能力回包才是权威，mod 增加操作后说明依旧
-正确。
+Skill 采用发现优先：capability 回复是权威，因此随着 mod 增加操作，说明仍然正确。
 
-同 XZ、不同高度不能算原地复测；只有显式把高度或位置选作自变量时才应改变它。
-如果无法验证初始状态已恢复，应报告限制，不得把异地测试当作受控对照实验。
+实验时，同一 X/Z、不同 Y 不是原位重复。只有把高度/位置显式作为自变量时才允许变化；
+如果无法验证基线恢复，智能体必须报告限制，而不是把挪位后的测试说成受控比较。
 
-这些约束属于 harness 侧的行为指令，Toolkit 没有通过命令守卫强制执行。
-更新已安装副本后，要检查实际运行是否加载 `minecraft-toolkit` 并遵循接入和
-实验约束；仅在 skill 列表里显示 enabled 不能证明它已经生效。
+这些是 Harness 侧行为说明。Toolkit 不会把它们实现为命令守卫。更新已安装副本后，要
+验证实际运行确实加载了 `minecraft-toolkit` 并遵循连接与实验指引；技能列表里显示
+启用并不能证明这一点。
 
-## 前置条件
+## 从发行包安装（固定版本）
 
-- **带 `gh skill` 的 GitHub CLI。** GitHub CLI 里的 Agent Skill 是**预览功能**，
-  可能变化。本文用 `gh 2.95.0` 验证；先跑 `gh skill install --help` 看你这份
-  CLI 支持的 `--agent` 取值和参数。
-- **本地已安装 Toolkit**，智能体才有东西可调——见[安装说明](install.md)。Skill
-  只说明怎么用，不负责安装。
-- 如果命令要求认证，先跑 `gh auth login`。
-
-## 安装
-
-`gh skill install` 按标准 `skills/*/SKILL.md` 约定发现 Skill。project 作用域装进
-当前仓库，user 作用域装进用户主目录。
-
-### 通用 / 共享目标
+bridge 安装器会按发布校验和验证 Skill 包，并且除非指定 `--update-skill`，不会覆盖
+已有目录：
 
 ```bash
-# user 作用域：对该用户的每个运行时都可用
-gh skill install guajun/mc-agent minecraft-toolkit --agent universal --scope user
-
-# project 作用域：共享的 .agents/skills 目录，GitHub Copilot、Cursor、Codex、
-# Gemini CLI、Antigravity、Amp、Cline、OpenCode、Warp 等都读它
-gh skill install guajun/mc-agent minecraft-toolkit --agent universal --scope project
+# 显式指定 harness
+sh install.sh --version 0.5.0 --skill-harness codex
+# 或自定义父目录；会安装到 <DIR>/minecraft-toolkit/
+sh install.sh --version 0.5.0 --skill-dir /path/to/skills
 ```
 
-### 指定一个明确支持的运行时
-
-`--agent` 支持列表里的任何取值都可以。例如 Claude Code：
-
-```bash
-gh skill install guajun/mc-agent minecraft-toolkit --agent claude-code --scope user
-```
-
-本 Skill 验证过的落点（Windows 参考机，`gh 2.95.0`）：
-
-| 命令 | 落点 |
+| `--skill-harness` | 目标目录 |
 | --- | --- |
-| `--agent universal --scope user` | `~/.config/agents/skills/minecraft-toolkit/` |
-| `--agent universal --scope project` | `.agents/skills/minecraft-toolkit/`（共享） |
-| `--agent claude-code --scope user` | `~/.claude/skills/minecraft-toolkit/` |
-| `--agent codex --scope user` | `~/.codex/skills/minecraft-toolkit/` |
-| `--agent pi --scope user` | `~/.pi/agent/skills/minecraft-toolkit/` |
+| `codex` | `$CODEX_HOME/skills` 或 `~/.codex/skills` |
+| `claude-code`（`claude`） | `$CLAUDE_CONFIG_DIR/skills` 或 `~/.claude/skills` |
+| `universal` | `$XDG_CONFIG_HOME/agents/skills` 或 `~/.config/agents/skills` |
+| `hermes` | `$HERMES_HOME/skills` 或 `~/.hermes/skills` |
 
-用精确路径形式可以不扫描整个仓库，装的是同一个 Skill：
+Windows 使用 `./install.ps1 -Version 0.5.0 -SkillHarness codex`（或 `-SkillDir DIR`）。
 
-```bash
-gh skill install guajun/mc-agent skills/minecraft-toolkit --agent universal --scope user
-```
+## 用 `gh skill` 安装
 
-### Hermes（自定义目录）
-
-Hermes **不是** `gh skill` 的原生 `--agent` 目标：支持列表里没有这个名字，
-`--agent hermes` 会以 `invalid argument "hermes" for "--agent" flag` 被拒绝。
-不要宣称原生支持。
-
-Hermes 通过遍历自己的 home 下的 skills 目录来发现 Skill，所以用 `--dir` 装到
-这个目录即可。`--dir` 会创建 `<dir>/minecraft-toolkit/SKILL.md`：
-
-=== "Windows（PowerShell）"
-
-    ```powershell
-    gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:LOCALAPPDATA\hermes\skills"
-    ```
-
-=== "macOS / Linux"
-
-    ```bash
-    gh skill install guajun/mc-agent minecraft-toolkit --dir "${HERMES_HOME:-$HOME/.hermes}/skills"
-    ```
-
-Hermes home：Windows 是 `%LOCALAPPDATA%\hermes`，macOS/Linux 是 `~/.hermes`
-（或 `HERMES_HOME` 指定的位置）。
-
-## 验证安装
+支持原生 Skill 的 Harness 可以用自己的流程。GitHub CLI skills 处于 preview；
+本文以 `gh 2.95.0` 验证：
 
 ```bash
-gh skill list                       # 列出 minecraft-toolkit 和目标
+gh skill install guajun/mc-agent minecraft-toolkit --agent codex --scope user
+# 或显式目标目录
+gh skill install guajun/mc-agent minecraft-toolkit --dir "$HOME/.hermes/skills"
 ```
 
-对 Hermes，直接问 Hermes：
+Hermes 没有原生 `gh skill` agent 目标，用 `--dir` 安装到 Hermes skill 目录：
+Windows 为 `%LOCALAPPDATA%\hermes\skills`，macOS/Linux 为
+`${HERMES_HOME:-$HOME/.hermes}/skills`。
 
-```bash
-hermes skills list                  # minecraft-toolkit | （无分类）| local | enabled
-```
+`gh skill` 读取仓库分支；发行安装器才是绑定到具体 toolkit 版本的路径。更新已安装
+副本后，请验证新内容确实被加载。
 
-运行时在任务匹配 description 时加载 Skill；加载进智能体之前，也可以用
-`gh skill preview guajun/mc-agent minecraft-toolkit` 先预览。
+## 前提
 
-!!! note "保持 Skill 更新"
-    加 `-f` 重装会覆盖旧副本；也可以 `gh skill update minecraft-toolkit`
-    （`gh skill update --all` 刷新全部）。安装进去的 Skill frontmatter 里带有
-    来源元数据，`update` 读的就是它。
+- 已安装二进制并配置目标——见[安装与首次运行](getting-started.md)。Skill 只解释
+  Toolkit，不安装它。
+- 使用 `gh skill` 时需要已认证的 GitHub CLI（`gh auth login`）。
 
-## 下一步：Hermes 无人值守
+## 下一步：无人值守
 
-Skill 只是事件驱动方案的一半。另一半是用户在 Hermes Gateway 里配置的 webhook
-route：它加载这份 Skill，并把 route 限制到 Toolkit MCP toolset。见
-[Hermes 无人值守：webhook + Toolkit Skill](hermes-unattended.md)。
+Skill 是事件驱动方案的一半。另一半是用户配置的路由（例如 Hermes），它加载本 skill
+并订阅 daemon 的签名 webhook：见
+[无人值守 Hermes：webhook + Skill](hermes-unattended.md)。

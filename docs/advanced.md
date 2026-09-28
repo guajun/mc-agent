@@ -12,19 +12,24 @@ start with [Install and first run](getting-started.md).
 | Trigger an agent from game events | [Unattended Hermes: webhook + Skill](hermes-unattended.md) |
 | Understand Hermes integration and the legacy loop | [Hermes integration status](hermes-setup.md) |
 
-The signed event sender and Skill are available. Signed end-to-end Hermes
-delivery still depends on [mc-agent-bridge#7](https://github.com/guajun/mc-agent-bridge/issues/7).
-Treat the unattended guide as integration work, rather than the default first-run
-path. The optional legacy `mc-agent-loop` is described in the Hermes guide.
+The signed event sender and Skill are available, and the webhook path is
+verified against the local receiver shipped in `tools/webhook_receiver.py`.
+Forwarding into a Hermes generic route uses the documented `hermes-v2` shim;
+verify it in your gateway version. The optional legacy `mc-agent-loop` is
+described in the Hermes guide and depends on the Python bridge.
 
 ## Worlds and experiments
 
 | Goal | Guide |
 | --- | --- |
-| Fork and restore a world | [World-fork protocol](protocol-snapshot.md) |
+| Understand entity snapshots and legacy world forks | [World-fork protocol (legacy)](protocol-snapshot.md) |
 | Check a restored fork | [Fork verification](fork-verify.md) |
 | Provision an isolated server | [Headless lab servers](lab-server.md) |
 | Build observation code for a lab | [Building a mod](mod-building.md) |
+
+Remote paths are never local paths. `snapshot` writes entity-order records on
+the game host; `fork`/`restore` remain local legacy Python tooling and are
+refused for remote targets. Full freeze/re-attach guarantees are not claimed.
 
 ## Integration and evidence
 
@@ -43,13 +48,13 @@ merged on 2026-09-26:
 The cold start records the original autonomous model run. The regression reuses
 its successful recipe without a model and is evidence of repeatability. The
 [runbook](minecart-rom-runbook.md) separates offline verification, the recorded
-demo and fresh live-game runs. Optional Hermes webhook compatibility remains a
-separate follow-up.
+demo and fresh live-game runs.
 
 ### Technical runbooks
 
 These are developer and experiment runbooks; they are not required to install
-the Toolkit or connect an agent.
+the Toolkit or connect an agent. They document the MCP-era experiment tooling
+and are kept as historical records (MCP was removed in bridge #12).
 
 - [Auditable cold-start runs](coldstart-protocol.md)
 - [Read-only minecart audit mod](minecart-audit.md)

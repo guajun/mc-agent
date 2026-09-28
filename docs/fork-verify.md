@@ -1,5 +1,12 @@
 # Fork verification: did the lab reproduce the live world?
 
+!!! warning "Legacy local tooling"
+    `fork`/`restore`/`verify` are not part of the Go CLI. They remain local
+    Python tooling that needs access to the game host world directory, and
+    they are refused for remote targets. An entity snapshot is an entity-order
+    record, not a process memory checkpoint; full freeze/re-attach guarantees
+    are not claimed.
+
 A save file contains blocks and entity NBT but not the order the level ticks
 entities in, and that order decides the outcome of anything computed entity by
 entity. So "fork a live world" is only worth something if the restored world

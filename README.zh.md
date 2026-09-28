@@ -1,109 +1,93 @@
 # Minecraft Agent Toolkit
 
-让你的 AI 智能体读取 Minecraft 世界、查找玩家和实体、执行命令，并使用世界快照。
-沿用你熟悉的 MCP 智能体应用，也可以直接在终端体验。
+让 AI 智能体读取 Minecraft 世界、查找玩家与实体、执行命令并处理实体快照。
+产品由一个 Fabric mod 和一个 Go 单二进制组成：不需要 MCP 服务器，也不需要运行
+Python。
 
-**[从这里开始](docs/zh/getting-started.md)** · **[中文文档网站](https://guajun.github.io/mc-agent/zh/)** · **[English README](README.md)**
+**[从这里开始](docs/zh/getting-started.md)** · **[文档站点](https://guajun.github.io/mc-agent/zh/)** · **[English README](README.md)**
 
-## 能做什么？
+## 我能做什么？
 
-| 能力 | 你可以这样使用 |
+| 能力 | 示例请求 |
 | --- | --- |
-| 读取世界状态 | “概括当前世界状态和在线玩家。” |
-| 查看玩家和实体 | “找到我的玩家，描述我周围的实体。” |
-| 执行命令并读取结果 | “列出当前在线玩家。” |
-| 采集快照 | “为这次实验采集一份实体顺序快照。” |
-| 重复实验 | 按[世界分叉指南](docs/zh/protocol-snapshot.md)复制世界并校验恢复结果。 |
+| 读取世界 | “总结当前世界状态和在线玩家。” |
+| 查看玩家与实体 | “找到我并描述附近的实体。” |
+| 执行命令并读取结果 | “列出在线玩家。” |
+| 采集实体顺序快照 | “为这次实验采集一个实体快照。” |
+| 由事件驱动 | “有玩家发言；读取发言时刻的上下文并安全作答。” |
 
-实际可用操作由连接的 mod 决定，智能体先查询 `capabilities` 再调用工具。
-模型和对话由你使用的智能体应用提供。
+可用操作取决于连接的 mod。智能体会先查询 `capabilities`。模型与对话由你的
+智能体应用提供；Toolkit 从不调用模型。
 
-**已验收案例：** [Minecart ROM](docs/zh/minecart-rom-runbook.md) 已于 2026-09-26
-完成实机工具链门禁、真实智能体自主冷启动和全新游戏实例回归三个阶段。
-证据与复现入口见指南；脚本回归与原始自主运行分别记录。
-
-## 安装并完成第一次连接
-
-**需要准备：** Minecraft **26.2**、Fabric Loader **0.19+**、Fabric API、
-**JDK 25**、**Python 3.11+** 和 Git。游戏接口、Toolkit 和智能体应用运行在同一台机器。
-建议先用一个单机世界体验。
-
-1. **安装游戏 mod。** 按[构建与安装步骤](docs/zh/getting-started.md)操作，随后进入世界或启动独立服务端。目前文档提供的是源码构建路径。
-2. **安装 Toolkit。** 在准备长期保留的工作目录中，运行对应系统的命令。
-3. **检查连接，再接入智能体。** [首次运行指南](docs/zh/getting-started.md)提供成功标志和 MCP 配置。
-
-### Windows · PowerShell
-
-```powershell
-git clone https://github.com/guajun/mc-agent-bridge
-python -m venv .venv
-.venv/Scripts/python -m pip install -e "mc-agent-bridge[mcp]"
-
-# 改成包含 mc-agent-server/ 的游戏实例或服务端目录。
-# 使用 Toolkit 期间保持此终端打开。
-.venv/Scripts/mc-bridge run --server-dir "C:/Minecraft/my-instance"
-```
-
-在**相同工作目录打开第二个终端**：
-
-```powershell
-.venv/Scripts/mc-bridge call status
-.venv/Scripts/mc-bridge call capabilities
-.venv/Scripts/mc-bridge call state
-```
-
-### macOS / Linux · shell
-
-```bash
-git clone https://github.com/guajun/mc-agent-bridge
-python3 -m venv .venv
-.venv/bin/python -m pip install -e "mc-agent-bridge[mcp]"
-
-# 改成包含 mc-agent-server/ 的游戏实例或服务端目录。
-# 使用 Toolkit 期间保持此终端打开。
-.venv/bin/mc-bridge run --server-dir "/path/to/minecraft-instance"
-```
-
-在**相同工作目录打开第二个终端**：
-
-```bash
-.venv/bin/mc-bridge call status
-.venv/bin/mc-bridge call capabilities
-.venv/bin/mc-bridge call state
-```
-
-**成功标志：** `status` 显示 `connected: true`、`vantage: server`，
-`state` 返回世界数据。完成这些检查无需模型账号。
-遇到问题时，先查[首次运行帮助](docs/zh/getting-started.md)。
-
-## 架构方案
+## 组件关系
 
 ```text
-你 → 智能体应用 → Minecraft Agent Toolkit ↔ Fabric mod ↔ Minecraft 世界
-     (Harness)       MCP / CLI + 常驻进程       服务端视角
+你 → 智能体应用 → mc-agent CLI ─┐
+     （Harness）                 │ loopback IPC
+                                └→ mc-agent daemon ↔ mc-agent-interface mod ↔ Minecraft
 ```
 
-mod 从服务端读取权威世界状态，单机世界使用内置的集成服务端。
-Toolkit 保持游戏连接，智能体应用负责决定何时调用哪些工具。
-MCP 适配器连接已经运行的 Toolkit 常驻进程。游戏控制连接仅限本机 loopback。
+| 组件 | 需要安装什么 | 运行位置 |
+| --- | --- | --- |
+| 游戏 mod | 在实例的 `mods/` 中放入 [`mc-agent-interface` 0.8.0+](https://github.com/guajun/mc-agent-interface-mod/releases) | 游戏服务端：专用服务器、LAN 房主或单机集成服务器 |
+| Toolkit | 一个 Go 二进制 `mc-agent-0.5.0`（Windows amd64、Linux amd64、macOS arm64） | Harness 的实际执行环境（本机、WSL、容器或远端） |
+| 智能体应用 | 任何能执行命令的 Harness，如 Codex、Claude Code、Hermes | Harness 所在位置 |
+| 操作说明 | 可移植的 [Toolkit Skill](docs/zh/toolkit-skill.md) | 每个 Harness 安装一次 |
 
-| 组件 | 安装内容 |
-| --- | --- |
-| 游戏 mod | 将 [mc-agent-interface-mod](https://github.com/guajun/mc-agent-interface-mod) 放入实例的 `mods/` |
-| Toolkit | 安装 [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge)，获得 `mc-bridge` 命令 |
-| 智能体应用 | 使用现有 MCP 客户端（如 Codex、Claude Code、Hermes），或能运行 CLI 的智能体 |
-| 可选操作说明 | 安装可移植的 [Toolkit Skill](docs/zh/toolkit-skill.md) |
+专用服务器只需要 mod；LAN 房主只需要 mod，Toolkit 连接实际公布的 LAN 端口；
+单机世界使用集成服务器和同一个 mod。服务器侧 daemon 是可选的：同一个二进制
+既可以跑在服务器旁，也可以跑在 Harness 环境，多个 daemon 可独立连接。不需要
+SSH、额外公网端口、代理或客户端 mod 中继。
 
-本仓库存放文档、共享 Skill 和实验工具。标准用法只需在智能体应用之外安装 mod 和 Toolkit。
-组件术语与部署方案见[架构说明](docs/zh/concepts.md)。
-Hermes 无人值守模式仍有签名投递联调问题，状态与配置见[独立指南](docs/zh/hermes-unattended.md)。
+## 快速开始
 
-## 继续探索
+**游戏侧需要：** Minecraft **26.2**、Fabric Loader **0.19.5**、Fabric API
+**0.161.0**、Java **25**；二进制需要受支持的平台（Windows amd64、Linux glibc
+amd64、macOS arm64）。运行发行版二进制不需要 Python 或 Go。
 
-- [安装细节、升级与卸载](docs/zh/install.md)
-- [CLI 命令与 MCP 工具](docs/zh/tools.md)
-- [进阶指南、实验与设计历史](docs/zh/advanced.md)
-- [开发和预览文档](docs/zh/contributing-docs.md)
+1. **安装游戏 mod。** 从 [mod releases](https://github.com/guajun/mc-agent-interface-mod/releases)
+   下载 `mc-agent-interface-0.8.0.jar`（或[自行构建](docs/zh/mod-building.md)），
+   与 Fabric API 一起放入 `mods/`，然后打开世界或启动服务器。
+
+2. **安装二进制与 Skill。**
+
+    === "Linux amd64 / macOS arm64"
+
+        ```bash
+        curl -fsSL https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.sh \
+            | sh -s -- --version 0.5.0 --skill-harness codex
+        ```
+
+    === "Windows amd64"
+
+        ```powershell
+        iwr -useb https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.ps1 -OutFile install.ps1
+        ./install.ps1 -Version 0.5.0 -SkillHarness codex
+        ```
+
+3. **连接并检查。**
+
+    ```bash
+    mc-agent daemon start
+    mc-agent doctor
+    mc-agent state
+    ```
+
+    远程或 LAN 服务器需要先用 mod 指纹和服务器签发的凭证注册目标，见
+    [安装与首次运行](docs/zh/getting-started.md)。
+
+## 文档
+
+- [安装与首次运行](docs/zh/getting-started.md) —— mod、二进制、首次连接与首次调用。
+- [安装参考](docs/zh/install.md) —— 升级、卸载、支持平台与部署位置。
+- [架构](docs/zh/concepts.md) —— 组件、术语与边界。
+- [工具](docs/zh/tools.md) —— CLI 命令参考与能力模型。
+- [Toolkit Skill](docs/zh/toolkit-skill.md) —— 可移植操作指南。
+- [无人值守 Hermes：webhook + Skill](docs/zh/hermes-unattended.md) —— 事件驱动运行与在线要求。
+- [故障排查](docs/zh/troubleshooting.md) —— 连接、身份与写操作结果。
+
+本仓库保存文档、权威 Skill 源和实验工具。发行包在固定提交上从这里生成；
+二进制与安装器位于 [mc-agent-bridge](https://github.com/guajun/mc-agent-bridge)。
 
 ## 许可证
 

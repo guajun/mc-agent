@@ -1,5 +1,12 @@
 # Stage-one integration gate
 
+!!! note "Historical experiment record (MCP-era tooling)"
+    This page documents an experiment run with the MCP-era tooling and is kept
+    as a historical record. MCP was removed in
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12);
+    the current product surface is the `mc-agent` Go CLI/daemon. Python
+    utilities referenced here are explicit developer/legacy tooling.
+
 [Issue #14](https://github.com/guajun/mc-agent/issues/14) is the readiness gate
 between the Minecart ROM prerequisites (#15, bridge#6, #16, #17, #18, #19) and
 the stage-two cold start. A unit test passing in one repository, or a tool

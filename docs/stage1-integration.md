@@ -1,5 +1,12 @@
 # Stage-one integration run
 
+!!! note "Historical experiment record (MCP-era tooling)"
+    This page documents an experiment run with the MCP-era tooling and is kept
+    as a historical record. MCP was removed in
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12);
+    the current product surface is the `mc-agent` Go CLI/daemon. Python
+    utilities referenced here are explicit developer/legacy tooling.
+
 !!! success "Full gate pass (authoritative run, branch `codex/rom13-fullgate`)"
     The issue-#14 acceptance run (`tools/stage1_fullgate.py`, run id
     `rom13-fullgate-20260926T044858Z`, executed source commit

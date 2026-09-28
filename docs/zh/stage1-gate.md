@@ -1,5 +1,11 @@
 # 阶段一集成门禁
 
+!!! note "历史实验记录（MCP 时期工具）"
+    本页记录使用 MCP 时期工具完成的实验，仅作为历史记录保留。MCP 已在
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12)
+    中移除；当前产品入口是 `mc-agent` Go CLI/daemon。文中引用的 Python 工具
+    属于开发者/显式遗留工具。
+
 [Issue #14](https://github.com/guajun/mc-agent/issues/14) 是矿车 ROM 前置需求（#15、bridge#6、#16、#17、#18、#19）与阶段二冷启动之间的就绪门禁。某个仓库的单测通过、或者某个工具返回 `issued`，都**不是**整条实机链路可用的证据。本门禁消费这些前置项产出的实机证据，尽可能自行重算，并在任何缺项上拒绝通过。
 
 门禁由 `tools/stage1_gate.py` 实现（纯标准库）。它不启动游戏、也不制造证据：它读取一个*门禁包*（包含 `bundle.json` 与原始证据的目录），并严格失败关闭：

@@ -2,113 +2,113 @@
 
 [English](https://guajun.github.io/mc-agent/install/)
 
-**第一次安装？请从[安装与首次运行](getting-started.md)开始。**
-那里提供各系统的命令、mod 复制、连接检查和 MCP 配置。
-本页记录部署设置、升级、发现规则和卸载方式。
+**首次安装请先看[安装与首次运行](getting-started.md)。** 那里有各系统命令、mod
+启用、凭证签发和首次连接。本页覆盖支持矩阵、部署位置、升级、卸载与移除。
 
-## 要求与部署位置
+## 支持平台
+
+发行版二进制只在下述平台由发布工作流构建、打包并做安装验证：
+
+| 平台 | 归档 |
+| --- | --- |
+| Windows 10/11 amd64 | `mc-agent-<version>-windows-amd64.zip` |
+| Linux glibc amd64 | `mc-agent-<version>-linux-amd64.tar.gz` |
+| macOS 14+ arm64（Apple 芯片） | `mc-agent-<version>-darwin-arm64.tar.gz` |
+
+Windows arm64、Linux arm64、Linux musl/Alpine、macOS amd64 及其他 OS/CPU 组合
+不在测试和承诺范围内；安装器会明确拒绝。mod 是纯 Java，在 Minecraft 26.2 +
+Fabric Loader 0.19.5 + Fabric API 0.161.0 + Java 25 上运行。
+
+组件位置：
 
 | 组件 | 要求 | 运行位置 |
 | --- | --- | --- |
-| Fabric mod | Minecraft 26.2、Fabric Loader 0.19+、Fabric API、Java 25 | 独立服务端或单机集成服务端 |
-| Toolkit（`mc-agent-bridge`） | Python 3.11+ | 与 mod endpoint、Harness 同一台机器 |
-| Harness | 支持 MCP，或能运行 CLI | 与 Toolkit 同一台机器 |
+| Fabric mod | Minecraft 26.2、Fabric Loader 0.19.5+、Fabric API 0.161.0、Java 25 | 专用服务器、LAN 房主或单机集成服务器 |
+| `mc-agent` 二进制 | 上述平台之一；运行不需要 Python、Go 或 MCP | Harness 的实际执行环境：本机、WSL、容器或远程主机 |
+| daemon | 同一个二进制，可选的长驻进程 | Harness 旁或服务器旁 |
 
-mod socket 与 Toolkit API 只监听 loopback 是部署假设，不是需要绕开的限制。
-不要把任何游戏控制端口暴露到互联网。
+mod 的控制监听在游戏自身的 TCP 端口并带认证；保持正常防火墙卫生即可，不需要额外
+公网控制端口。daemon 的本地 IPC 只在 loopback。
 
 ## Fabric mod
 
-请使用[mod 构建与安装步骤](getting-started.md#1-install-the-game-mod)。
-包含 `versions/` 和 `libraries/` 的构建资源根目录可能与实际运行实例目录不同，
-首次运行指南解释了这两个路径。
-
-把构建出的 jar 和 Fabric API 放进服务端或客户端实例的 **mods/**。同一个 jar
-同时包含客户端和服务端入口。Toolkit 默认使用服务端入口，包括单机世界里的
-集成服务端。
+在实例 JVM 参数中加入 `-Dmcagent.control=true`（Fabric 服务端的
+`user_jvm_args.txt`，或客户端 JVM 参数）以启用同端口控制传输。遗留 loopback
+适配器无需开关，仍然可用。
 
 | 属性 | 默认值 | 用途 |
 | --- | --- | --- |
-| **mcagent.serverDir** | **mc-agent-server** | 服务端视角状态、快照与端口文件 |
-| **mcagent.serverPort** | **25581** | 首选 loopback 端口 |
-| **mcagent.contextCacheSize** | **256** | 聊天上下文包容量 |
-| **mcagent.contextCacheTtlSeconds** | **300** | 上下文包有效期 |
-| **mcagent.dir** / **mcagent.port** | **<gameDir>/mc-agent** / **25580** | 旧客户端视角 endpoint |
+| `mcagent.control` | `false` | 在游戏端口启用带认证的控制传输 |
+| `mcagent.serverDir` | `mc-agent-server` | 服务端适配器状态、快照与端口文件 |
+| `mcagent.serverPort` | `25581` | 遗留适配器尝试的第一个 loopback 端口 |
+| `mcagent.contextCacheSize` | `256` | 聊天上下文 bundle 上限 |
+| `mcagent.contextCacheTtlSeconds` | `300` | bundle 生命周期 |
+| `mcagent.dir` / `mcagent.port` | `<gameDir>/mc-agent` / `25580` | 遗留客户端视角端点 |
 
-升级时替换 jar，并确保只留一个版本。卸载时删除 jar；只有不再需要事件与快照
-时才一起删除数据目录。
+升级时替换 jar，并只保留一个 interface 版本与匹配的 Fabric API。卸载时删除 jar；
+只有不再需要其事件与快照时才删除 `mc-agent-server/`。
 
-## Toolkit（`mc-agent-bridge`）
+## 二进制
 
-按 Windows 或 macOS/Linux 使用 [Toolkit 安装命令](getting-started.md#2-install-the-toolkit)。
+使用固定版本安装器（详见 [mc-agent-bridge 安装文档](https://github.com/guajun/mc-agent-bridge/blob/main/docs/install.md)）：
 
-只需要守护进程、CLI 或 JSON-lines API 时可不装 MCP extra。可编辑安装在
-checkout 中 pull 即升级；删除虚拟环境即可卸载。
+```bash
+# Linux amd64 / macOS arm64
+curl -fsSL https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.sh \
+    | sh -s -- --version 0.5.0 --skill-harness codex
+```
 
-以下命令假设虚拟环境已激活。也可以像首次运行指南一样，从工作目录使用完整的
-`.venv/Scripts/mc-bridge`（Windows）或 `.venv/bin/mc-bridge`（macOS/Linux）路径。
-验证可执行文件：
+```powershell
+# Windows amd64
+iwr -useb https://raw.githubusercontent.com/guajun/mc-agent-bridge/v0.5.0/install/install.ps1 -OutFile install.ps1
+./install.ps1 -Version 0.5.0 -SkillHarness codex
+```
 
-~~~powershell
-mc-bridge --help
-mc-bridge discover --server-dir "C:/minecraft/server"
-~~~
+默认位置：`~/.mc-agent/bin`（Linux/macOS）、`%LOCALAPPDATA%\mc-agent\bin`
+（Windows）。状态目录为 `$XDG_CONFIG_HOME/mc-agent`、
+`~/Library/Application Support/mc-agent` 或 `%AppData%\mc-agent`；
+`MC_AGENT_HOME` 与 `--home DIR` 可覆盖。
 
-## 服务端视角发现
+升级时用新版本再次运行安装器；旧二进制保留为 `mc-agent.previous`，下载或校验失败
+不会改变当前安装。卸载用 `--uninstall`（`-Uninstall`），需要时再加
+`--remove-skill` / `--purge-state`（`-RemoveSkill` / `-PurgeState`）。
 
-默认 **mc-bridge run** 按以下顺序解析：
+## 目标与传输选择
 
-1. 显式 **--mod-port**；
-2. **--port-file** 或 **MC_AGENT_PORT_FILE**；
-3. **<--server-dir | MC_AGENT_SERVER_DIR | 当前目录>/mc-agent-server/port.txt**；
-4. 显式指定 server directory 时的 **<--server-dir>/port.txt**。
+| 场景 | 目标 |
+| --- | --- |
+| 启用 `-Dmcagent.control=true` 的专用服务器 | `--transport remote --address HOST:<游戏端口> --pin sha256:...` |
+| LAN 世界 | `--transport remote --address HOST:<公布端口> --pin sha256:...`（在房主上读取指纹） |
+| 未开 LAN 的单机 | `--transport legacy --server-dir <实例目录> --vantage server` |
+| 旧 mod / 显式客户端视角 | `--transport legacy --vantage client [--port-file FILE]` |
 
-如果都找不到，守护进程会报告错误并继续等待。它不会猜服务端端口，也不会
-静默连接客户端视角。
-
-~~~powershell
-mc-bridge run --server-dir "C:/minecraft/server"
-~~~
-
-保持常驻进程运行，在使用同一环境的第二个终端中检查：
-
-~~~powershell
-mc-bridge call status
-mc-bridge call capabilities
-~~~
-
-客户端视角是明确的旧式 opt-in：
-
-~~~powershell
-mc-bridge run --vantage client --port-file "C:/minecraft/client/mc-agent/port.txt"
-~~~
-
-## Harness 集成
-
-使用 MCP 时，参考 [MCP 设置与配置示例](getting-started.md#4-connect-your-agent)，
-让 Harness 通过绝对路径拉起 **mc-bridge mcp**。此适配器连接长期运行的
-守护进程，不能替代守护进程。不支持 MCP 的 Harness 使用 **mc-bridge call**
-或 loopback JSON-lines API。
-
-Codex、Claude Code 或其它用户主动型 Harness 不需要安装 **mc-agent-loop**。
-loop 只是 echo 测试和临时 Hermes HTTP 路径的可选兼容包。
+远程校验始终开启（`--pin` 或 `--ca`），没有 trust-all 模式。凭证保存在状态目录，
+只显示来源（`store`/`env`/`file`）。
 
 ## 验证
 
-| 检查 | 期望结果 |
+| 检查 | 预期结果 |
 | --- | --- |
-| 服务端日志 | server vantage armed/listening |
-| **mc-agent-server/port.txt** | 含实际 loopback 端口 |
-| **mc-bridge discover** | 报告 **vantage: server** 及来源 |
-| **mc-bridge call status** | 守护进程与 mod 已连接 |
-| **mc-bridge call capabilities** | 经过筛选的服务端工具面 |
-| **mc-bridge call player** | 结构化 found/not-found 玩家结果 |
+| 服务端/客户端日志 | 启用时控制传输就绪；遗留适配器监听 |
+| `mc-agent-server/control/fingerprint.txt` | 该实例的 `sha256:...` |
+| `mc-agent doctor` | 版本、home、目标、daemon 及每目标 TLS/能力检查 |
+| `mc-agent capabilities` | 连接 mod 的支持/不支持操作 |
+| `mc-agent state` | 返回世界数据而非连接错误 |
 
-## 卸载
+## Harness 集成
 
-| 组件 | 删除内容 |
+让 Harness 调用 `mc-agent` 可执行文件。没有需要注册的 MCP 服务器。安装
+[Toolkit Skill](toolkit-skill.md)，让智能体了解发现、身份、游标与未知写结果流程。
+无法加载 Skill 的 Harness 也可以直接调用 CLI；命令面见[工具](tools.md)。
+
+用户主动型 Harness 不需要 `mc-agent-loop`。它仍是可选的兼容监听器，用于其 echo
+测试与临时 Hermes HTTP 路径，状态为显式遗留。
+
+## 移除
+
+| 组件 | 移除方式 |
 | --- | --- |
-| Fabric mod | **mods/** 中的 jar；可选删除 **mc-agent-server/** |
-| Toolkit | 虚拟环境与 checkout |
-| Harness 配置 | MCP server 项与 webhook secret/route |
-| 实验室实例 | 只删除 **labs/** 下明确选定的目录 |
+| Fabric mod | 从 `mods/` 删除 jar；可选删除 `mc-agent-server/` |
+| 二进制 | `install.sh --uninstall --remove-skill --purge-state`（或 PowerShell 等价命令） |
+| Harness 集成 | 无需注销；如安装过 Skill 副本可删除 |
+| lab 实例 | 只删除 `labs/` 下选定的目录 |

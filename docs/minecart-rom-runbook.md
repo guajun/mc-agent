@@ -1,5 +1,12 @@
 # Minecart ROM acceptance runbook
 
+!!! note "Historical experiment record (MCP-era tooling)"
+    This page documents an experiment run with the MCP-era tooling and is kept
+    as a historical record. MCP was removed in
+    [mc-agent-bridge#12](https://github.com/guajun/mc-agent-bridge/issues/12);
+    the current product surface is the `mc-agent` Go CLI/daemon. Python
+    utilities referenced here are explicit developer/legacy tooling.
+
 This is the parent-level record of the Minecart ROM acceptance chain for
 [issue #13](https://github.com/guajun/mc-agent/issues/13): tooling readiness
 ([#14](https://github.com/guajun/mc-agent/issues/14)), one audited real-agent

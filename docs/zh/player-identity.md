@@ -11,7 +11,7 @@ Toolkit 没有一个永久绑定的玩家身体。默认服务端视角可以解
 Harness 知道稳定 UUID 时应优先使用；名字只是便捷输入：
 
 ~~~powershell
-mc-bridge call player '{"player":"<uuid-or-name>"}'
+mc-agent player <uuid-or-name>
 ~~~
 
 结果包含身份、维度、位置、速度、旋转、生命、游戏模式、眼睛位置和服务端
@@ -21,7 +21,7 @@ mc-bridge call player '{"player":"<uuid-or-name>"}'
 收到消息时发送者的精简上下文：
 
 ~~~powershell
-mc-bridge call context '{"id":"<context_id>"}'
+mc-agent context <context_id>
 ~~~
 
 缓存容量和有效期有限，应尽早读取。Agent 执行期间需要的新信息再通过
@@ -74,7 +74,8 @@ delivery-ID 互操作问题
 能力时，才使用客户端视角：
 
 ~~~powershell
-mc-bridge run --vantage client --port-file "C:/path/to/mc-agent/port.txt"
+mc-agent target add client --transport legacy --vantage client --port-file "C:/path/to/mc-agent/port.txt"
+mc-agent daemon start
 ~~~
 
 第二个 Minecraft 客户端可给 Agent 独立账号、背包、屏幕和相机，但要付出一个

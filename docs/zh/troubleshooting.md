@@ -1,48 +1,67 @@
-# 疑难排查
+# 故障排查
 
-下面这些大多是做这套东西时在真实世界里撞出来的。
+以下多数问题是我们在真实世界里边做边踩出来的。
 
-## 游戏侧
+## 连接
 
-### Toolkit daemon 说连不上 mod
+### `doctor` 报 `daemon_not_running`（退出码 4）
 
-```
-[mc-agent-bridge] cannot reach interface mod on 127.0.0.1:25580; retrying
-```
-
-按顺序检查：
-
-1. mod 在 `<实例>/mods/` 里吗？日志里有 `[mc-agent-interface] listening on ...` 吗？
-2. 游戏**在世界里**吗？不少原语（命令、聊天、实体）需要已进入世界。
-3. 端口被别的进程占了吗？mod 会自动往后让一位并写进 `port.txt`；用 `--port-file` 指过去。
-4. 防火墙拦了 loopback 吗？（少见，但某些公司 VPN 客户端会。）
-
-### `/mcagent` 提示 "unknown or incomplete command"
-
-涉及世界的客户端指令需要先进入世界；而**新加的** mod 版本要重启才生效。如果这条命令从来没成功过，就是 jar 没被加载——检查日志里的 mod 列表。
-
-### 两个客户端抢一个 port 文件
-
-每个客户端都会写 `<gameDir>/mc-agent/port.txt`，共用同一游戏目录的两个客户端会互相覆盖。给第二个自己的数据目录和端口：
-
-```
--Dmcagent.dir=<实例>/mc-agent-b, -Dmcagent.port=25591
+```bash
+mc-agent daemon start
+mc-agent daemon status
+mc-agent doctor
 ```
 
-### 某个 mod 让客户端在启动时崩溃（而且只在远程桌面下）
+daemon 会在状态目录写 `daemon.log`。如果 `daemon status` 显示 `staleState`，说明
+状态文件指向已死进程：删除它或直接启动新 daemon。
 
-在 Axiom 5.5.0 + RDP 下见过：编辑器构建字体图集时报
-`Dear ImGui Assertion Failed: ... Out of texture memory`。不是我们的代码——升级那个 mod 就好了。如果有崩溃看起来和接口无关，把那个 mod 移出去看是否还崩。
+### `connection_failed`、TLS 或 pin 错误
+
+1. `<gameDir>/mc-agent-server/control/fingerprint.txt` 是否存在？没有就带上
+   `-Dmcagent.control=true` 重启游戏/服务器。
+2. 地址是否为**实际**游戏端口（LAN 世界是公布端口）？`mc-agent target show <name>`
+   会打印配置的地址。
+3. 指纹变化后重新读取并用 `target add --force` 更新。证书校验无法关闭，这是有意
+   设计。
+4. 凭证错误时在服务器控制台重新签发，并用 `--token-stdin`/`--token-env`/
+   `--token-file` 保存。
+
+### `target_unknown` 或连到了错误的世界
+
+`mc-agent target list` 显示目标与默认项。用 `--target NAME` 或用 `target use NAME`。
+daemon 从不猜世界。
+
+### 游戏内 `/mcagent` 提示控制传输已关闭
+
+该实例 JVM 参数缺少开关。加入 `-Dmcagent.control=true` 并重启。新增的 mod 版本也
+只有重启后生效；先检查日志中的 mod 列表。
+
+### 两个客户端共用一个端口文件（遗留适配器）
+
+每个遗留端点都会写端口文件，共用游戏目录的客户端可能冲突。给第二个实例独立目录
+与端口：
+
+```
+-Dmcagent.dir=<instance>/mc-agent-b -Dmcagent.port=25591
+```
+
+### 某 mod 只在远程桌面下导致客户端启动崩溃
+
+在 Axiom 5.5.0 + RDP 下见过：`Dear ImGui Assertion Failed: ... Out of texture
+memory`，发生在编辑器构建字体图集时。不是我们的代码——升级该 mod 后恢复。如果崩溃
+看起来与 interface 无关，先移除其他 mod 验证。
 
 ## 命令与反馈
 
-### 命令执行了，但什么都没返回
+### 命令执行了但没有返回
 
-反馈就是聊天。`mc_command` 只负责**发送**；想拿到回答要用 **`mc_command_output`**（或 `tools/game_cmd.py`），它会把命令产生的消息收集起来。
+反馈走聊天。`mc-agent command` 只负责发送；需要回答时用
+`mc-agent command-output "<line>"`（或 `tools/game_cmd.py`），它会收集命令产生的
+消息。
 
-### gamerule 报 "Incorrect argument for command"
+### gamerule 报 “Incorrect argument for command”
 
-Minecraft 26.2 把 gamerule 全部改成了 `snake_case`：
+Minecraft 26.2 把 gamerule 改为 `snake_case`：
 
 | 旧名 | 26.2 |
 | --- | --- |
@@ -50,47 +69,76 @@ Minecraft 26.2 把 gamerule 全部改成了 `snake_case`：
 | `randomTickSpeed` | `random_tick_speed` |
 | `doDaylightCycle` | `advance_time` |
 
-### `/summon` 悄悄什么都没做
+### 写操作超时且 `resultUnknown`
 
-目标位置如果在未加载的区块里，实体根本不会被创建，而命令依然报告成功。实验室里要先把区域 force-load 起来——`fork_verify.py restore` 会根据录制的包围盒自动帮你做这件事。
+不要盲目重放。查看 `mc-agent request-status <id>` 与 `mc-agent requests` 账本：
+在服务器认领之前就超时的请求会被取消、可以安全重试；已经在运行的会保留账本条目，
+直到服务器报告最终状态。如果服务器没有记录（例如游戏重启），条目保持 `unresolved`，
+由运营者决定。
+
+### `/summon` 静默失败
+
+如果目标位置在未加载区块，实体根本不会创建，命令仍报告成功。实验室里先强制加载
+该区域——`fork_verify.py restore` 会按录制的包围盒处理（遗留本地工具）。
 
 ## Tick、顺序与确定性
 
-### 实体死了却一直不消失
+### 已死亡但不清除的实体
 
-要在游戏**运行中** kill，然后 `save-all flush` 落盘，再冻结。冻结状态下的游戏永远不会跑"移除濒死实体"的那个循环，于是它们以幽灵形式留在 tick 列表里——选择器选不到，但任何读列表的东西都能看见。
+在**游戏运行中**先杀死它们，然后 `save-all flush`，再冻结。冻结的游戏不会运行清除
+死亡实体的循环，它们会以幽灵形式留在 tick 列表里——选择器看不到，读列表的工具能看到。
 
-### 还原后的分叉少了实体
+### 恢复的 fork 实体不全
 
-按顺序检查：区块加载了吗（见上）、录制用的半径是多少（半径是**从玩家**量起的；无头实验室没有玩家，所以要"所有实体"）、以及那个实体是不是乘客——乘客的 NBT 内联在载具里，会随载具一起回来，所以不需要单独 summon。
+依次检查：区块是否加载（见上）、录制半径（半径以*玩家*为中心；无头 lab 没有玩家，
+应请求全部），以及录制的实体是否是乘客——乘客 NBT 嵌在载具里随载具恢复，不会单独
+生成。
 
-### 同一个实验在不同次运行里数值不同
+### 同一实验在不同运行中数字不同
 
-实体 tick 顺序是加载时按区块加载顺序重建的，而物理是逐个实体计算的。在实验室里你可以**拥有**这个顺序：`mc_fork` 会记录它，`fork_verify.py check` 会比对它。如果两次运行不同，`diff` 会告诉你哪些实体动得不一样——那是**测量结果**，不是失败。
+实体 tick 顺序在加载时按区块加载顺序重建，物理逐实体计算。实验室里可以掌控顺序：
+录制并比较快照。两次运行不同时，diff 会显示哪些实体轨迹不同——这是测量结果，不是
+失败。
 
-实验室里值得一并钉住的旋钮：`gamerule spawn_monsters false`、`gamerule random_tick_speed 0`、`gamerule advance_time false`、`difficulty peaceful`，以及用 `tick freeze` + `tick step N` 做确定性步进。
+实验室里值得固定的开关：`gamerule spawn_monsters false`、
+`gamerule random_tick_speed 0`、`gamerule advance_time false`、
+`difficulty peaceful`，以及 `tick freeze` + `tick step N` 做确定性步进。
 
 ## 实验室
 
-### 世界已经拷进去了，实验室里却没有实体
+### 世界已复制，但 lab 里没有实体
 
-无头服没有玩家，所以没有区块被加载。先把关心的区域 force-load 起来（`forceload add <x1> <z1> <x2> <z2>`），并且记住：**拷贝来的世界在 region 文件里仍然带着实体数据**——如果你只想保留录制的那批实体，就在游戏内清场并 `save-all flush`，然后再还原。
+无头服务器没有玩家，因此没有区块加载。强制加载关心的区域
+（`forceload add <x1> <z1> <x2> <z2>`），并记住复制的世界在区域文件里仍带实体数据
+——只想保留录制实体时，先在游戏内清理并 `save-all flush` 再恢复。
 
-### 两个服务器，一个端口
+### 两个服务器抢一个端口
 
-mod 会从基准端口往上扫，所以第二个实例会落到下一个空闲端口。请读各自实例的 `port.txt`，不要假设一定是 25580/25581。
+遗留适配器会从基础端口向上扫描，第二个实例会落到下一个空闲端口。读取每个实例自己
+的端口文件，不要假定 25580/25581。控制传输使用各服务器自己的游戏端口。
 
 ## 智能体
 
-### 兼容 loop 自己和自己对话，或者永远不回
+### 智能体看不到游戏
 
-这只适用于旧客户端视角的 `mc-agent-loop`，不适用于用户主动型 Harness 或服务端视角 webhook 设计。loop 会忽略它所附着那个客户端发出的聊天，所以单机会话没法用它自己的聊天触发。要么用第二个玩家（见 [玩家身份与游戏上下文](player-identity.md)），要么用一次性模式：
-`mc-agent-loop once "..."`。
+先调用 `mc-agent version`、`doctor` 和 `capabilities`。根据实际错误码区分 daemon
+不可达、mod 未连接和操作不支持。如果描述错了玩家，用该玩家的稳定 UUID 调用
+`player`；一个服务端视角 daemon 能解析所有在线玩家。
+
+### 兼容 loop 自己回答自己，或从不回答
+
+这只适用于遗留客户端视角的 `mc-agent-loop`，不适用于用户主动型 Harness 或 webhook
+方案。loop 会忽略它所连接客户端自己的聊天，所以单机会话无法用自身聊天触发它：要么
+使用第二个玩家（[玩家身份](player-identity.md)），要么用一次性回合
+`mc-agent-loop once "..."`。loop 依赖遗留 Python bridge，Codex、Claude Code 或任何
+直接运行 CLI 的 Harness 都不需要它。
 
 ### 回复被截断
 
-聊天行很短。`--chunk-size` 负责切分长回答，`--chunk-delay` 控制间隔。
+聊天行很短。`--chunk-size` 拆分长回答，`--chunk-delay` 控制节奏。这是 loop 配置，
+不是 Toolkit 命令。
 
-### Harness 看不到游戏
+### 智能体的回答没有出现在游戏里
 
-先调用 `mc_status` 与 `mc_capabilities`。无法连接守护进程时，检查 `mc-bridge run` 是否正在运行，以及是否发现服务端视角的 `mc-agent-server/port.txt`。描述错玩家时，用稳定 UUID（名字仅作便捷输入）调用 `mc_player`；同一服务端视角 Toolkit 可以解析该实例中的每位在线玩家。见 [玩家身份与游戏上下文](player-identity.md)。
+daemon 从不把回复写回 Minecraft。请在 Harness 或 webhook 路由中配置投递；见
+[Hermes 与无人值守](hermes-setup.md)。
