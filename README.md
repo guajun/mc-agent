@@ -70,7 +70,23 @@ required to run the released binary.
         ./install.ps1 -Version 0.5.0 -SkillHarness codex
         ```
 
-3. **Connect and check.**
+3. **Put the binary on PATH for this shell, then connect.** The installer does
+   not modify PATH unless you asked it to; either use `--add-to-path`
+   (`-AddToPath`) and open a new shell, or set it for the current session:
+
+    === "Linux amd64 / macOS arm64"
+
+        ```bash
+        export PATH="$HOME/.mc-agent/bin:$PATH"
+        ```
+
+    === "Windows amd64"
+
+        ```powershell
+        $env:Path = "$env:LOCALAPPDATA\mc-agent\bin;$env:Path"
+        ```
+
+4. **Connect and check.**
 
     ```bash
     mc-agent daemon start
