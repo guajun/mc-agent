@@ -64,15 +64,16 @@ directory with `--dir`, or use the release installer with
 ./install.ps1 -Version 0.5.0 -SkillHarness hermes
 
 # Or with GitHub CLI against the meta repository
-gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:LOCALAPPDATA\hermes\skills"
+gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:HERMES_HOME\skills"
 hermes skills list        # minecraft-toolkit | (no category) | local | enabled
 ```
 
 ## 2. Enable the Hermes webhook platform on loopback
 
-Enable it with the wizard (`hermes gateway setup`) or in
-`%LOCALAPPDATA%\hermes\config.yaml`. The `host` key is what keeps the listener
-off the network:
+Enable it with the wizard (`hermes gateway setup`) or in the Hermes config
+file (`config.yaml` under your Hermes home; confirm the location with your
+installed Hermes version - it is not fixed across releases). The `host` key is
+what keeps the listener off the network:
 
 ```yaml
 platforms:
@@ -84,7 +85,8 @@ platforms:
       secret: "<global fallback secret>"   # optional; routes can carry their own
 ```
 
-The environment-variable spelling in `%LOCALAPPDATA%\hermes\.env` works too
+The environment-variable spelling in the Hermes `.env` file (under the Hermes
+home) works too
 (`WEBHOOK_ENABLED=true`, `WEBHOOK_PORT=8644`, `WEBHOOK_SECRET=...`). Start the
 gateway and check it:
 
@@ -109,8 +111,8 @@ hermes webhook subscribe mc-chat `
 
 `{sender}`, `{data.text}`, `{context_id}` and `{tick}` are payload fields from
 the daemon's event body; `{__raw__}` dumps the whole payload if you need it.
-The route is stored in `%LOCALAPPDATA%\hermes\webhook_subscriptions.json`
-(mode 0600).
+The route is stored in `webhook_subscriptions.json` under the Hermes home
+(mode 0600); confirm the path for your Hermes version.
 
 Then allow the run to execute the CLI. Webhook runs deliberately get a
 restricted toolset, so add the process-execution toolset for this route in
@@ -182,7 +184,9 @@ mc-agent daemon run --webhook-url http://127.0.0.1:8645/hook \
 
 The forward mode emits `X-Webhook-Signature-V2`, `X-Webhook-Timestamp` and a
 stable `webhook-id`, so retries de-duplicate in Hermes instead of starting a
-second run.
+second run. If the downstream route answers with an error, the receiver returns
+`503` and does **not** mark the event delivered, so the daemon retries the same
+event id instead of losing it.
 
 ## 6. Verify the flow
 

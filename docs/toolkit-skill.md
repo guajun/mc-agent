@@ -58,7 +58,7 @@ sh install.sh --version 0.5.0 --skill-dir /path/to/skills
 | `codex` | `$CODEX_HOME/skills` or `~/.codex/skills` |
 | `claude-code` (`claude`) | `$CLAUDE_CONFIG_DIR/skills` or `~/.claude/skills` |
 | `universal` | `$XDG_CONFIG_HOME/agents/skills` or `~/.config/agents/skills` |
-| `hermes` | `$HERMES_HOME/skills` or `~/.hermes/skills` |
+| `hermes` | `$HERMES_HOME/skills` (the installer requires `HERMES_HOME`; Hermes' default home is version-dependent, so no directory is guessed) |
 
 On Windows use `./install.ps1 -Version 0.5.0 -SkillHarness codex` (or
 `-SkillDir DIR`).
@@ -75,8 +75,10 @@ gh skill install guajun/mc-agent minecraft-toolkit --dir "$HOME/.hermes/skills"
 ```
 
 For Hermes (no native `gh skill` agent target), install into the Hermes skill
-directory with `--dir`: `%LOCALAPPDATA%\hermes\skills` on Windows,
-`${HERMES_HOME:-$HOME/.hermes}/skills` on macOS/Linux.
+directory with `--dir "$HERMES_HOME/skills"` or the installer's
+`--skill-harness hermes` with `HERMES_HOME` set. Set `HERMES_HOME` from your
+installed Hermes configuration; the release installer deliberately does not
+guess a default.
 
 `gh skill` reads the repository branch; the release installer is the path that
 is pinned to the exact toolkit version. After updating an installed copy,

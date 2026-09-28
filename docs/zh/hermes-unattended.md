@@ -56,13 +56,14 @@ Hermes 没有原生 `gh skill` agent 目标；用 `--dir` 装到它的 home skil
 ./install.ps1 -Version 0.5.0 -SkillHarness hermes
 
 # 或用 GitHub CLI 从 meta 仓库安装
-gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:LOCALAPPDATA\hermes\skills"
+gh skill install guajun/mc-agent minecraft-toolkit --dir "$env:HERMES_HOME\skills"
 hermes skills list        # minecraft-toolkit | (no category) | local | enabled
 ```
 
 ## 2. 在 loopback 上启用 Hermes webhook 平台
 
-用向导（`hermes gateway setup`）或编辑 `%LOCALAPPDATA%\hermes\config.yaml` 启用。
+用向导（`hermes gateway setup`）或编辑 Hermes 配置文件（Hermes home 下的
+`config.yaml`；具体位置随 Hermes 版本变化，请以已安装版本为准）启用。
 `host` 键决定监听器不暴露到网络：
 
 ```yaml
@@ -75,7 +76,7 @@ platforms:
       secret: "<全局回退 secret>"   # 可选；路由可自带
 ```
 
-`%LOCALAPPDATA%\hermes\.env` 中的环境变量写法同样有效
+Hermes home 下 `.env` 中的环境变量写法同样有效
 （`WEBHOOK_ENABLED=true`、`WEBHOOK_PORT=8644`、`WEBHOOK_SECRET=...`）。启动 gateway
 并检查：
 
@@ -99,8 +100,8 @@ hermes webhook subscribe mc-chat `
 ```
 
 `{sender}`、`{data.text}`、`{context_id}`、`{tick}` 是 daemon 事件体中的字段；
-需要时 `{__raw__}` 输出整个 payload。路由保存在
-`%LOCALAPPDATA%\hermes\webhook_subscriptions.json`（权限 0600）。
+需要时 `{__raw__}` 输出整个 payload。路由保存在 Hermes home 下的
+`webhook_subscriptions.json`（权限 0600）；具体路径请以已安装版本为准。
 
 然后允许该运行执行 CLI。webhook 运行默认只得到受限工具集，因此在
 `webhook_subscriptions.json` 为该路由加入进程执行工具集（名称以你的 Hermes 版本
@@ -165,7 +166,8 @@ mc-agent daemon run --webhook-url http://127.0.0.1:8645/hook \
 ```
 
 转发模式发送 `X-Webhook-Signature-V2`、`X-Webhook-Timestamp` 和稳定的 `webhook-id`，
-因此重试会在 Hermes 去重，而不会启动第二次运行。
+因此重试会在 Hermes 去重，而不会启动第二次运行。下游路由返回错误时，接收端返回
+`503` 且**不**把事件标记为已投递，daemon 会用同一事件 id 重试而不是丢掉事件。
 
 ## 6. 验证流程
 

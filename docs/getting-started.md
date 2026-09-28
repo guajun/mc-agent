@@ -35,7 +35,10 @@ verify the SHA-256, and copy the jar next to Fabric API in the instance's
 === "macOS / Linux"
 
     ```bash
+    # Linux
     sha256sum mc-agent-interface-0.8.0.jar   # compare with checksums.txt
+    # macOS (no GNU sha256sum by default)
+    shasum -a 256 mc-agent-interface-0.8.0.jar
     cp mc-agent-interface-0.8.0.jar /path/to/instance/mods/
     ```
 
@@ -60,7 +63,8 @@ server console answered your first `/mcagent control` command.
 
 ### Credentials
 
-Control credentials are minted on the server console (permission level 3+):
+Control credentials are minted on the server console by the **owner**
+(permission level 4):
 
 ```
 /mcagent control status
@@ -69,7 +73,10 @@ Control credentials are minted on the server console (permission level 3+):
 /mcagent control token revoke <id>
 ```
 
-The secret is shown exactly once, as `mca1.<id>.<base64url>`. If the server has
+The secret is shown exactly once, as `mca1.<id>.<base64url>`. A `read`
+credential is required for observation (state, entities, player/chat context,
+snapshots, events); `write` adds `command`, `mark` and `snapshot`. A write-only
+credential receives no events and no replay. If the server has
 no usable credential yet, the mod issues one bootstrap `read+write` credential
 and writes it to `<gameDir>/mc-agent-server/control/bootstrap-token.txt`
 (owner-only). Move it into the daemon (stdin) and revoke the bootstrap
@@ -104,7 +111,10 @@ Replace the skill target with your harness (`claude-code`, `universal`,
 `hermes`) or use `--skill-dir DIR` for a custom directory; `--no-skill` skips
 it. The installer verifies the published checksum, refuses to overwrite an
 existing Skill directory unless `--update-skill` is given, and prints the
-`version` and `doctor` commands. See
+`version` and `doctor` commands. It does not modify PATH unless you pass
+`--add-to-path`; for the current shell run
+`export PATH="$HOME/.mc-agent/bin:$PATH"` (Windows:
+`$env:Path = "$env:LOCALAPPDATA\mc-agent\bin;$env:Path"`). See
 [Installing the Toolkit Skill](toolkit-skill.md) for the mapping and the
 manual alternative.
 

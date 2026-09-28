@@ -33,7 +33,10 @@ jar 与 Fabric API 一起放入实例的 `mods/`：
 === "macOS / Linux"
 
     ```bash
+    # Linux
     sha256sum mc-agent-interface-0.8.0.jar   # 与 checksums.txt 对比
+    # macOS（默认没有 GNU sha256sum）
+    shasum -a 256 mc-agent-interface-0.8.0.jar
     cp mc-agent-interface-0.8.0.jar /path/to/instance/mods/
     ```
 
@@ -55,7 +58,7 @@ JVM 参数。
 
 ### 凭证
 
-控制凭证在服务器控制台签发（权限等级 3+）：
+控制凭证由服务器控制台的**所有者**（权限等级 4）签发：
 
 ```
 /mcagent control status
@@ -64,7 +67,9 @@ JVM 参数。
 /mcagent control token revoke <id>
 ```
 
-密钥只显示一次，格式为 `mca1.<id>.<base64url>`。如果服务器还没有可用凭证，mod 会
+密钥只显示一次，格式为 `mca1.<id>.<base64url>`。观察类操作（state、entities、
+player/chat 上下文、snapshots、events）需要 `read` 凭证；`write` 额外允许
+`command`、`mark` 和 `snapshot`。只有 write 的凭证收不到事件与回放。如果服务器还没有可用凭证，mod 会
 签发一个 bootstrap `read+write` 凭证并写入
 `<gameDir>/mc-agent-server/control/bootstrap-token.txt`（仅属主可读）。把它交给
 daemon（标准输入）并在签发每个 daemon 专属凭证后吊销 bootstrap 凭证。`read` 凭证
@@ -97,7 +102,10 @@ daemon（标准输入）并在签发每个 daemon 专属凭证后吊销 bootstra
 把 skill 目标换成你的 Harness（`claude-code`、`universal`、`hermes`），或用
 `--skill-dir DIR` 指定自定义目录；`--no-skill` 跳过安装。安装器会校验发布校验和，
 除非指定 `--update-skill` 否则不会覆盖已有 Skill 目录，并打印后续 `version` 和
-`doctor` 命令。映射表和手动方式见[安装 Toolkit Skill](toolkit-skill.md)。
+`doctor` 命令。除非传入 `--add-to-path`，安装器不会修改 PATH；当前 shell 可运行
+`export PATH="$HOME/.mc-agent/bin:$PATH"`（Windows：
+`$env:Path = "$env:LOCALAPPDATA\mc-agent\bin;$env:Path"`）。映射表和手动方式见
+[安装 Toolkit Skill](toolkit-skill.md)。
 
 **成功标志：** `mc-agent version` 输出
 `mc-agent 0.5.0 (control protocol 1, mod >= 0.8.0)`。

@@ -51,7 +51,7 @@ sh install.sh --version 0.5.0 --skill-dir /path/to/skills
 | `codex` | `$CODEX_HOME/skills` 或 `~/.codex/skills` |
 | `claude-code`（`claude`） | `$CLAUDE_CONFIG_DIR/skills` 或 `~/.claude/skills` |
 | `universal` | `$XDG_CONFIG_HOME/agents/skills` 或 `~/.config/agents/skills` |
-| `hermes` | `$HERMES_HOME/skills` 或 `~/.hermes/skills` |
+| `hermes` | `$HERMES_HOME/skills`（安装器要求设置 `HERMES_HOME`；Hermes 默认目录随版本变化，不猜测） |
 
 Windows 使用 `./install.ps1 -Version 0.5.0 -SkillHarness codex`（或 `-SkillDir DIR`）。
 
@@ -66,9 +66,9 @@ gh skill install guajun/mc-agent minecraft-toolkit --agent codex --scope user
 gh skill install guajun/mc-agent minecraft-toolkit --dir "$HOME/.hermes/skills"
 ```
 
-Hermes 没有原生 `gh skill` agent 目标，用 `--dir` 安装到 Hermes skill 目录：
-Windows 为 `%LOCALAPPDATA%\hermes\skills`，macOS/Linux 为
-`${HERMES_HOME:-$HOME/.hermes}/skills`。
+Hermes 没有原生 `gh skill` agent 目标，用
+`--dir "$HERMES_HOME/skills"`，或用发行安装器的 `--skill-harness hermes` 并设置
+`HERMES_HOME`。`HERMES_HOME` 以你安装的 Hermes 配置为准；发行安装器有意不猜测默认目录。
 
 `gh skill` 读取仓库分支；发行安装器才是绑定到具体 toolkit 版本的路径。更新已安装
 副本后，请验证新内容确实被加载。
