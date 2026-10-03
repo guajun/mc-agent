@@ -110,6 +110,14 @@ daemon（标准输入）并在签发每个 daemon 专属凭证后吊销 bootstra
 **成功标志：** `mc-agent version` 输出
 `mc-agent 0.5.0 (control protocol 1, mod >= 0.8.0)`。
 
+脚本应运行 `mc-agent --pretty version`：它返回包含 `version`、`controlProtocol`、
+`modMinVersion` 及运行时信息的 JSON。有限的数据命令在 stdout 输出一个 JSON 值；
+`version` 默认输出文本，`help` 在 stderr 输出文本，`events --follow` 持续输出 JSON 值，
+`daemon run` 在前台运行，不返回最终结果。错误在 stderr 输出 JSON，并以非零退出码结束；
+接受结果前应检查退出码。
+用法错误还可能在 stderr 输出帮助文本；不提供命令时只输出帮助并以退出码 2 结束。
+不要假定整个 stderr 都是一个 JSON 值。
+
 ## 3. 检查连接 { #3-check-the-connection }
 
 ### 专用服务器或 LAN 世界

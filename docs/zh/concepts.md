@@ -44,7 +44,7 @@ Toolkit 是本地基础设施，不是智能体运行时。它暴露事实与基
 | **Agent** | 决定做什么的推理过程 |
 | **Harness** | 运行智能体、提供工具并拥有会话的宿主应用，如 Codex、Claude Code、Hermes |
 | **Minecraft Agent Toolkit** | Fabric mod + `mc-agent` Go CLI/daemon + 可移植 Skill |
-| **CLI** | 短生命周期的 `mc-agent` 进程：输出一个 JSON 结果后退出 |
+| **CLI** | `mc-agent` 命令入口；有限的数据调用返回 JSON，文本与流式输出例外见[入门](getting-started.md) |
 | **daemon** | 长驻进程，拥有游戏连接、回放缓冲、未知写账本和可选 webhook |
 | **控制传输** | 游戏实际端口上的认证 TLS 连接（控制协议 1） |
 | **遗留适配器** | 0.8 之前的明文 loopback JSON-lines 传输，用于旧 mod、显式客户端视角和单机本地路径 |

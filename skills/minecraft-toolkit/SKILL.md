@@ -54,6 +54,15 @@ mc-agent schema               # operation contract; schema <op> for one operatio
 ```
 
 - `version` output: `mc-agent <product> (control protocol <n>, mod >= <mod>)`.
+  For scripts, use `mc-agent --pretty version` and parse its JSON fields
+  `version`, `controlProtocol`, and `modMinVersion`.
+- Finite data commands print one JSON value on stdout. `version` defaults to
+  text, `help` prints text on stderr and exits 0, `events --follow` streams JSON values,
+  and `daemon run` stays in the foreground without a final result. Errors are
+  JSON on stderr and use non-zero process exit codes; check both streams and
+  the exit code instead of silently accepting a missing parsed result.
+  Usage failures may also print help text on stderr; invoking without a command prints only
+  help and exits 2. Do not parse all stderr as a single JSON value.
 - `doctor` exits non-zero when something it checked is not green. On a machine
   with no configured target the `targets` check is expected to fail; read the
   individual checks instead of only the exit code.
