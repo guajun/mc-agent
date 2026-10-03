@@ -50,7 +50,7 @@ credential, and the policy belongs to the harness and its operator.
 | **Agent** | the reasoning process deciding what to do |
 | **Harness** | the host application that runs the agent, supplies tools and owns its session; examples include Codex, Claude Code and Hermes |
 | **Minecraft Agent Toolkit** | the Fabric mod plus the `mc-agent` Go CLI/daemon and the portable Skill |
-| **CLI** | a short-lived `mc-agent` process; one JSON result, then exit |
+| **CLI** | `mc-agent` command surface; finite data calls return JSON, with text and streaming exceptions documented in [Getting started](getting-started.md) |
 | **daemon** | the long-running process that owns the game connection, replay buffer, unknown-write ledger and optional webhook |
 | **control transport** | the authenticated TLS connection on the actual Minecraft game port (control protocol 1) |
 | **legacy adapter** | the pre-0.8 plaintext loopback JSON-lines transport, kept for older mods, explicit client vantage and the single-player local path |

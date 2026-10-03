@@ -11,7 +11,7 @@ with an upstream dependency when the supporting mod API has not shipped yet.
 
 | Surface | How to use it |
 | --- | --- |
-| CLI | `mc-agent <command>`; one JSON value on stdout, errors on stderr |
+| CLI | `mc-agent <command>`; finite data commands return JSON; see output exceptions below |
 | Daemon | `mc-agent daemon start` (detached) or `daemon run` (foreground/supervised) |
 | Local IPC | token-protected loopback socket; the CLI uses it automatically |
 | Remote transport | `target add ... --transport remote`; the daemon speaks TLS to the mod |
@@ -20,6 +20,22 @@ with an upstream dependency when the supporting mod API has not shipped yet.
 There is no MCP server and no Python bridge in the product path. The optional
 webhook is outbound-only; the daemon never calls a model and never manages a
 harness session.
+
+Finite data commands print one JSON value on stdout. Output exceptions:
+
+- `version` defaults to human-readable text; `mc-agent --pretty version`
+  returns JSON with `version`, `controlProtocol`, `modMinVersion`, and runtime
+  metadata. Use this JSON entry point in scripts.
+- `help` prints human-readable text on stderr and exits successfully.
+- `events --follow` streams JSON values; consume successive values rather
+  than parsing all stdout as one result.
+- `daemon run` runs in the foreground without a final result.
+
+Errors are JSON on stderr with a stable code and non-zero process exit code.
+Check the exit code and parse the appropriate stream; an absent JSON result
+must not silently count as success.
+Usage failures may also print help text on stderr; invoking without a command
+prints only help and exits 2. Do not assume all stderr is a single JSON value.
 
 ## Command catalog
 
