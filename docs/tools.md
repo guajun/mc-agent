@@ -83,6 +83,37 @@ utilities, not product runtime requirements.
 | `webhook_receiver.py` | local HMAC-verifying receiver for webhook testing |
 | `smoke_offline.py` | developer smoke test of the legacy Python daemon/agent-loop path |
 
+### Launching a client with its own data directory
+
+`launch_instance.py` reads the installed version, libraries and assets from
+`--minecraft-dir`. Use `--game-dir` to keep the experiment's client data,
+default launch log and mc-agent server state in a separate directory:
+
+```powershell
+python tools/launch_instance.py --minecraft-dir "D:/MC/.minecraft" `
+  --version 26.2-Fabric --game-dir "F:/research/client-game" `
+  --jvm-property mcagent.control=true --world "research world"
+```
+
+Provision the experiment's mods, configuration and saves in that game directory
+before launching. The tool does not copy the user's instance or world.
+It resolves `--game-dir` against the caller's cwd before starting Java and adds
+`-Dmcagent.serverDir=<absolute gameDir>/mc-agent-server` unless a serverDir
+property is already present in `--jvm-property`, `--jvm-arg` or the version's JVM
+arguments. Raw `--game-arg=--gameDir=...` (or the two-argument form) is also
+normalized this way; conflicting game directories are rejected.
+
+Before launch, the tool prints the process cwd, client game directory, server
+directory and control directory. Check those paths; after launch, verify the
+control files and snapshots appear under the printed server directory. Existing
+files are preserved. Java's cwd remains the installed version directory, so an
+explicit relative serverDir is relative to that cwd. Without a game directory
+override, the original defaults remain: client data and cwd use the version
+directory, and server state uses its `mc-agent-server` subdirectory. Dedicated
+servers retain the Mod's default `mc-agent-server`, relative to their process
+cwd. These settings select file destinations; they do not sandbox Minecraft or
+other mods.
+
 ## Legacy agent-loop
 
 `mc-agent-loop` is not part of the Toolkit contract. It remains an optional

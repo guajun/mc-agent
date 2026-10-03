@@ -37,6 +37,10 @@ def parse_args() -> argparse.Namespace:
         help="the launcher's game root, i.e. the folder holding versions/ libraries/ assets/",
     )
     parser.add_argument("--version", required=True, help="version folder name, e.g. 26.2-Fabric")
+    parser.add_argument(
+        "--game-dir", default="",
+        help="client data directory; also defaults mcagent.serverDir to its mc-agent-server subdirectory",
+    )
     parser.add_argument("--java", default="", help="java executable (default: JAVA_HOME or PATH)")
     parser.add_argument("--memory", default="4G", help="heap size, e.g. 4G")
     parser.add_argument(
@@ -142,6 +146,7 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], Path, Path]:
         args.world = Path(args.world_file).read_text(encoding="utf-8").strip()
     minecraft_dir = Path(args.minecraft_dir).resolve()
     version_dir = minecraft_dir / "versions" / args.version
+    game_dir, game_args, independent = resolve_game_directory(args, version_dir)
     version_json = version_dir / f"{args.version}.json"
     client_jar = version_dir / f"{args.version}.jar"
     if not version_json.exists():
@@ -201,7 +206,7 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], Path, Path]:
         "clientid": account.get("userid", ""),
         "version_name": args.version,
         "version_type": data.get("type", "release"),
-        "game_directory": str(version_dir),
+        "game_directory": str(game_dir),
         "assets_root": str(minecraft_dir / "assets"),
         "assets_index_name": (data.get("assetIndex") or {}).get("id", data.get("assets", "legacy")),
         "resolution_width": str(args.width or 1280),
@@ -226,14 +231,54 @@ def build_command(args: argparse.Namespace) -> tuple[list[str], Path, Path]:
         elif library_enabled(entry, features=features):
             command.extend(substitute(str(value)) for value in entry.get("value", []))
     command.extend(args.jvm_arg)
+    if independent and not any(part.startswith("-Dmcagent.serverDir=") for part in command):
+        command.append(f"-Dmcagent.serverDir={game_dir / 'mc-agent-server'}")
     command.append(data["mainClass"])
     for entry in data.get("arguments", {}).get("game", []):
         if isinstance(entry, str):
             command.append(substitute(entry))
         elif library_enabled(entry, features=features):
             command.extend(substitute(str(value)) for value in entry.get("value", []))
-    command.extend(args.game_arg)
+    command.extend(game_args)
     return command, version_dir, natives
+
+
+def resolve_game_directory(args: argparse.Namespace, version_dir: Path) -> tuple[Path, list[str], bool]:
+    """Resolve the client directory before launch, including legacy raw overrides.
+
+    Paths are relative to the caller, not the Java process's version-directory cwd.
+    Strip raw gameDir options so the version JSON receives a single directory.
+    """
+    directories = [args.game_dir] if args.game_dir else []
+    remaining: list[str] = []
+    raw = iter(args.game_arg)
+    for value in raw:
+        if value == "--gameDir":
+            directory = next(raw, "")
+            if not directory or directory.startswith("--"):
+                raise SystemExit("--game-arg=--gameDir requires a directory; prefer --game-dir")
+            directories.append(directory)
+        elif value.startswith("--gameDir="):
+            directory = value.partition("=")[2]
+            if not directory:
+                raise SystemExit("--gameDir requires a directory; prefer --game-dir")
+            directories.append(directory)
+        else:
+            remaining.append(value)
+    resolved = [Path(value).resolve() for value in directories]
+    if resolved and any(path != resolved[0] for path in resolved[1:]):
+        raise SystemExit("conflicting game directories; specify one --game-dir")
+    return (resolved[0] if resolved else version_dir), remaining, bool(resolved)
+
+
+def server_directory(command: list[str], cwd: Path) -> Path:
+    """Report the effective JVM serverDir, respecting Java's last property value."""
+    value = "mc-agent-server"
+    for part in command:
+        if part.startswith("-Dmcagent.serverDir="):
+            value = part.partition("=")[2]
+    directory = Path(value)
+    return directory.resolve() if directory.is_absolute() else (cwd / directory).resolve()
 
 
 def default_account_file() -> Path:
@@ -257,16 +302,23 @@ def main() -> int:
         print("error: pass --minecraft-dir (or set MC_AGENT_MINECRAFT_DIR)", file=sys.stderr)
         return 2
     command, version_dir, natives = build_command(args)
+    game_dir, _, independent = resolve_game_directory(args, version_dir)
+    server_dir = server_directory(command, version_dir)
 
+    print(f"[launch] cwd: {version_dir}")
+    print(f"[launch] game dir: {game_dir}")
+    print(f"[launch] server dir: {server_dir}")
+    print(f"[launch] control dir: {server_dir / 'control'}")
     if args.dry_run:
         print(" ".join(f'"{part}"' if " " in part else part for part in command))
         return 0
 
-    log_path = Path(args.log) if args.log else version_dir / "mc-agent" / "game-launch.log"
+    if independent:
+        game_dir.mkdir(parents=True, exist_ok=True)
+    log_path = Path(args.log) if args.log else game_dir / "mc-agent" / "game-launch.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     handle = open(log_path, "ab")
     print(f"[launch] java: {command[0]}")
-    print(f"[launch] game dir: {version_dir}")
     print(f"[launch] natives: {natives}")
     print(f"[launch] log: {log_path}")
     process = subprocess.Popen(
