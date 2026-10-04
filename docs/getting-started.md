@@ -121,6 +121,15 @@ manual alternative.
 **Success:** `mc-agent version` prints
 `mc-agent 0.5.0 (control protocol 1, mod >= 0.8.0)`.
 
+For scripts, run `mc-agent --pretty version`: it returns JSON fields
+`version`, `controlProtocol`, and `modMinVersion` plus runtime metadata.
+Finite data commands return one JSON value on stdout. `version` defaults to
+text, `help` prints text on stderr and exits 0, `events --follow` streams JSON values, and
+`daemon run` stays in the foreground without a final result. Errors are JSON
+on stderr with a non-zero exit code; check that code before accepting a result.
+Usage failures may also print help text on stderr; invoking without a command prints only help
+and exits 2. Do not assume all stderr is a single JSON value.
+
 ## 3. Check the connection { #3-check-the-connection }
 
 ### Dedicated server or LAN world
