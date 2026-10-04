@@ -1,5 +1,20 @@
 # 快照协议 v1（分叉一个活的世界）
 
+!!! note "Mod 0.9.0 实体采集"
+    下文记录历史本地协议和配方。当前服务端 `entities` 在线读出非玩家 NBT 和顺序，
+    `snapshot` 写出同一份 `entity-nbt/1` 记录。两者显式指定维度（默认主世界），不再按玩家半径筛选。
+    新 CLI 要求 `entities:nbt` / `snapshot:entity-nbt`；旧 `SNAPSHOT 0 name [dimension]` 仅为兼容形式。
+    为现有保真比较工具保留 `vel`，删除 `entityId`、`yaw`、`pitch` 投影。
+    在线 NBT 受帧大小限制（默认 8 MiB），不是完整世界传输。仍可按顺序逐个 summon `restorable` 记录。
+    下文的 freeze/save/copy 历史配方不保证采集无侵入。
+
+    现行完整字段与边界见[工具说明](tools.md)。
+
+
+## 历史本地协议与配方
+
+以下记录 0.9.0 之前的本地工具流程；其中按玩家半径采集和 freeze/save/copy 配方不是当前服务端契约。
+
 !!! warning "遗留本地工具"
     `fork`/`restore`/`verify` 不属于 Go CLI。它们仍是需要访问游戏主机世界目录的
     本地 Python 工具，对远程目标会被拒绝。实体快照是实体顺序记录，不是进程内存

@@ -1,5 +1,24 @@
 # Snapshot protocol v1 (forking a live world)
 
+!!! note "Mod 0.9.0 entity capture"
+    The following is the historical local protocol/recipe. Current server
+    `entities` reads ordered non-player NBT inline; `snapshot` writes the same
+    `entity-nbt/1` records. Both accept explicit dimension (default overworld),
+    not player radius. New CLI requires `entities:nbt`/`snapshot:entity-nbt`.
+    Legacy `SNAPSHOT 0 name [dimension]` is accepted as compatibility only.
+    Records retain `vel` for fidelity tools, but drop `entityId`, `yaw`, `pitch`.
+    Inline NBT is frame-bounded (8 MiB default), not a world transfer. Sequential
+    summon of `restorable` records remains supported. The historical
+    freeze/save/copy recipe below is not a non-invasive capture guarantee.
+
+    See [current tools and entity NBT contract](tools.md#current-entity-nbt-contract-mod-090).
+
+
+## Historical local protocol and recipe
+
+The remainder records the pre-0.9.0 local workflow; its player-radius
+parameters and freeze/save/copy recipe are not the current server contract.
+
 !!! warning "Legacy local tooling"
     `fork`/`restore`/`verify` are not part of the Go CLI. They remain local
     Python tooling that needs access to the game host world directory, and

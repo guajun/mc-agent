@@ -142,7 +142,7 @@ Ask for the minimum you need; large worlds answer with large payloads.
 | Need | Command | Notes |
 | --- | --- | --- |
 | World/server state, online players, tick, level, world directory | `mc-agent state` | includes world-save metadata |
-| Entities | `mc-agent entities [--radius N]` | summarised: counts by type plus the closest |
+| Entities | `mc-agent entities [--dimension D]` | server non-player NBT and tick order; requires `entities:nbt` |
 | One player | `mc-agent player <name\|uuid>` | server-known context plus view target |
 | Chat-time context | `mc-agent context <id>` | bundle by `context_id` |
 | Run a command | `mc-agent command "<line>"` | write; returns `writeSeq`; no leading slash |
@@ -150,7 +150,7 @@ Ask for the minimum you need; large worlds answer with large payloads.
 | Events | `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C]` | replay by (streamId, seq) cursor |
 | Watch events | `mc-agent events --follow` | one JSON value per line |
 | Save metadata / snapshots | `mc-agent save`, `mc-agent snapshots` | reads |
-| Entity-order snapshot | `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | write; the game host writes files |
+| Entity-order snapshot | `mc-agent snapshot [--name N] [--dimension D]` | write; the game host writes files |
 | Unknown write ledger | `mc-agent requests`, `mc-agent request-status <id>` | never blindly replay |
 | Cross-daemon leases | `mc-agent exclusive-acquire/renew/release/status <key>` | coordination, not locks |
 
@@ -280,3 +280,16 @@ delivery as authorization.
   the webhook contract.
 - Toolkit install and upgrade: `mc-agent-bridge` `docs/install.md` and
   `docs/release.md` in the release repository.
+
+## Entity NBT boundary
+
+For authoritative entity capture require `entities:nbt` (Mod 0.9.0), then
+use `entities --dimension ID` (default overworld). `snapshot --name NAME
+--dimension ID` writes the same records on the game host and requires
+`snapshot:entity-nbt`. Radius flags/parameters are removed, including zero;
+use game commands or local NBT analysis for ordinary filtering. Records contain
+non-player NBT, tick order, summon type/position and passenger restore metadata;
+`vel` remains for existing fidelity comparison. Summon only `restorable` roots
+in order. Inline NBT is frame-bounded; disk paths are remote game-host paths.
+Neither capture claims a full or non-invasive world fork. Legacy client entity
+sampling is a synchronized projection, not this NBT source.

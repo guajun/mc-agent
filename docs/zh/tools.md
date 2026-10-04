@@ -20,13 +20,13 @@ Minecraft Agent Toolkit 由 `mc-agent` Go 二进制实现。实时的 **capabili
 | `mc-agent state` | 权威世界/tick 状态与在线玩家 |
 | `mc-agent player <name\|uuid>` | 按 UUID（或名字）解析玩家并返回实时上下文/视线 |
 | `mc-agent context <id>` | 按 `context_id` 取回受限聊天时刻 bundle |
-| `mc-agent entities [--radius N]` | 附近实体摘要 |
+| `mc-agent entities [--dimension D]` | 服务端非玩家实体 NBT 和 tick 顺序（需 `entities:nbt`） |
 | `mc-agent command "<line>"` | 执行命令（写；返回 `writeSeq`） |
 | `mc-agent command-output "<line>" [--wait S]` | 执行命令并读取回答 |
 | `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | 按 (streamId, seq) 游标回放或流式读取事件 |
 | `mc-agent requests`、`mc-agent request-status <id>` | 未知写账本与查询 |
 | `mc-agent save`、`mc-agent snapshots` | 存档元数据与快照列表 |
-| `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | 在游戏主机写入实体顺序快照 |
+| `mc-agent snapshot [--name N] [--dimension D]` | 在游戏主机写入实体顺序快照 |
 | `mc-agent mark <text>`、`mc-agent wait <ticks>` | 标注事件流；等待游戏 tick |
 | `mc-agent exclusive-* <key>` | 跨 daemon 租约 |
 
@@ -109,3 +109,25 @@ python tools/launch_instance.py --minecraft-dir "D:/MC/.minecraft" `
 `mc-agent-loop` 不属于 Toolkit 契约。它仍是可选的兼容监听器，带 `echo` 和临时
 `hermes` 后端，并依赖遗留 Python bridge。Codex、Claude Code 等用户主动型 Harness
 直接运行 CLI，不应被描述成 loop 后端。其默认聊天触发词是 `@agent`。
+
+## 当前实体 NBT 契约（Mod 0.9.0）
+
+`entities` 需 `entities:nbt`，`snapshot` 需 `snapshot:entity-nbt`，仅服务端提供。
+旧 Mod 或未声明能力的连接会拒绝这些新操作；不会把旧客户端投影视为 NBT。
+可选 `dimension` 默认 `minecraft:overworld`，不隐含选择玩家，所有 `radius` 参数或标志均拒绝。
+
+在线结果含 `type: entities`、`schema: entity-nbt/1`、`instance`、`tick`、`dimension`、
+`playersSkipped`、`orderHash` 和 `entities` 数组。每条记录和快照 JSONL 行含 `order`、
+`uuid`、`type`、`pos`、`vel`、`nbt`（SNBT）、`passengers`（UUID 数组）、
+`vehicle`（UUID 或 null）、`restorable`。玩家及已移除/死亡项不进入记录；范围是存活的实体
+ tick 列表，并非世界中所有已存储或已加载实体。删除 `entityId`、`yaw`、`pitch` 投影；
+`vel` 为现有保真比较工具保留，完整持久化状态由 NBT 承载。
+
+按记录顺序逐个 summon `restorable: true` 的根实体，使用其类型、位置和 NBT；乘客随载具
+嵌套恢复。顺序 hash 包含所有记录 UUID，包括乘客，单独一致不证明保真。
+`snapshot` 在游戏主机写同一实体记录和元数据，然后返回含 schema、id、dir、数量、hash、
+tick、维度、字节数和覆盖状态的确认；它不是世界文件复制。
+
+在线 NBT 受协商帧大小约束（默认 8 MiB），没有分页，大结果可能失败。这些采集不主动卸载区块
+或保存世界，也不单独承诺完整无侵入分叉。普通筛选用游戏命令或本地分析；旧客户端采样仍是
+独立的同步投影。
