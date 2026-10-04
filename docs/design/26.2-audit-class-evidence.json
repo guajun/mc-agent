@@ -22,7 +22,7 @@
   },
   "decompiler": "Vineflower; selected classes, no runtime execution",
   "decompiler_jar_sha256": "a615d07ddbbcd489369674f40e42df639c32be95410890b38f173d5c1e2ea39c",
-  "class_count": 118,
+  "class_count": 136,
   "classes": [
     {
       "class": "net.minecraft.server.MinecraftServer",
@@ -495,6 +495,88 @@
     {
       "class": "net.minecraft.world.ticks.ScheduledTick$1",
       "sha256": "663d696a0434dab8c93f7f6dbcfb2e7eb56cb9b73c8305a5b90f4af9e1fec809"
+    },
+    {
+      "class": "net.minecraft.client.server.IntegratedServer",
+      "sha256": "874910b299043a9e050e9514266511e781c58765d85bb52ce8c65cb382cfcbf0"
+    },
+    {
+      "class": "net.minecraft.network.Connection$1",
+      "sha256": "1fd5bc93fb91a5789054ee7864d38f9c3998f787c584c7727096ff8f7a47a539"
+    },
+    {
+      "class": "net.minecraft.network.Connection$2",
+      "sha256": "8e09db87609d14a73b44098032e3adde660731034214cad8f08a9258b2e28600"
+    },
+    {
+      "class": "net.minecraft.network.Connection$3",
+      "sha256": "b31cec2f0f76d9239b7154532b047b172dc42d9ef916f938cd13cb3b1a0cf870"
+    },
+    {
+      "class": "net.minecraft.network.Connection",
+      "sha256": "23f314350e25844d3480e7d3b719fb203e1e076bf4d102bb12758de5d8dd28da"
+    },
+    {
+      "class": "net.minecraft.network.ConnectionProtocol",
+      "sha256": "1631162e454b61e79a07710553de15480c268a08e55c8675e6c645706f23729d"
+    },
+    {
+      "class": "net.minecraft.network.PacketProcessor$ListenerAndPacket",
+      "sha256": "2f782729098510f7dfb7bb7c412bb7ec855b8d1894ee235a4990fa759198aa63"
+    },
+    {
+      "class": "net.minecraft.network.PacketProcessor",
+      "sha256": "bafaceae134b98aab738eca82e943cab7fabd18fbac005a60a539977ba9987d9"
+    },
+    {
+      "class": "net.minecraft.network.protocol.PacketUtils",
+      "sha256": "6db11623ddb8280d704edca7136dcca0a03906edd2cd4ab0abfe134a515b0055"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$1",
+      "sha256": "d0c7d62842ef306449af8a316dff16a014bd91d038cd432db77867b98789a54a"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$2",
+      "sha256": "b31379233b5b0c21e62c78e116f8f86f70f615907cc2e2c2ad7cee5f3c9abdff"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$3",
+      "sha256": "ab9208bb56e51bb9ba0cd6851072c4c51e9ffd9266408266251f7110fcc471b7"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$LatencySimulator$DelayedMessage",
+      "sha256": "11d575596c8f1697811b0d75442435ef2829c9b402d4118bbd873dc39442c569"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$LatencySimulator",
+      "sha256": "b1e0ec981183befb393f03a4ca751140afbd5b3a86ced994441cd49da370a0ae"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener",
+      "sha256": "3436a34d09b3e8f80f0e0f4728175d484b14add2ee1a8f27188ebb2d01c9b14f"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerGamePacketListenerImpl$1",
+      "sha256": "04990db58dbe6abc5c0a478b6a8817c1b6ce26fefa171c007a9025fdfe6648a0"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerGamePacketListenerImpl",
+      "sha256": "7ae6a2f6b2653b05cfbae93c0e9f40b2a3bfc045f66cbc3bc940bbde0d543c26"
+    },
+    {
+      "class": "net.minecraft.util.thread.BlockableEventLoop",
+      "sha256": "4ae6a952c8d0c39d6773a474db87a0eca1d7bab561ec8f1aa8f75614160e99fb"
     }
-  ]
+  ],
+  "additional_hook_evidence": {
+    "artifact": "fabric-api 0.161.0+26.2 nested fabric-lifecycle-events-v1 4.1.4+29b6eb019e",
+    "jar_sha256": "cba8c892c9f203aaac8441da7cd800510097120610dc69557592f2b1dcab9d8a",
+    "classes": [
+      {
+        "class": "net.fabricmc.fabric.mixin.event.lifecycle.MinecraftServerMixin",
+        "sha256": "9e6a255c7829bb10cb6a83a00a2c4f2aacee43b09b6bedc824287a6aa17807d9"
+      }
+    ]
+  }
 }
