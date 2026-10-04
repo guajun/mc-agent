@@ -1,0 +1,582 @@
+{
+  "audit_date": "2026-10-04",
+  "artifact": "Mojang Minecraft 26.2 client distribution; server-shared classes inspected",
+  "jar_sha1": "2dc72797acbc1b63fc16a11c4ac393605f453754",
+  "version": {
+    "id": "26.2",
+    "name": "26.2",
+    "world_version": 4903,
+    "series_id": "main",
+    "protocol_version": 776,
+    "pack_version": {
+      "resource_major": 88,
+      "resource_minor": 0,
+      "data_major": 107,
+      "data_minor": 1
+    },
+    "build_time": "2026-06-16T12:01:27+00:00",
+    "java_component": "java-runtime-epsilon",
+    "java_version": 25,
+    "stable": true,
+    "use_editor": false
+  },
+  "decompiler": "Vineflower; selected classes, no runtime execution",
+  "decompiler_jar_sha256": "a615d07ddbbcd489369674f40e42df639c32be95410890b38f173d5c1e2ea39c",
+  "class_count": 136,
+  "classes": [
+    {
+      "class": "net.minecraft.server.MinecraftServer",
+      "sha256": "61d107869098170aec04c53da169db136b119fa4f541be776310d7f85e925c17"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$1",
+      "sha256": "fa8add9504c69b5445f0b200758780850d0b986bc636996677313691f9d0d3f3"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$2",
+      "sha256": "6222959bf1ac016b9d9ccd5e9e56e5b835201ed7cff94b551891a012243c7509"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$MultiplayerScope",
+      "sha256": "7b7a0cf73595cd3f28481eb4f9d679e6ac53ca8738c791895b9fc81bbcb62d98"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$ReloadableResources",
+      "sha256": "a5b9904dc59dc47e23f22c5f083e3a0f8c39f36232ac06c871107dfe7acb5f1c"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$ServerResourcePackInfo",
+      "sha256": "1e60d932a9f2f144a1e05a2e8ea91170a40b5ae468880e304a6c7e85a197dd17"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$TimeProfiler",
+      "sha256": "3cb2b106f2e984ffb15ff91f82b0997326e38631391e9c8d024c9048a86ee1ff"
+    },
+    {
+      "class": "net.minecraft.server.MinecraftServer$TimeProfiler$1",
+      "sha256": "ac1cdcb880d80e4a37ad615b115dfddaa1f9d9b67571e62ab656ed34a916a8d3"
+    },
+    {
+      "class": "net.minecraft.server.commands.SaveAllCommand",
+      "sha256": "347b4318cd5c81f7abc2305d7b192568b2eff54b1bf6db308355ce52cfc646b2"
+    },
+    {
+      "class": "net.minecraft.server.commands.SummonCommand",
+      "sha256": "f6ecfb3ce860474fb52c60d6f25957feee1cc2291abba28a88fbbcd9ae485bcb"
+    },
+    {
+      "class": "net.minecraft.server.level.ChunkMap",
+      "sha256": "cad61f1989874214608540cd4eb0a391e61849e8a37838878a280e6a5e3a2dd9"
+    },
+    {
+      "class": "net.minecraft.server.level.ChunkMap$DistanceManager",
+      "sha256": "9ba80a9526ec84caf64089d5a08a5ebe72b35eb32c862599f1acf12dbabda33e"
+    },
+    {
+      "class": "net.minecraft.server.level.ChunkMap$TrackedEntity",
+      "sha256": "a4c5acf30c3626dea9b135ab8f8ca1f86e67060104a181b1764b3d887eda2c2c"
+    },
+    {
+      "class": "net.minecraft.server.level.DistanceManager",
+      "sha256": "51b4221b41a5a9a09b6de02b04c0f037c6b6cbfd1abbb568987da90699dcd52f"
+    },
+    {
+      "class": "net.minecraft.server.level.DistanceManager$FixedPlayerDistanceChunkTracker",
+      "sha256": "3b851ab68b33a46d2930c46fe69a8a30b696249df3d94832dc57a870f819e6ea"
+    },
+    {
+      "class": "net.minecraft.server.level.DistanceManager$PlayerTicketTracker",
+      "sha256": "cc36832390c8ac22f81be932ea81b6174436d376be14fc5a3459dc5db4010793"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerChunkCache",
+      "sha256": "738418f51185f1c85bda6c341c1225b2d925c2c355a86545d9a1a69028ad3a67"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerChunkCache$MainThreadExecutor",
+      "sha256": "20e75ae393136e8f8732653c9fac915d4e23dde53397a55fdf6b2a900897c74b"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerEntity",
+      "sha256": "e3a6592c64da41fca698046ac20f8b56a5060481335c02a5cad7a1bbd3b67f04"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerEntity$Synchronizer",
+      "sha256": "dd7aabfe73788e018d6b9821533452fe95ae7d802151d245d0da86a1f1b32768"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerLevel",
+      "sha256": "8e503c6d761c27595fb1b6a0d9af12336c0aac393fd8abac3c34d3b2906114df"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerLevel$1",
+      "sha256": "17298e89e2dfbc860370f71805d00c9e344fde9d7d07e804f9a1c5ad82e868e8"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerLevel$EntityCallbacks",
+      "sha256": "ea3e763b78af29be56c778fb12cda0380476206292935a2a09e0e87e6478ef7f"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer",
+      "sha256": "ba4cbad90ee8364d8351547afd5ef4a3fd75c0ae73b3258d8cf9e49b0dcc1d92"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$1",
+      "sha256": "ff32e8a49a696529863ec69d627bc4c14d5435be7dc4898742d481b8fc5e403f"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$1$1",
+      "sha256": "b8500077faa8acdc3dda4d05f73db8b249b51d4099138e8077132f71ddf83f31"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$2",
+      "sha256": "ecab179c4151a45da1451df3b954eef2536d61bce4ad1b81c2d05c430bf11188"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$3",
+      "sha256": "ce73dca889c77a2fe7800b79c59ed110ac049fc14209751cffd59a35ff9ab9c4"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$RespawnConfig",
+      "sha256": "75af27e42792d16a8c188405da3960c4f20f5a0d9e0a58135f675522b04501d7"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$RespawnPosAngle",
+      "sha256": "80d706d469247c075026d0aaea05f3ef97df4ad1c56fa931601140a3d61af243"
+    },
+    {
+      "class": "net.minecraft.server.level.ServerPlayer$SavedPosition",
+      "sha256": "60c22138b6adb63807cf2ea8dea24c57a44c4c6a4ba9634640ceb3c8b648ff2d"
+    },
+    {
+      "class": "net.minecraft.server.level.Ticket",
+      "sha256": "eaa46b50b870cb497adc6ccee23e38de31905eb0cda913158efb1f371f508e40"
+    },
+    {
+      "class": "net.minecraft.server.level.TicketType",
+      "sha256": "a29f828ed7af1be74b60008eed30fa07913583b4b6a6409e29012cf86144c6a6"
+    },
+    {
+      "class": "net.minecraft.server.level.TicketType$Flags",
+      "sha256": "90db6e467af39b5fb581e6704cbb81fb1b239e0aa9ee7c1fa6a8064526bb9fbb"
+    },
+    {
+      "class": "net.minecraft.server.players.PlayerList",
+      "sha256": "79ddeb10d8afac1ee7bc197abe33e5c4c0df35046bfab6ca430bea50c898c249"
+    },
+    {
+      "class": "net.minecraft.server.players.PlayerList$1",
+      "sha256": "472d5485aef186978d7bdac53bf4afba10720cb3544fb2873ff4420c66e2713e"
+    },
+    {
+      "class": "net.minecraft.server.players.PlayerList$2",
+      "sha256": "eab6166d51fec4206fcd498a6b484a659fe5f4920e97f903ebe453e8bbdddee5"
+    },
+    {
+      "class": "net.minecraft.util.RandomSource",
+      "sha256": "91dd6dc6af1de4e1b320cb0da9ac4923c92b533deccda17a784341106bf0d19e"
+    },
+    {
+      "class": "net.minecraft.world.RandomSequence",
+      "sha256": "76c3351ead49a4775a4dfd5fd7db4067c1e70402af6c6b5e65055a9bd27e6b75"
+    },
+    {
+      "class": "net.minecraft.world.RandomSequences",
+      "sha256": "4db6149306640e03dce86ae553dfd6baa408238e1105e7ff75b6f061cd426166"
+    },
+    {
+      "class": "net.minecraft.world.RandomSequences$DirtyMarkingRandomSource",
+      "sha256": "e5e3c88f90e7cf1f3941a48941157b22ea5f7aa0f194b3d4c80fa8aed2c9f299"
+    },
+    {
+      "class": "net.minecraft.world.clock.ServerClockManager",
+      "sha256": "29ae16b1cfa6efae20fad813c729af75260e5f06f27207bcf0450af5ff9ec97f"
+    },
+    {
+      "class": "net.minecraft.world.clock.ServerClockManager$ClockInstance",
+      "sha256": "759ab0c7b2af80176435c29c461e31d1bc51c420678238032b3e024bae8dad41"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity",
+      "sha256": "2dbeaf9e8512d715a1887c4fc3892fea94029db09116274e0fe1b091870ab8e3"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$1",
+      "sha256": "babbea4ee63ba7a5b3ced81af73bd69c00bb373f35affb48bf0896f26ec20009"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$EntityPathElement",
+      "sha256": "c35c707bec7eec37c296e191326a1ed694ca11794c0687bed960bed78bd048b3"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$Flags",
+      "sha256": "eb2af23d623c86ae8b8cefb85b8b140b13bbd9922ca5716467e50b6756eeaf3d"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$MoveFunction",
+      "sha256": "50183aa6e62aa91ed4ff2973c44c8123b335bb9c705b1ef47e961dfcf5fbbf99"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$Movement",
+      "sha256": "56a58c1a38f6c521d7b87fc278c2cc4cfaec22823113f88e355767e026561630"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$MovementEmission",
+      "sha256": "191d4ebbd15b92fe43dc1811f436423f71fcec95a544e3bc3cc8af8648e3bfdf"
+    },
+    {
+      "class": "net.minecraft.world.entity.Entity$RemovalReason",
+      "sha256": "230c3a361f11a4af7662cdeece13fea8af1a2a4eeb89ca7427942bf9f357b534"
+    },
+    {
+      "class": "net.minecraft.world.entity.LivingEntity",
+      "sha256": "eae909d66232bfa9cdadc374653f84a72cfbb547401db60a404c8088e65df6d8"
+    },
+    {
+      "class": "net.minecraft.world.entity.LivingEntity$1",
+      "sha256": "8895d7187c3772a5c20dde21c21b690d8e86f2ae11de46e6062293e9803aef52"
+    },
+    {
+      "class": "net.minecraft.world.entity.LivingEntity$Fallsounds",
+      "sha256": "09e7087dff90c94d2af93c6577f6d44737e708b2f7bed8cc8249909265544c4c"
+    },
+    {
+      "class": "net.minecraft.world.entity.Mob",
+      "sha256": "60ac9d80970a1dc7ed0406261b6100392324dad4c011563718dca8f00a84b381"
+    },
+    {
+      "class": "net.minecraft.world.entity.Mob$1",
+      "sha256": "2628a5d390884ff6ce0cafba0233060b4c7fd6523f5c146dff513b0e78beb0ba"
+    },
+    {
+      "class": "net.minecraft.world.entity.Mob$2",
+      "sha256": "0e00e10eff434f0b5f5d2dbe019e22ef4e38e6990ede03dabebf17e050c74f54"
+    },
+    {
+      "class": "net.minecraft.world.entity.ai.Brain",
+      "sha256": "902fa7d90b7a6955d7fc201b586205ceebb039635e12fe8d15f2666b5397adb2"
+    },
+    {
+      "class": "net.minecraft.world.entity.ai.Brain$1",
+      "sha256": "d6e6052ee40c0747e95ccdac78bffa6a1e953a2b8f60088a9d6ae16ee770d022"
+    },
+    {
+      "class": "net.minecraft.world.entity.ai.Brain$ActivitySupplier",
+      "sha256": "a25573f9f3a265936455784b2a9e6e43b3b5771f945eceaec85978462cecc4a1"
+    },
+    {
+      "class": "net.minecraft.world.entity.ai.Brain$Packed",
+      "sha256": "3972daf05291182f1fbc5288fd9435f0e59b370c04f23eb8264ee6406a832825"
+    },
+    {
+      "class": "net.minecraft.world.entity.ai.Brain$Provider",
+      "sha256": "76c2a3e258bdc5a3de685c8862c7beff1d1ef4135cfbcb95c5290e639f74b4ef"
+    },
+    {
+      "class": "net.minecraft.world.entity.ai.Brain$Visitor",
+      "sha256": "ff87c6027a9a11dde1eb3941373aa4d452ce6f2bcf25de5a5a6ec043198d6599"
+    },
+    {
+      "class": "net.minecraft.world.level.Level",
+      "sha256": "ba93c39a7052d6f045f78c177aacaa3d27112840cc59fe44ce5d94dd121402dd"
+    },
+    {
+      "class": "net.minecraft.world.level.Level$ExplosionInteraction",
+      "sha256": "590381f3d1f2852345e6484d1a1ee3368d381b1604b6fbc953429cfa9b262940"
+    },
+    {
+      "class": "net.minecraft.world.level.TicketStorage",
+      "sha256": "ecfe0441808c2aa1815286f8fd7679afb312f1a6b54b3905b5c875f01d11771b"
+    },
+    {
+      "class": "net.minecraft.world.level.TicketStorage$ChunkUpdated",
+      "sha256": "7e555fdbb95441e2371782974b4a3a1f351ba26e1f86ae0c9a6891168805d149"
+    },
+    {
+      "class": "net.minecraft.world.level.TicketStorage$TicketPredicate",
+      "sha256": "6093fdbacab42f1e85cc302caf1a9f6fb469309747ca598d9be4147ddd5efac6"
+    },
+    {
+      "class": "net.minecraft.world.level.block.entity.BlockEntity",
+      "sha256": "d78cd22088caba501be3bb15f018082628460c01aadbb1b5ac6360c28ecba9b1"
+    },
+    {
+      "class": "net.minecraft.world.level.block.entity.BlockEntity$1",
+      "sha256": "0fcd3a8524de77756d0069ec35338ab59d5a7d56ce8f8a71e28d888713222197"
+    },
+    {
+      "class": "net.minecraft.world.level.block.entity.BlockEntity$BlockEntityPathElement",
+      "sha256": "11459f446c34d7447b3d00011316bb6c1f576a40b26c2f346aedcfdd121694c6"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk",
+      "sha256": "5d5d2d1eeeaded3ff42ac00c6c177e1962156d277d75c2b23f1cdee0dadf42e4"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk$1",
+      "sha256": "c0b0dce411ad31b881ca591888fb8d401d1bd5d6243c50189cc13a093c6db240"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk$BoundTickingBlockEntity",
+      "sha256": "5596fb42b93556697bfdd1d1421e2a2d11752b649f805525c4eabc7b68165f83"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk$EntityCreationType",
+      "sha256": "7d282ec806fdaf199c26951353ba9b8ec9dcbcaec79df3a85ece232fd0cc8ab7"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk$PostLoadProcessor",
+      "sha256": "5edebc7bc1669889a2ee88befb8a12396b4f590a224eae3b617f56608f62d7b4"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk$RebindableTickingBlockEntityWrapper",
+      "sha256": "9a9f9af09e9606b59e8ce84722baddee4ce4844d4bbeb436638d803f54e393f1"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.LevelChunk$UnsavedListener",
+      "sha256": "a12db5a494e5530989d4d69fcc4fbcaf8ceb81460f11f7ad56462da791792ef0"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.EntityStorage",
+      "sha256": "6f6a6da7595fccae9a7e3b3ae80737157bfe0c5584ba90f63d37397177b39120"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.IOWorker",
+      "sha256": "40880647b4a65e9f16e7140d1f9a5f444df5262149e549b2a212fc66d00c6863"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.IOWorker$PendingStore",
+      "sha256": "f65e35de1d40c8f77adbe0710179964ceeb495ea475f421289061dc3be3aa2ea"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.IOWorker$Priority",
+      "sha256": "7d296cc33be65cbf0e777784a770aed352ba8356460f403786d64318c36be091"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.IOWorker$ThrowingSupplier",
+      "sha256": "d140e4ef4d8eef01b2c4976a97dcdc5aaf8aab9e98202fed8dc27a7891722401"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.SerializableChunkData",
+      "sha256": "440b20c0e2c45744c4c4748dce5c50568e9922833937ad198f3bcf395aec22f6"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.SerializableChunkData$ChunkReadException",
+      "sha256": "540be258cf9719508a4a8dcb69a51c58fbb5d7b9f62374ef08dd6a53b4d8469e"
+    },
+    {
+      "class": "net.minecraft.world.level.chunk.storage.SerializableChunkData$SectionData",
+      "sha256": "ceabf7d455b54b64d92e5d80781e1586d418e4524c12c7e1c68cb15ec05e8dfc"
+    },
+    {
+      "class": "net.minecraft.world.level.entity.EntityTickList",
+      "sha256": "7881d977d4d2a818630f16d1b72576294b25f3f8c31eeb2e4a9bfdc5c168a2bf"
+    },
+    {
+      "class": "net.minecraft.world.level.entity.PersistentEntitySectionManager",
+      "sha256": "97023712e06bd2da1ab91c3ca09b3822999364cc886cd0282ff259cea6c177d7"
+    },
+    {
+      "class": "net.minecraft.world.level.entity.PersistentEntitySectionManager$Callback",
+      "sha256": "f1993358feecc6f74a177609ca183a39713c11d7df7cba3e3452908411efe0f8"
+    },
+    {
+      "class": "net.minecraft.world.level.entity.PersistentEntitySectionManager$ChunkLoadStatus",
+      "sha256": "6bf584c35dd587d7d9ef3ee70f9e0a0fa55eda6188f645fb60ce4124c5718668"
+    },
+    {
+      "class": "net.minecraft.world.level.gameevent.GameEventDispatcher",
+      "sha256": "d7bbcbd41a297cbca5c0b963746addbb840d5918961becd5bd0ac009d40b2d7f"
+    },
+    {
+      "class": "net.minecraft.world.level.gameevent.vibrations.VibrationSystem",
+      "sha256": "25eae8f7cecbe33234861cfb8cd988dce8477fc7307933818e07d1f3a62f38d6"
+    },
+    {
+      "class": "net.minecraft.world.level.gameevent.vibrations.VibrationSystem$Data",
+      "sha256": "8785e72f1c0627189521555d1d1535cbb67ec62cebd3a7cf3da02ff83b82cf6c"
+    },
+    {
+      "class": "net.minecraft.world.level.gameevent.vibrations.VibrationSystem$Listener",
+      "sha256": "fca5a49bed22182ada38e2572471b57980ee19980c0ea895a7a8db4c77fd62df"
+    },
+    {
+      "class": "net.minecraft.world.level.gameevent.vibrations.VibrationSystem$Ticker",
+      "sha256": "efe8889590eba1d296f646ca707dd7f36db30907882913fe7b2affd91ed08120"
+    },
+    {
+      "class": "net.minecraft.world.level.gameevent.vibrations.VibrationSystem$User",
+      "sha256": "66fadbf2e17128ad76faeda44260e1444640493864f036bbd86f7694dcb6045e"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.CollectingNeighborUpdater",
+      "sha256": "78419bfc47109d37748fcd666b7fcdd40ca91398b577c3b10c3a888c82bf8277"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.CollectingNeighborUpdater$FullNeighborUpdate",
+      "sha256": "f396dc1371b706d605400fff47b4104228594ee5decb39cfae93a121c0bbf25e"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.CollectingNeighborUpdater$MultiNeighborUpdate",
+      "sha256": "740cd0f2e81acf59e192cabbe449d2c3d9db1ad73a34f254618482e4d61812f8"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.CollectingNeighborUpdater$NeighborUpdates",
+      "sha256": "42bf32562b8869b989ee12aa9b87f6883a670d2f08bbd7ee045e56c6bff36dbe"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.CollectingNeighborUpdater$ShapeUpdate",
+      "sha256": "65b71f7d03c01d63963be018e6c52fc6d01b2dcc43d25c99c18c59ccaa2faa76"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.CollectingNeighborUpdater$SimpleNeighborUpdate",
+      "sha256": "142da082d980e2ee671c6ec97b542d32f4baca9cf6c105dca22719bddf1a1853"
+    },
+    {
+      "class": "net.minecraft.world.level.redstone.NeighborUpdater",
+      "sha256": "67d4d124c120e33ffe08fbbef87e0a03f2b696adbe2e51f1b9ff8b7e6bd17e70"
+    },
+    {
+      "class": "net.minecraft.world.level.storage.PlayerDataStorage",
+      "sha256": "1adf0ec2a504ef5587860fc1c074dd7c8281a11e6e5e9b1656ef53bffe6b8724"
+    },
+    {
+      "class": "net.minecraft.world.level.storage.PrimaryLevelData",
+      "sha256": "b71ed0107476dfa6f2936e27976dfbbf72e2d732b8091c20007cfdb78eb6744a"
+    },
+    {
+      "class": "net.minecraft.world.level.storage.PrimaryLevelData$SpecialWorldProperty",
+      "sha256": "5bc7594a223fa92ba5093d8f9c04ac2fe7266795c584cc818debfa9a42cbf827"
+    },
+    {
+      "class": "net.minecraft.world.level.storage.SavedDataStorage",
+      "sha256": "4dbeaaf7b017694eeaeb2c3c33495627750f3179c40de3b9a04c04c459f7510e"
+    },
+    {
+      "class": "net.minecraft.world.level.timers.TimerQueue",
+      "sha256": "65a3fe5e10002c7605890173d2ae947f5310d868045a7c249cd8d0a6e311da55"
+    },
+    {
+      "class": "net.minecraft.world.level.timers.TimerQueue$Event",
+      "sha256": "8f9d48fa59885b7d16c90847f0e46cb3c2af28fcdfe59f09909e43278bebb449"
+    },
+    {
+      "class": "net.minecraft.world.level.timers.TimerQueue$Event$Packed",
+      "sha256": "8db64819f53555d6e5e14f94fdc12fa0ce26c9d6386e5b38f9f68474191d42e3"
+    },
+    {
+      "class": "net.minecraft.world.level.timers.TimerQueue$Packed",
+      "sha256": "0d681a0bf572aa94eda01e218b2ed3267445943c23ade25724fb74532a0092df"
+    },
+    {
+      "class": "net.minecraft.world.ticks.LevelChunkTicks",
+      "sha256": "d822dce47f239123d8d7f0bacd246d82010b57d4bc03b2a4c827e4428010c235"
+    },
+    {
+      "class": "net.minecraft.world.ticks.LevelTicks",
+      "sha256": "02a10693c6fd9ed119fc36cb33047667d925470325ac285abf33d7071fbd0c3a"
+    },
+    {
+      "class": "net.minecraft.world.ticks.LevelTicks$PosAndContainerConsumer",
+      "sha256": "5423197a16627a22760384bdd96e4b4a88c07cc37c5c46c262edc10b15ccf8e1"
+    },
+    {
+      "class": "net.minecraft.world.ticks.SavedTick",
+      "sha256": "b4e71ef731fbc922b91639d0772a941a9669b35e46e2180d175c7fd2d55b5200"
+    },
+    {
+      "class": "net.minecraft.world.ticks.SavedTick$1",
+      "sha256": "e038e99a08d55540aa31ba017783b345f874a049fbdfa5e18ef4825c52ac5f0e"
+    },
+    {
+      "class": "net.minecraft.world.ticks.ScheduledTick",
+      "sha256": "c42f7c233bff18e02c677a2ec2dc21cce418430069f291c8e036eeb0cfcd6d33"
+    },
+    {
+      "class": "net.minecraft.world.ticks.ScheduledTick$1",
+      "sha256": "663d696a0434dab8c93f7f6dbcfb2e7eb56cb9b73c8305a5b90f4af9e1fec809"
+    },
+    {
+      "class": "net.minecraft.client.server.IntegratedServer",
+      "sha256": "874910b299043a9e050e9514266511e781c58765d85bb52ce8c65cb382cfcbf0"
+    },
+    {
+      "class": "net.minecraft.network.Connection$1",
+      "sha256": "1fd5bc93fb91a5789054ee7864d38f9c3998f787c584c7727096ff8f7a47a539"
+    },
+    {
+      "class": "net.minecraft.network.Connection$2",
+      "sha256": "8e09db87609d14a73b44098032e3adde660731034214cad8f08a9258b2e28600"
+    },
+    {
+      "class": "net.minecraft.network.Connection$3",
+      "sha256": "b31cec2f0f76d9239b7154532b047b172dc42d9ef916f938cd13cb3b1a0cf870"
+    },
+    {
+      "class": "net.minecraft.network.Connection",
+      "sha256": "23f314350e25844d3480e7d3b719fb203e1e076bf4d102bb12758de5d8dd28da"
+    },
+    {
+      "class": "net.minecraft.network.ConnectionProtocol",
+      "sha256": "1631162e454b61e79a07710553de15480c268a08e55c8675e6c645706f23729d"
+    },
+    {
+      "class": "net.minecraft.network.PacketProcessor$ListenerAndPacket",
+      "sha256": "2f782729098510f7dfb7bb7c412bb7ec855b8d1894ee235a4990fa759198aa63"
+    },
+    {
+      "class": "net.minecraft.network.PacketProcessor",
+      "sha256": "bafaceae134b98aab738eca82e943cab7fabd18fbac005a60a539977ba9987d9"
+    },
+    {
+      "class": "net.minecraft.network.protocol.PacketUtils",
+      "sha256": "6db11623ddb8280d704edca7136dcca0a03906edd2cd4ab0abfe134a515b0055"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$1",
+      "sha256": "d0c7d62842ef306449af8a316dff16a014bd91d038cd432db77867b98789a54a"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$2",
+      "sha256": "b31379233b5b0c21e62c78e116f8f86f70f615907cc2e2c2ad7cee5f3c9abdff"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$3",
+      "sha256": "ab9208bb56e51bb9ba0cd6851072c4c51e9ffd9266408266251f7110fcc471b7"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$LatencySimulator$DelayedMessage",
+      "sha256": "11d575596c8f1697811b0d75442435ef2829c9b402d4118bbd873dc39442c569"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener$LatencySimulator",
+      "sha256": "b1e0ec981183befb393f03a4ca751140afbd5b3a86ced994441cd49da370a0ae"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerConnectionListener",
+      "sha256": "3436a34d09b3e8f80f0e0f4728175d484b14add2ee1a8f27188ebb2d01c9b14f"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerGamePacketListenerImpl$1",
+      "sha256": "04990db58dbe6abc5c0a478b6a8817c1b6ce26fefa171c007a9025fdfe6648a0"
+    },
+    {
+      "class": "net.minecraft.server.network.ServerGamePacketListenerImpl",
+      "sha256": "7ae6a2f6b2653b05cfbae93c0e9f40b2a3bfc045f66cbc3bc940bbde0d543c26"
+    },
+    {
+      "class": "net.minecraft.util.thread.BlockableEventLoop",
+      "sha256": "4ae6a952c8d0c39d6773a474db87a0eca1d7bab561ec8f1aa8f75614160e99fb"
+    }
+  ],
+  "additional_hook_evidence": {
+    "artifact": "fabric-api 0.161.0+26.2 nested fabric-lifecycle-events-v1 4.1.4+29b6eb019e",
+    "jar_sha256": "cba8c892c9f203aaac8441da7cd800510097120610dc69557592f2b1dcab9d8a",
+    "classes": [
+      {
+        "class": "net.fabricmc.fabric.mixin.event.lifecycle.MinecraftServerMixin",
+        "sha256": "9e6a255c7829bb10cb6a83a00a2c4f2aacee43b09b6bedc824287a6aa17807d9"
+      }
+    ]
+  }
+}
