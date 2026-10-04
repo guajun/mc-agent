@@ -77,6 +77,33 @@ daemon 可以把选定事件转发到一个 webhook 接收端。投递使用 HMA
 | `webhook_receiver.py` | 用于 webhook 测试的本地 HMAC 校验接收端 |
 | `smoke_offline.py` | 遗留 Python daemon/agent-loop 路径的开发者冒烟测试 |
 
+### 用独立数据目录启动客户端
+
+`launch_instance.py` 从 `--minecraft-dir` 读取已安装的版本、库与资源。
+指定 `--game-dir`，把实验的客户端数据、默认启动日志和 mc-agent 服务端状态
+放在独立目录：
+
+```powershell
+python tools/launch_instance.py --minecraft-dir "D:/MC/.minecraft" `
+  --version 26.2-Fabric --game-dir "F:/research/client-game" `
+  --jvm-property mcagent.control=true --world "research world"
+```
+
+启动前在该 gameDir 中准备实验自己的 mods、配置和存档；工具不会复制用户实例或世界。
+工具先按调用者的 cwd 把 gameDir 解析成绝对路径，再启动 Java。
+如果 `--jvm-property`、`--jvm-arg` 或版本的 JVM 参数中没有指定 serverDir，
+就补上 `-Dmcagent.serverDir=<绝对 gameDir>/mc-agent-server`。
+原有的 `--game-arg=--gameDir=...`（以及分成两个参数的形式）也会这样处理；
+互相冲突的游戏目录会被拒绝。
+
+启动前会打印进程 cwd、客户端 gameDir、服务端 serverDir 和 controlDir。
+先核对这些路径，再在启动后确认控制文件、快照实际出现在打印的服务端目录下。
+既有文件会保留。Java 的 cwd 仍是已安装的版本目录，因此显式指定的相对 serverDir
+仍相对此 cwd 解析。不覆盖游戏目录时保留原默认行为：客户端数据和 cwd 使用版本目录，
+服务端状态使用其 `mc-agent-server` 子目录。专用服也仍保留 Mod 的默认值
+`mc-agent-server`，相对于专用服进程 cwd。这些设置指定文件落点，不是 Minecraft
+或其他 Mod 的文件系统沙箱。
+
 ## 遗留 agent-loop
 
 `mc-agent-loop` 不属于 Toolkit 契约。它仍是可选的兼容监听器，带 `echo` 和临时
