@@ -56,14 +56,14 @@ accepts `--target` unless it manages targets or the daemon itself.
 | `call <op> [--params JSON] [--param key=value] [--request-id ID] [--timeout SECONDS]` | daemon | raw operation call; `--request-id` only exists here |
 | `state` | `state` | world/server state, tick, level, world dir, online players |
 | `player <name\|uuid>` | `player` | server-known context and live view target |
-| `entities [--radius N]` | `entities` | summarised entity list |
+| `entities [--dimension D]` | `entities` | server non-player NBT and tick order; requires `entities:nbt` |
 | `context <id>` | `context` | chat-time context bundle by `context_id` |
 | `command <line>` | `command` | write; returns `writeSeq` |
 | `command-output <line> [--wait S]` | `command` | write plus collected output |
 | `mark <text>` | `mark` | write; annotates the event stream |
 | `wait <ticks>` | `wait` | block until the game advanced |
 | `save` | `state` | world-save metadata |
-| `snapshot [--name N] [--dimension D] [--radius R]` | `snapshot` | write an entity-order snapshot on the game host |
+| `snapshot [--name N] [--dimension D]` | `snapshot` | write the same entity NBT on the game host; requires `snapshot:entity-nbt` |
 | `snapshots` | `snapshot` | list snapshots on the instance |
 | `events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | daemon | replay/stream buffered events by (streamId, seq) |
 | `requests` | daemon | unknown-write ledger |

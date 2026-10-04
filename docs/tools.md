@@ -21,13 +21,13 @@ Global options: `--home DIR`, `--target NAME`, `--pretty`.
 | `mc-agent state` | authoritative world/tick state and online players |
 | `mc-agent player <name\|uuid>` | resolve a player by UUID (or name) and return live context/view |
 | `mc-agent context <id>` | fetch a bounded chat-time bundle by `context_id` |
-| `mc-agent entities [--radius N]` | nearby entities, summarised |
+| `mc-agent entities [--dimension D]` | server non-player NBT and tick order (requires `entities:nbt`) |
 | `mc-agent command "<line>"` | issue a command (write; returns `writeSeq`) |
 | `mc-agent command-output "<line>" [--wait S]` | issue a command and read its answer |
 | `mc-agent events [--stream-id ID] [--since N] [--limit N] [--category C] [--follow]` | replay or stream buffered events by (streamId, seq) cursor |
 | `mc-agent requests`, `mc-agent request-status <id>` | unknown-write ledger and lookup |
 | `mc-agent save`, `mc-agent snapshots` | world-save metadata and snapshot list |
-| `mc-agent snapshot [--name N] [--dimension D] [--radius R]` | entity-order snapshot written on the game host |
+| `mc-agent snapshot [--name N] [--dimension D]` | entity-order snapshot written on the game host |
 | `mc-agent mark <text>`, `mc-agent wait <ticks>` | annotate the stream; wait for game ticks |
 | `mc-agent exclusive-* <key>` | cross-daemon leases |
 
@@ -121,3 +121,32 @@ compatibility listener with `echo` and temporary `hermes` backends and depends
 on the legacy Python bridge. Codex, Claude Code and other user-driven harnesses
 run the CLI directly and must not be described as loop backends. Its default
 chat trigger is `@agent`.
+
+## Current entity NBT contract (Mod 0.9.0)
+
+`entities` requires `entities:nbt`; `snapshot` requires `snapshot:entity-nbt`.
+They are server-only. Old Mods and unknown capability lists are refused for
+these operations. Optional `dimension` defaults to `minecraft:overworld`;
+there is no implicit player selection. Every `radius` parameter/flag is rejected.
+
+The inline result has `type: entities`, `schema: entity-nbt/1`, `instance`,
+`tick`, `dimension`, `playersSkipped`, `orderHash` and `entities` (array).
+Each array record and snapshot JSONL line has `order`, `uuid`, `type`, `pos`,
+`vel`, `nbt` (SNBT), `passengers` (UUIDs), `vehicle` (UUID or null), and
+`restorable`. Players and removed/dead entries are excluded; this is the
+surviving entity tick list, not every entity stored in or loaded by the world.
+`entityId`, `yaw`, `pitch` projections are removed. `vel` remains because
+existing fidelity comparisons need it; the full persistent state is in NBT.
+
+Restore roots (`restorable: true`) sequentially using their type, position and
+NBT; passengers come back nested with their vehicle. The order hash covers all
+record UUIDs in order, including passengers, and alone does not prove fidelity.
+`snapshot` writes the identical entity records and a metadata file on the game
+host, then returns an acknowledgement including schema, id, dir, count, hash,
+tick, dimension, byte count and replacement status. It is not a world-file copy.
+
+Inline NBT remains subject to the negotiated frame limit (8 MiB default), with
+no pagination. Large results can fail. These captures do not unload chunks or
+initiate a world save; they alone do not promise a complete non-invasive fork.
+Use ordinary game commands or local analysis for filtering. Legacy client
+entity recording remains a separate synchronized projection.
