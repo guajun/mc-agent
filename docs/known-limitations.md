@@ -49,6 +49,13 @@ state and scheduled queues, the game-time basis of saved delays, cross-chunk
 ordering, and which chunks are actually loaded/ticking. Persisted fluid data
 alone does not establish identical continuation.
 
+Saved ticks retain relative order within each chunk, but do not encode the original
+global `subTickOrder` across chunks. Restoring equal-time, equal-priority ticks can
+therefore change their execution order. Water spreading itself uses scheduled
+ticks; secondary effects such as drops may still consume random numbers. Lava
+also has random spread delays and random-tick ignition, so it needs a separate
+assessment.
+
 Random ticks have a different gap: the current state of `Level.randValue` used
 to select positions and `Level.random` used by block behavior is not saved.
 World reload reconstructs these sources; unloading one chunk does not itself
