@@ -48,6 +48,7 @@ nav:
       - Headless lab servers: lab-server.md
       - Building a mod for a lab: mod-building.md
       - Checking a fork: fork-verify.md
+      - Known experiment limitations: known-limitations.md
       - Experiments and validation:
           - Auditable cold-start runs: coldstart-protocol.md
           - "Audit test mod (read-only evidence)": minecart-audit.md
@@ -86,6 +87,7 @@ plugins:
             Advanced guides: 进阶指南
             Experiments and validation: 实验与验收
             Design history: 设计历史
+            Known experiment limitations: 已知实验限制
             Installation reference: 安装参考
             Documentation development: 文档开发
             Installation: 安装

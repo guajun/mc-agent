@@ -217,6 +217,17 @@ consider an earlier clean baseline and advance a branch to the studied condition
 Verify that condition and baseline behavior; do not assume this method reproduces
 every unsupported intermediate state or silently change the research question.
 
+Do not claim exact fork continuation of in-flight piston movement: ordinary 26.2
+saving omits movement runtime state and pending block-event order. When the
+question permits, branch a stationary clean baseline and activate the mechanism
+afterward. Entities that can be produced per trial and kept loaded/ticking may be
+created and used inside the branch. Verify the relevant conditions; neither
+method covers a question requiring the precise existing dynamic state.
+Same-seed exact random continuation is not guaranteed; water's scheduled fluid
+state is partly persisted and must not be described as wholly lost. Use the
+[known limitations](https://guajun.github.io/mc-agent/known-limitations/) before
+interpreting a branch as equivalent to its source.
+
 For repeated trials, A/B comparisons, or reproducing a reported mechanism:
 
 1. Before changing the world, identify the test subject and record its

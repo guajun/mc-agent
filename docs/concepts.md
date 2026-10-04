@@ -124,6 +124,10 @@ to preserve a sensitive intermediate state, but its validity depends on the
 experiment; it does not make all unsupported states reproducible. Describe the
 supported state and known gaps rather than claiming an exact continuation.
 
+Known gaps include in-flight piston save/load state and pending block events.
+See [known experiment limitations](known-limitations.md) for stationary-baseline
+and entity-lifecycle methods and their applicability.
+
 ## Honest boundaries
 
 - **Remote paths are remote.** A server's `worldDir` is never interpreted as a
