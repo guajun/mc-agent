@@ -32,6 +32,11 @@ The skill is deliberately discovery-first: the capability reply is the
 authority, so the instructions stay correct as the mod gains operations.
 
 For experiments, the same X/Z at a different height is not an in-place repeat.
+The Skill also distinguishes save metadata from game saving and explains the
+[world-fork boundary](concepts.md#world-forks-and-experiment-boundaries): for
+save-sensitive experiments, an earlier clean baseline may be more suitable than
+capturing a sensitive intermediate state. The required conditions must still be
+verified; this is not a universal reproduction guarantee.
 Height/location may vary when explicitly selected as the independent variable.
 If baseline restoration cannot be verified, the agent must report the limitation
 instead of presenting a relocated test as a controlled comparison.

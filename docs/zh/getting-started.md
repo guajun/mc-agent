@@ -6,6 +6,10 @@
 
 ## 开始之前
 
+这里接通命令和游戏状态／实体采集。完整世界分叉是 Minecraft 26.2 的设计目标，
+尚未实现为正式 Go `fork`／`restore` 命令。实验中使用保存前，先了解简短的
+[研究边界](concepts.md#world-forks-and-experiment-boundaries)。
+
 | 需要 | 检查 |
 | --- | --- |
 | 游戏：Minecraft 26.2、Fabric Loader 0.19.5+、Fabric API 0.161.0 | 该配置能正常启动并进入世界。 |

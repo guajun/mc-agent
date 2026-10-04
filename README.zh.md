@@ -1,6 +1,8 @@
 # Minecraft Agent Toolkit
 
-让 AI 智能体读取 Minecraft 世界、查找玩家与实体、执行命令并处理实体快照。
+项目的首要目标是让智能体方便地把 **Minecraft 26.2** 世界分叉到本机开展实验，
+保留实验所需的运行态。当前 Toolkit 提供命令执行、游戏状态读取和实体 NBT／tick
+顺序采集；正式 Go CLI 尚未提供世界 `fork`／`restore` 或任意运行态检查点恢复。
 产品由一个 Fabric mod 和一个 Go 单二进制组成：不需要 MCP 服务器，也不需要运行
 Python。
 
@@ -18,6 +20,11 @@ Python。
 
 可用操作取决于连接的 mod。智能体会先查询 `capabilities`。模型与对话由你的
 智能体应用提供；Toolkit 从不调用模型。
+
+保存是可接受的实验边界，不是只读观察：`save-all` 可能执行保存维护并改变运行态。
+若实验依赖自动保存或暂停／保存行为，可以从更早的干净起点分叉，在分支中推进到
+待研究条件并验证它。是否适用取决于具体实验，不保证任意中间状态都可复现。
+参见[研究边界](docs/zh/concepts.md#world-forks-and-experiment-boundaries)。
 
 ## 组件关系
 

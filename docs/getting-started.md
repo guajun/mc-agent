@@ -7,6 +7,11 @@ binary runs where your agent runs.
 
 ## Before you start
 
+These steps connect commands and game-state/entity capture. Full world branching
+is the Minecraft 26.2 design target, not an implemented Go `fork`/`restore`
+command. Before using saving in an experiment, read the short
+[research boundary](concepts.md#world-forks-and-experiment-boundaries).
+
 | You need | Check |
 | --- | --- |
 | Minecraft 26.2, Fabric Loader 0.19.5+, Fabric API 0.161.0 | Launch that profile once and confirm it opens. |

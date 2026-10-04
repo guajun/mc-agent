@@ -11,6 +11,11 @@ Minecraft Agent Toolkit 通过一个轻量 Go CLI 和 Fabric mod 把 AI 智能�
 Minecraft。可以使用你现有的智能体应用，也可以先在终端里试用。不需要 MCP 服务器，
 也不需要运行 Python。
 
+世界分叉首阶段针对 **Minecraft 26.2**，目标是把分支搬到智能体本机开展实验。
+当前 Go Toolkit 提供命令、状态和实体 NBT／顺序采集，尚未实现完整世界
+`fork`／`restore`。保存影响是可接受的能力边界；保存敏感的实验可考虑更早的干净
+起点。参见[范围与实验设计](concepts.md#world-forks-and-experiment-boundaries)。
+
 <div class="landing-actions" markdown>
 
 [安装并试用](getting-started.md){ .md-button .md-button--primary }

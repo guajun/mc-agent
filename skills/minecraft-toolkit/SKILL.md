@@ -208,6 +208,15 @@ reports the final state.
 
 ## 7. Run controlled experiments in place
 
+The world-fork target is Minecraft 26.2; the Go CLI does not yet implement
+world `fork`/`restore` or arbitrary runtime checkpoint recovery. Entity NBT and
+order capture are only part of a branch. `save` reads metadata, whereas a game
+`save-all` command can perform maintenance and change runtime state; those save
+effects are an accepted project boundary. For save-sensitive experiments,
+consider an earlier clean baseline and advance a branch to the studied condition.
+Verify that condition and baseline behavior; do not assume this method reproduces
+every unsupported intermediate state or silently change the research question.
+
 For repeated trials, A/B comparisons, or reproducing a reported mechanism:
 
 1. Before changing the world, identify the test subject and record its
