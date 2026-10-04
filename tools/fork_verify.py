@@ -734,13 +734,15 @@ class BridgeClient:
         return await self._ensure().call(method, params or {}, timeout=timeout or self.timeout)
 
     async def snapshot(
-        self, name: str | None = None, radius: float | None = None
+        self, name: str | None = None, radius: float | None = None, dimension: str | None = None
     ) -> dict[str, Any]:
         params: dict[str, Any] = {}
         if name:
             params["name"] = name
         if radius:
             params["radius"] = radius
+        if dimension:
+            params["dimension"] = dimension
         return await self.call("snapshot", params)
 
     async def snapshots(self) -> dict[str, Any]:
@@ -946,19 +948,15 @@ def default_check_name(now: float | None = None) -> str:
 
 
 def _snapshot_radius(snapshot: Snapshot, override: float | None = None) -> float | None:
-    """The radius the recording used, so the fresh snapshot asks the same question.
-
-    An override matters in a headless lab: a radius is measured from a player and a
-    lab has none, so the caller asks for every entity the level ticks instead -
-    which, after a restore, is exactly the recorded set.
-    """
-    if override is not None:
-        return override if override > 0 else None
-    radius = snapshot.meta.get("radius")
-    if isinstance(radius, bool) or not isinstance(radius, (int, float)):
-        return None
-    value = float(radius)
-    return value if value > 0 else None
+    """Refuse player-relative legacy captures rather than silently changing scope."""
+    for radius in (snapshot.meta.get("radius", 0), override):
+        if radius is None:
+            continue
+        if isinstance(radius, bool) or not isinstance(radius, (int, float)) or not math.isfinite(radius):
+            raise SnapshotError("snapshot radius must be finite")
+        if radius != 0:
+            raise SnapshotError("player-radius capture was removed; an old radius-limited recording cannot be rechecked as a full dimension")
+    return None
 
 
 async def run_check(
@@ -980,9 +978,9 @@ async def run_check(
     _write(
         err,
         f"asking the bridge for a fresh snapshot (name={snapshot_name}, "
-        f"radius={radius if radius else 'every entity the level ticks'})",
+        f"dimension={fork.meta.get('dimension') or 'minecraft:overworld'}, scope=surviving tick-list entries)",
     )
-    ack = await client.snapshot(name=snapshot_name, radius=radius)
+    ack = await client.snapshot(name=snapshot_name, radius=radius, dimension=str(fork.meta.get("dimension") or "minecraft:overworld"))
     if not isinstance(ack, dict) or not ack.get("dir"):
         raise SnapshotError(f"the bridge did not report a snapshot directory: {ack!r}")
     live = load_snapshot(Path(str(ack["dir"])))
@@ -1169,7 +1167,7 @@ def write_snapshot(
         "minecraft": "26.2",
         "tick": 104233,
         "dimension": "minecraft:overworld",
-        "radius": 64.0,
+        "radius": 0.0,
         "entities": len(records) if entities_override is None else entities_override,
         "orderHash": digest if order_hash_override is None else order_hash_override,
         "createdAt": 1790145600000,
@@ -1307,6 +1305,26 @@ async def run_selftest(out: TextIO | None = None, err: TextIO | None = None) -> 
         _write(err, f"fixtures: {root}")
         a = write_snapshot(root / "a", base)
         a_copy = write_snapshot(root / "a-copy", base)
+        compact = write_snapshot(root / "compact", [
+            {key: value for key, value in record.items() if key not in {"entityId", "yaw", "pitch"}}
+            for record in base
+        ], meta_extra={"schema": "entity-nbt/1"})
+        compact_snapshot = load_snapshot(compact)
+        test.equal("NBT records without removed projections keep summon lines",
+                   [summon_command(entity) for entity in compact_snapshot.entities], expected_commands)
+        test.equal("NBT records without removed projections keep velocity comparisons",
+                   len(diff_snapshot(load_snapshot(a), compact_snapshot).velocity_deltas), len(base))
+        legacy_radius = write_snapshot(root / "legacy-radius", base, meta_extra={"radius": 64.0})
+        try:
+            _snapshot_radius(load_snapshot(legacy_radius))
+            test.check("nonzero legacy radius is explicitly refused", False)
+        except SnapshotError:
+            test.check("nonzero legacy radius is explicitly refused", True)
+        try:
+            _snapshot_radius(load_snapshot(legacy_radius), 0)
+            test.check("zero override cannot hide a radius-limited recording", False)
+        except SnapshotError:
+            test.check("zero override cannot hide a radius-limited recording", True)
         swapped = write_snapshot(root / "b-swapped", [base[0], base[2], base[1], base[3]])
         moved = write_snapshot(
             root / "c-moved",
@@ -1583,9 +1601,9 @@ async def run_selftest(out: TextIO | None = None, err: TextIO | None = None) -> 
             ["snapshot"],
         )
         test.equal(
-            "check asks for the fork's radius under the given name",
+            "check asks for full-dimension capture without radius",
             fake.calls[0][1],
-            {"name": "lab-1", "radius": 64.0},
+            {"name": "lab-1", "dimension": "minecraft:overworld"},
         )
 
         fake = FakeTransport(snapshot_dir=swapped)
@@ -1728,8 +1746,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--radius",
         type=float,
         default=None,
-        help="override the recording's radius (0 = every entity the level ticks; a "
-        "headless lab needs this, since a radius is measured from a player)",
+        help="legacy compatibility: only 0 is accepted; nonzero radius capture was removed",
     )
     check.add_argument(
         "--api-port",

@@ -14,7 +14,7 @@
 | 输入 | 用途 |
 | --- | --- |
 | `meta.json`：`protocol`、`entities`、`orderHash` | 校验：协议版本为 1、记录条数、以及文件必须复现的哈希 |
-| `meta.json`：`radius` | `check` 里新快照会问同一个半径（0 或缺失 = 该关卡在 tick 的所有实体） |
+| `meta.json`：`radius` | `check` 拒绝旧的非零半径；当前采集该维度的存活 tick 列表 |
 | `meta.json`：`tick`、`dimension` | 仅用于定位；只打印，从不比对 |
 | `entities.jsonl`：行的顺序 | tick 顺序——整条轨道存在的意义所在 |
 | `entities.jsonl`：`uuid` | `orderHash`、重复检测，以及两个快照之间匹配实体 |
@@ -55,7 +55,7 @@ python tools/fork_verify.py restore <forkDir> --from 500 --limit 100
 
 ```bash
 # 0. 游戏侧（进程内冻结、方块已拷贝）：由 bridge 的 fork 工具完成
-mc-bridge call fork '{"name": "before", "radius": 64}'
+mc-bridge call fork '{"name": "before"}'
 
 # 1. 我们录到了什么？（离线；文件自相矛盾就退出 1）
 python tools/fork_verify.py inspect <forkDir>
@@ -107,7 +107,7 @@ result: MATCH
 2. **演练是默认行为。** 必须显式 `--apply` 才会碰游戏，同时提供 `--dry-run` 让脚本能表明意图。工具只打印时不发送任何东西。
 3. **还原走 `command`，不走 `restore`。** bridge 有一个整文件级的 `restore` 工具，但这个工具每次 bridge 调用只发一条 `/summon`，这样 `--from`、`--limit`、每 100 条进度和逐条失败处理才都有意义。客户端类仍然按契约的名称包装 `snapshot`、`snapshots`、`fork`、`restore`、`order`（自测会断言方法名和参数形状）。
 4. **`check` 从磁盘读新快照。** bridge 的 `snapshot` 返回一个目录，而各类型计数需要实体本身——所以这个工具假定了工具链其余部分也假定的事：bridge 和游戏都跑在运行此工具的机器上。如果实验室把快照目录挪到了读不到的地方，那是**硬错误**，不会悄悄降级成只比哈希。
-5. **`check` 用分叉自己的半径。** 带半径的录制会和带半径的新快照比对；只有 `radius <= 0` 或缺失半径才问"所有实体"。半径是从玩家量起的（客户端 vantage），所以一个把实体还原到别的参考点周围的实验室会表现为计数不匹配——这是诚实的，不是噪声。
+5. **`check` 使用记录的维度和完整 tick 列表范围。** 旧元数据或覆盖参数里的非零半径都会在发送请求前拒绝；`--radius 0` 不能掩盖旧的半径限定录制，避免比较范围悄悄改变。旧录制仍可用本地 `diff` 检查。
 6. **`nbt` 是校验必需、还原容忍的。** 没有 `nbt` 的记录是校验错误（协议规定 `nbt` 就是 `/summon` 接受的东西），而 `restore` 会打印警告并在没有它的情况下 summon——实体出现，内存态丢失，所以对这条不能声称"忠实还原"。
 7. **还原只拒绝它无法处理的东西。** `type`/`pos` 缺失或畸形、或某行无法解析，会中止整次运行；顺序、uuid、哈希的问题只是警告，因为这些行仍然可以 summon。`inspect` 永远展示完整列表。
 8. **每条顶层记录一条命令，乘客也算。** 协议为关卡 tick 的每个实体写一行，所以还原就按文件顺序发出这些行，对 `passengers` 或 `vehicle` 不做任何"聪明"处理；连接关系是 NBT 的职责，在这一侧去重反而会破坏顺序保证。
@@ -130,3 +130,7 @@ python tools/fork_verify.py selftest
 * 它从不启动、停止或冻结 Minecraft，也从不拷贝文件：那是 mod 和 bridge 的事。
 * 它不算物理，也不比对**方块**。`diff` 比对的是实体；区域文件是 bridge 的事，方块级对比会是另一个工具。
 * 它不判断差异意味着什么。它报告首个分歧和最大差值；是不是一个发现，由实验决定。
+
+当前 Mod 0.9.0 快照使用 `entity-nbt/1`；保留逐个 summon 需要的 `type`、`pos`、`nbt` 和顺序。
+`vel` 为现有比较工具保留，删除 `entityId`、`yaw`、`pitch` 不会跳过速度比较。
+旧 freeze/save/copy 配方不是经验证的无侵入世界采集。

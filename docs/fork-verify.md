@@ -25,8 +25,8 @@ A fork directory is whatever `mc_fork` copied: region files plus
 | Input | Used for |
 | --- | --- |
 | `meta.json`: `protocol`, `entities`, `orderHash` | validation: protocol 1, record count, and the hash the file must reproduce |
-| `meta.json`: `radius` | the fresh snapshot in `check` asks the same radius (0/absent = every entity the level ticks) |
-| `meta.json`: `tick`, `dimension` | orientation only; they are printed and never compared |
+| `meta.json`: `radius` | legacy nonzero radius is rejected by `check`; current captures use the whole dimension |
+| `meta.json`: `tick`, `dimension` | tick is printed; dimension is used for the fresh capture |
 | `entities.jsonl`: line order | the tick order - the authoritative thing this whole track exists to preserve |
 | `entities.jsonl`: `uuid` | `orderHash`, duplicate detection, and matching entities between two snapshots |
 | `entities.jsonl`: `type`, `pos`, `nbt` | `/summon` lines for `restore` |
@@ -72,7 +72,7 @@ the game, and this tool is one more loopback client of it.
 
 ```bash
 # 0. game side (frozen in-process, blocks copied): the bridge's fork tool
-mc-bridge call fork '{"name": "before", "radius": 64}'
+mc-bridge call fork '{"name": "before"}'
 
 # 1. what did we record?  (offline; exits 1 if the file contradicts itself)
 python tools/fork_verify.py inspect <forkDir>
@@ -153,11 +153,11 @@ single line so a 500-entity comparison stays readable.
    the game are on the machine running the tool. If the lab moved the snapshot
    directory somewhere this tool cannot read, that is a hard error, not a
    silent downgrade to comparing hashes only.
-5. **`check` uses the fork's radius.** A radius-limited recording is compared
-   with a radius-limited fresh snapshot; only `radius <= 0` or an absent radius
-   asks for every entity. The radius is measured from the player (client
-   vantage), so a lab that restores entities around a different reference point
-   will show up as a count mismatch - which is honest, not noise.
+5. **`check` uses the recorded dimension and full ticking-entity scope.**
+   Nonzero radius in either old metadata or an override is rejected before
+   sending a fresh capture; `--radius 0` cannot hide a radius-limited recording.
+   This prevents a silently changed comparison scope. Use local `diff` to
+   inspect old radius recordings.
 6. **`nbt` is required by validation, tolerated by restore.** A record with no
    `nbt` is a validation error (the protocol says `nbt` is exactly what
    `/summon` accepts), and `restore` prints a warning and summons without it -
@@ -213,3 +213,10 @@ it is the part of this track that can be verified on a laptop.
   a different tool.
 * It does not decide what a difference means. It reports the first divergence
   and the largest deltas; the experiment decides whether that is a finding.
+
+Current Mod 0.9.0 snapshots use `entity-nbt/1`. Sequential summon still uses
+`type`, `pos`, `nbt` and order. `vel` remains for comparison, so deleting the
+redundant `entityId`, `yaw`, `pitch` projections does not skip velocity checks.
+A recorded player-radius capture cannot be rechecked at a different scope
+silently: `check` rejects nonzero radius. The legacy freeze/save/copy workflow
+is not a verified non-invasive world capture.
