@@ -100,6 +100,34 @@ and never substitute another player's data. `timing` distinguishes a network
 chat packet (`receipt`) from a server-side broadcast such as a Carpet fake
 player's say (`broadcast`); a broadcast bundle is not packet-time history.
 
+## World forks and experiment boundaries
+
+The first target is Minecraft **26.2**: conveniently move a world branch to the
+harness machine so the agent can use local files, analysis programs, JDKs and
+mods. Preserving runtime state serves the goal of sufficient experimental
+conditions; it is not a promise to checkpoint any JVM or arbitrary mod state.
+The current Go product exposes entity NBT/tick order and commands, not full
+world `fork`/`restore`. Entity snapshots alone are not a world branch.
+
+Protecting the source world remains the priority: capture must not require
+unloading/reloading its chunks to manufacture a copy. For now, the effects of
+`save-all` are an accepted boundary. Saving is not read-only and can perform
+save maintenance, including processing pending chunk/entity work. `mc-agent
+save` only reads save metadata; executing `save-all` requires a game command.
+No atomic tick-boundary world capture is implemented by these existing calls.
+
+For an experiment sensitive to autosave or pause/save behavior, choose an
+earlier clean starting point that tolerates saving, fork there, and advance the
+branch to the state under study. Check the required conditions and an unchanged
+baseline before interpreting modified trials. This method can remove the need
+to preserve a sensitive intermediate state, but its validity depends on the
+experiment; it does not make all unsupported states reproducible. Describe the
+supported state and known gaps rather than claiming an exact continuation.
+
+Known gaps include in-flight piston save/load state and pending block events.
+See [known experiment limitations](known-limitations.md) for stationary-baseline
+and entity-lifecycle methods and their applicability.
+
 ## Honest boundaries
 
 - **Remote paths are remote.** A server's `worldDir` is never interpreted as a

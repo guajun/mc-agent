@@ -208,6 +208,40 @@ reports the final state.
 
 ## 7. Run controlled experiments in place
 
+The world-fork target is Minecraft 26.2; the Go CLI does not yet implement
+world `fork`/`restore` or arbitrary runtime checkpoint recovery. Entity NBT and
+order capture are only part of a branch. `save` reads metadata, whereas a game
+`save-all` command can perform maintenance and change runtime state; those save
+effects are an accepted project boundary. For save-sensitive experiments,
+consider an earlier clean baseline and advance a branch to the studied condition.
+Verify that condition and baseline behavior; do not assume this method reproduces
+every unsupported intermediate state or silently change the research question.
+
+Classify the required conditions with combinable labels: save sufficient,
+quiesce before fork, recipe rebuildable, and runtime capture required. The axes
+are whether a save recovers the required state and whether memory conditions can
+be rebuilt by a verified recipe; these are not fixed or exclusive machine tiers.
+For piston, fluid and randomness-dependent machines, default to stopping the
+mechanism, letting relevant updates settle, and verifying a clean baseline before
+save/fork; restore and verify, then start it in the branch. Stopping the mechanism
+does not mean unloading chunks or stopping the server. Running-state continuation
+can break the experiment and is not guaranteed. This recipe does not preserve an
+existing movement phase or exact random stream when those are the research subject.
+Water's scheduled fluid state is partly persisted and must not be described as
+wholly lost; same-seed exact random continuation is not guaranteed.
+
+For entity-order experiments, choose or combine supported Mod/CLI NBT/order
+capture, ordinary reliable probes plus an Agent recovery recipe, or manual/redstone
+ordered generation. Do not infer runtime order from incidental query output or
+NBT list order alone. Verify capture coverage, references and observed order.
+Entities may be produced per trial and kept loaded/ticking when the question
+permits. If a prepared circuit recreates the required order, use the stopped
+pre-generation baseline and run the circuit after restoring; preserve the existing
+entity list only when the task requires it. Regeneration is not equivalent when
+original identity/history is required. Use the
+[known limitations](https://guajun.github.io/mc-agent/known-limitations/) before
+interpreting a branch as equivalent to its source.
+
 For repeated trials, A/B comparisons, or reproducing a reported mechanism:
 
 1. Before changing the world, identify the test subject and record its

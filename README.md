@@ -1,7 +1,10 @@
 # Minecraft Agent Toolkit
 
-Let your AI agent inspect a Minecraft world, find players and entities, run
-commands, and work with entity snapshots. The product is a Fabric mod plus a
+The project aims to make Minecraft **26.2** worlds easy to fork onto an agent's
+machine for experiments, preserving the runtime state those experiments need.
+Today the Toolkit runs commands, reads game state and captures entity NBT/tick
+order; the Go CLI does not yet provide world `fork`/`restore` or arbitrary runtime
+checkpoint recovery. The product is a Fabric mod plus a
 single Go binary; there is no MCP server and no Python runtime requirement.
 
 **[Start here](docs/getting-started.md)** · **[Documentation website](https://guajun.github.io/mc-agent/)** · **[中文 README](README.zh.md)**
@@ -19,6 +22,14 @@ single Go binary; there is no MCP server and no Python runtime requirement.
 Available operations depend on the connected mod. The agent checks
 `capabilities` before using them. Your agent application supplies the model and
 conversation; the Toolkit never calls a model.
+
+Saving is an accepted experiment boundary, not a read-only observation:
+`save-all` can perform save maintenance and alter runtime state. When an
+experiment depends on autosave or pause/save behavior, a useful design is to
+fork an earlier clean baseline and advance the branch to the condition under
+study, verifying that condition. This is an experiment-specific method, not a
+guarantee that every intermediate state is reproducible. See
+[research boundaries](docs/concepts.md#world-forks-and-experiment-boundaries).
 
 ## How it fits together
 

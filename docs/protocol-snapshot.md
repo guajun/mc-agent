@@ -16,6 +16,12 @@
 
 ## Historical local protocol and recipe
 
+For the current Minecraft 26.2 direction, save maintenance is an accepted
+boundary while chunk unload/reload must not be required to create a copy. An
+earlier clean baseline can support save-sensitive experiments when its validity
+is verified. See [current research scope](concepts.md#world-forks-and-experiment-boundaries);
+the historical recipe below does not implement an atomic tick-boundary capture.
+
 The remainder records the pre-0.9.0 local workflow; its player-radius
 parameters and freeze/save/copy recipe are not the current server contract.
 

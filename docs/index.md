@@ -11,6 +11,12 @@ Minecraft Agent Toolkit connects your AI agent to Minecraft through a small Go
 CLI and a Fabric mod. Use your existing agent application, or try the tools from
 a terminal first. There is no MCP server and no Python runtime requirement.
 
+The first world-fork target is **Minecraft 26.2**: bring a branch to the agent's
+machine for experiments. Today the Go Toolkit offers commands, state and entity
+NBT/order capture; full world `fork`/`restore` is not implemented. Saving effects
+are an accepted boundary, and save-sensitive experiments can consider an earlier
+clean baseline. See [scope and experiment design](concepts.md#world-forks-and-experiment-boundaries).
+
 <div class="landing-actions" markdown>
 
 [Install and try it](getting-started.md){ .md-button .md-button--primary }
