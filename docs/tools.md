@@ -48,6 +48,38 @@ An agent should:
 Exit codes and error codes are stable; see the
 [operation reference](https://github.com/guajun/mc-agent/blob/main/skills/minecraft-toolkit/references/toolkit-operations.md).
 
+## Connection paths and vantage
+
+| Game session | Target transport and endpoint | Vantage and scope |
+| --- | --- | --- |
+| Dedicated server | `remote`, actual game host/port, with TLS pin or CA and a valid credential | Server; authoritative state and advertised server operations |
+| Integrated server published to LAN | `remote`, the actual LAN game port reported by this world, with its TLS pin or CA and credential | Server; same control path as a dedicated server |
+| Single-player world not published to LAN | Explicit `legacy`, local server adapter's port file/address | `--vantage server`; local compatibility path, not proof of remote LAN connectivity |
+| Client endpoint | Explicit `legacy`, local client adapter's port file/address | `--vantage client`; advertised client-only operations such as screen/world/LAN |
+
+Remote means the TLS control transport even when the address is loopback.
+Legacy adapter ports (commonly 25580/25581) are not the LAN game port; do not
+send a `remote` target to them. Ports can vary: read the relevant port file for
+legacy and use the world's actual published game port for LAN. A remote
+connection does not fall back to legacy. See [connection setup](getting-started.md#3-check-the-connection).
+
+If a connection or operation fails, inspect the selected target with `target
+show`, `status`, `doctor`, `capabilities` and `state`:
+
+- **No published LAN endpoint:** confirm the intended world is open and has
+  been published to LAN before using remote; otherwise choose the explicit
+  local compatibility path. Control files alone do not prove a game-port
+  listener exists. After reopening/publishing, confirm the current port again.
+- **Wrong endpoint or identity:** check host, actual game port, transport and
+  the fingerprint/credential from the intended serverDir. Diagnose TLS or
+  authentication errors directly; do not disable verification or change to
+  legacy to make the check appear successful. Feed credentials through stdin,
+  environment or a file, rather than printing them in logs.
+- **Wrong vantage:** server remote does not provide client `screen`, `world`
+  or `lan` operations. Client legacy is not authoritative server NBT/order.
+  Check the returned `instance` and supported capabilities, not just whether
+  a socket accepted the connection.
+
 ## Clocks and state readback
 
 For a server vantage, `state.tick` and entity capture `tick` are the server tick

@@ -45,6 +45,32 @@ Minecraft Agent Toolkit 由 `mc-agent` Go 二进制实现。实时的 **capabili
 退出码与错误码稳定，见
 [操作参考](https://github.com/guajun/mc-agent/blob/main/skills/minecraft-toolkit/references/toolkit-operations.md)。
 
+## 连接路径与视角
+
+| 游戏会话 | target 的传输与端点 | 视角和范围 |
+| --- | --- | --- |
+| 专用服 | `remote`，实际游戏主机/端口，提供 TLS pin 或 CA 及有效凭据 | 服务端；权威状态及声明支持的服务端操作 |
+| 已发布 LAN 的整合服 | `remote`，该世界实际发布的 LAN 游戏端口，提供其 TLS pin 或 CA 及凭据 | 服务端；与专用服相同的控制路径 |
+| 未发布 LAN 的单人世界 | 显式 `legacy`，本地 server adapter 的端口文件/地址 | `--vantage server`；本地兼容路径，不证明 LAN remote 已连接 |
+| 客户端端点 | 显式 `legacy`，本地 client adapter 的端口文件/地址 | `--vantage client`；声明支持的 screen/world/LAN 等客户端操作 |
+
+即使地址是 loopback，remote 也表示 TLS 控制传输。legacy adapter 端口（常见
+25580/25581）不是 LAN 游戏端口，不能用 remote target 连它们。端口可能变化：
+legacy 读对应端口文件，LAN 使用该世界实际发布的游戏端口。remote 失败不会自动
+回退 legacy。配置见[连接检查](getting-started.md#3-check-the-connection)。
+
+连接或操作失败时，用 `target show`、`status`、`doctor`、`capabilities` 和 `state`
+检查当前所选 target：
+
+- **没有发布 LAN 端点：** remote 前先确认目标世界已经打开并发布 LAN；否则显式
+  选择本地兼容路径。控制文件存在不证明游戏端口已监听。重开/重新发布后核对当前端口。
+- **端点或身份错误：** 核对主机、实际游戏端口、transport，以及目标 serverDir 的
+  fingerprint/凭据。直接排查 TLS 或认证错误，不关闭验证，也不改连 legacy 让验收
+  看似成功。凭据通过 stdin、环境或文件传入，不打印到日志。
+- **视角错误：** 服务端 remote 不提供客户端 `screen`、`world`、`lan`；客户端
+  legacy 也不是权威服务端 NBT/order。检查返回的 `instance` 和支持能力，不能只看
+  socket 是否连通。
+
 ## 时钟与状态读回
 
 服务端视角的 `state.tick` 和实体采集的 `tick` 是服务器 tick 计数，不是维度的
