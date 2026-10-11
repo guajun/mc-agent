@@ -27,7 +27,7 @@ Minecraft Agent Toolkit 由 `mc-agent` Go 二进制实现。实时的 **capabili
 | `mc-agent requests`、`mc-agent request-status <id>` | 未知写账本与查询 |
 | `mc-agent save`、`mc-agent snapshots` | 存档元数据与快照列表 |
 | `mc-agent snapshot [--name N] [--dimension D]` | 在游戏主机写入实体顺序快照 |
-| `mc-agent mark <text>`、`mc-agent wait <ticks>` | 标注事件流；等待游戏 tick |
+| `mc-agent mark <text>`、`mc-agent wait <ticks>` | 标注事件流；等待所连接视角的 tick 回调 |
 | `mc-agent exclusive-* <key>` | 跨 daemon 租约 |
 
 客户端专用的遗留命令（`chat`、`screen`、`connect`、`world`、`lan`、
@@ -44,6 +44,69 @@ Minecraft Agent Toolkit 由 `mc-agent` Go 二进制实现。实时的 **capabili
 
 退出码与错误码稳定，见
 [操作参考](https://github.com/guajun/mc-agent/blob/main/skills/minecraft-toolkit/references/toolkit-operations.md)。
+
+## 连接路径与视角
+
+| 游戏会话 | target 的传输与端点 | 视角和范围 |
+| --- | --- | --- |
+| 专用服 | `remote`，实际游戏主机/端口，提供 TLS pin 或 CA 及有效凭据 | 服务端；权威状态及声明支持的服务端操作 |
+| 已发布 LAN 的整合服 | `remote`，该世界实际发布的 LAN 游戏端口，提供其 TLS pin 或 CA 及凭据 | 服务端；与专用服相同的控制路径 |
+| 未发布 LAN 的单人世界 | 显式 `legacy`，本地 server adapter 的端口文件/地址 | `--vantage server`；本地兼容路径，不证明 LAN remote 已连接 |
+| 客户端端点 | 显式 `legacy`，本地 client adapter 的端口文件/地址 | `--vantage client`；声明支持的 screen/world/LAN 等客户端操作 |
+
+即使地址是 loopback，remote 也表示 TLS 控制传输。legacy adapter 端口（常见
+25580/25581）不是 LAN 游戏端口，不能用 remote target 连它们。端口可能变化：
+legacy 读对应端口文件，LAN 使用该世界实际发布的游戏端口。remote 失败不会自动
+回退 legacy。配置见[连接检查](getting-started.md#3-check-the-connection)。
+
+连接或操作失败时，用 `target show`、`status`、`doctor`、`capabilities` 和 `state`
+检查当前所选 target：
+
+- **没有发布 LAN 端点：** remote 前先确认目标世界已经打开并发布 LAN；否则显式
+  选择本地兼容路径。控制文件存在不证明游戏端口已监听。重开/重新发布后核对当前端口。
+- **端点或身份错误：** 核对主机、实际游戏端口、transport，以及目标 serverDir 的
+  fingerprint/凭据。直接排查 TLS 或认证错误，不关闭验证，也不改连 legacy 让验收
+  看似成功。凭据通过 stdin、环境或文件传入，不打印到日志。
+- **视角错误：** 服务端 remote 不提供客户端 `screen`、`world`、`lan`；客户端
+  legacy 也不是权威服务端 NBT/order。检查返回的 `instance` 和支持能力，不能只看
+  socket 是否连通。
+
+## 时钟与状态读回
+
+服务端视角的 `state.tick` 和实体采集的 `tick` 是服务器 tick 计数，不是维度的
+gametime。`wait N` 按服务器 tick 回调计数；`tick freeze` 下回调和服务器计数仍
+前进，而维度 gametime 冻结。因此 wait 成功不能证明世界已经推进。遗留客户端 tick
+又是另一种时钟。`command-output --wait S` 是按秒计的输出收集超时，不是刻等待。
+
+适用于获准操作的冻结世界测量的有限参考流程：
+
+1. 设置状态后，读回所选维度中的目标 UUID、相关 NBT、位置和尺寸。命令 ack 或反馈
+   不证明游戏执行成功；分别检查 CLI 退出码、错误与未知写，无法确认必要状态时停止。
+2. 在同一维度读 `time query gametime`，将其和实际初始状态一起记录为 `t0`。
+   例如主世界用 `execute in minecraft:overworld run time query gametime`。保留原始
+   回复，无法解析时失败；文本反馈不是结构化 gametime API。
+3. 发出 `tick step 1`，在有界超时内轮询同一 gametime，确认到达 `t0 + 1` 后，调用
+   `entities --dimension minecraft:overworld`，按 UUID 选目标而非数组第一项。
+   记录样本在 step 后，分别保留 gametime 和 server tick。这些调用不是原子采样；
+   若 gametime 意外推进或无法确认冻结假设，不接受该样本。
+
+按任务需要重复即可；清理可能产生延迟后代，适用时等待其稳定并再次核验实体群体。
+这只是使用案例，不是强制实验模板。注入状态不能算真实玩家交互（如剪毛）通过。
+
+历史 [#45](https://github.com/guajun/mc-agent/issues/45) runner 的 `series[].tick`
+表示 gametime，与 Toolkit 的 `tick` 不同。离线复算 77 个试验的 2,010 条样本，全部
+满足 `gametime - t0 = step`。遍历完整 series 并匹配 `meta.cubeUUID`：
+`order_noai_d0_cube_first_r1` 首次观察到 BODY 是 step 2（4430 - 4428）；
+`misc_dispenser_body` 的 `pre_body: true` 表示 step 1 仍持有预装物品，不是新装填。
+没有确认初态为空时，首次观察到持有也不能证明新变化。目标/字段缺失、脚本失败与
+完整采样窗口内未观察到事件必须区分，均不能单独证明事件永不发生。这是历史数据
+离线核对，不是当前版本真实游戏验收。
+
+保留的 `summary.json` 另有七项与 UUID 完整 series 不一致：`misc_multi3_r1/r2/r3`
+和 `misc_prime` 的摘要为 null，但 step 1 已观察到持有；早期的
+`summon_d0_cube_first`、`summon_d0_item_first` 和 `summon_d10_cube_first` 摘要报有值，
+但 series 未匹配到所选 UUID。保留历史文件并报告差异，不能覆盖原始数据，也不能
+把摘要当成权威观测。
 
 ## 边界
 
