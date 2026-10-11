@@ -28,7 +28,7 @@ Global options: `--home DIR`, `--target NAME`, `--pretty`.
 | `mc-agent requests`, `mc-agent request-status <id>` | unknown-write ledger and lookup |
 | `mc-agent save`, `mc-agent snapshots` | world-save metadata and snapshot list |
 | `mc-agent snapshot [--name N] [--dimension D]` | entity-order snapshot written on the game host |
-| `mc-agent mark <text>`, `mc-agent wait <ticks>` | annotate the stream; wait for game ticks |
+| `mc-agent mark <text>`, `mc-agent wait <ticks>` | annotate the stream; wait for tick callbacks on the connected vantage |
 | `mc-agent exclusive-* <key>` | cross-daemon leases |
 
 Client-only legacy commands (`chat`, `screen`, `connect`, `world`, `lan`,
@@ -47,6 +47,58 @@ An agent should:
 
 Exit codes and error codes are stable; see the
 [operation reference](https://github.com/guajun/mc-agent/blob/main/skills/minecraft-toolkit/references/toolkit-operations.md).
+
+## Clocks and state readback
+
+For a server vantage, `state.tick` and entity capture `tick` are the server tick
+counter, not a level's gametime. `wait N` counts server tick callbacks. Under
+`tick freeze`, those callbacks and the server counter continue while level
+gametime stays frozen; a successful `wait` does not prove the world advanced.
+Legacy client ticks are another clock, not a substitute for server gametime.
+The `--wait S` option on `command-output` is an output collection timeout in
+seconds, not either tick clock.
+
+For a permitted, frozen-world measurement, a limited reference sequence is:
+
+1. Set the intended state, then read back the target UUID, relevant NBT and
+   position/size in the chosen dimension. A command acknowledgement or collected
+   feedback alone does not prove game execution succeeded. Check CLI exit codes,
+   errors and unknown writes; stop if the required state cannot be verified.
+2. Read `time query gametime` in that dimension and record it as `t0`, together
+   with the actual initial state. Use `execute in minecraft:overworld run time
+   query gametime` when that is the selected dimension. Retain the raw reply and
+   fail if it cannot be interpreted; feedback is not a structured gametime API.
+3. Request `tick step 1`, poll the same gametime until `t0 + 1` with a bounded
+   timeout, then capture `entities --dimension minecraft:overworld`. Select the
+   target by UUID, not the first array entry. Record that the sample is after
+   the step and retains separate gametime and server-tick fields. These calls
+   are separate observations, not an atomic capture; reject an unexpected
+   gametime advance or an unverified freeze assumption.
+
+Repeat only as needed for the task. Cleanup can create delayed descendants;
+where relevant, allow them to settle and verify the intended population again.
+This is a usage example, not a required experiment template. State injection
+does not establish that a real player interaction such as shearing succeeded.
+
+In the historical [#45](https://github.com/guajun/mc-agent/issues/45) data, the
+runner's `series[].tick` means gametime, unlike the Toolkit `tick` field.
+Recomputing all 77 trials / 2,010 samples gives no `gametime - t0 != step`
+mismatches. Match `meta.cubeUUID` across the complete series: the
+`order_noai_d0_cube_first_r1` target first has a body at step 2 (4430 - 4428).
+In `misc_dispenser_body`, `pre_body: true` means step 1 is continued possession,
+not a new load. First observed presence without a verified absent baseline is
+not a proven transition. Missing targets/fields, script failure, and no event
+observed within a complete sampling window are distinct results; none alone
+proves that an event can never happen. This is offline historical verification,
+not a current-version game acceptance result.
+
+The preserved `summary.json` also disagrees with UUID-matched series in seven
+trials: `misc_multi3_r1/r2/r3` and `misc_prime` show a null summary despite
+presence at step 1; three early `summon_d0_cube_first`, `summon_d0_item_first`,
+and `summon_d10_cube_first` summaries report presence without matching the
+selected UUID in the series. Retain the historical files and report these
+differences rather than replacing the source data or treating summaries as
+authoritative observations.
 
 ## Boundaries
 

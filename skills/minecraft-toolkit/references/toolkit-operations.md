@@ -61,7 +61,7 @@ accepts `--target` unless it manages targets or the daemon itself.
 | `command <line>` | `command` | write; returns `writeSeq` |
 | `command-output <line> [--wait S]` | `command` | write plus collected output |
 | `mark <text>` | `mark` | write; annotates the event stream |
-| `wait <ticks>` | `wait` | block until the game advanced |
+| `wait <ticks>` | `wait` | wait for tick callbacks on the connected vantage |
 | `save` | `state` | world-save metadata |
 | `snapshot [--name N] [--dimension D]` | `snapshot` | write the same entity NBT on the game host; requires `snapshot:entity-nbt` |
 | `snapshots` | `snapshot` | list snapshots on the instance |
@@ -79,6 +79,21 @@ checkpoints, and full freeze/re-attach guarantees are not claimed.
 
 `command-output` returns output from the command ack (`source: "ack"`) or, when
 needed, from the event buffer; use it when the reply matters.
+
+For the server vantage, `state.tick` and entity capture `tick` are server tick
+counters; `wait N` counts server tick callbacks. They continue under `tick
+freeze` while level gametime stays frozen. `wait` completion does not guarantee
+world advancement. Legacy client ticks are a separate clock. `command-output
+--wait S` is an output timeout in seconds, not a tick wait.
+
+When measuring a frozen level, read back its gametime (for example, `execute in
+minecraft:overworld run time query gametime`), request `tick step 1`, verify the
+expected gametime advance with a bounded timeout, then read the target UUID's
+state in the same dimension. Keep gametime, server tick and sampling phase
+separate. CLI success or command feedback alone does not verify a state change;
+read back required NBT/position, reject missing or unknown results, and avoid
+silently treating a missing entity or field as a negative observation. These
+separate calls do not promise an atomic sample.
 
 ## Errors and exit codes
 
